@@ -1,0 +1,6 @@
+@LeeTec.API_HostAddress = http://localhost:5208
+
+GET {{LeeTec.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
