@@ -34,5 +34,11 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowFrontend");
 app.UseAuthorization();
 app.MapControllers();
+// Seed default data
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    DataSeeder.SeedRoles(context);
+}
 
 app.Run();
