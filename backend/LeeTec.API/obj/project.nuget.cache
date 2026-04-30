@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "882vLmvLDLs=",
+  "dgSpecHash": "4PmWQxZOMBg=",
   "success": true,
   "projectFilePath": "C:\\leetec-sms\\backend\\LeeTec.API\\LeeTec.API.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\LEONE CHIRODZA\\.nuget\\packages\\bcrypt.net-next\\4.1.0\\bcrypt.net-next.4.1.0.nupkg.sha512",
     "C:\\Users\\LEONE CHIRODZA\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
     "C:\\Users\\LEONE CHIRODZA\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\8.0.4\\microsoft.aspnetcore.authentication.jwtbearer.8.0.4.nupkg.sha512",
     "C:\\Users\\LEONE CHIRODZA\\.nuget\\packages\\microsoft.aspnetcore.openapi\\8.0.26\\microsoft.aspnetcore.openapi.8.0.26.nupkg.sha512",
