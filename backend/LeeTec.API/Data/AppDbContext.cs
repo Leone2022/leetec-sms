@@ -15,5 +15,10 @@ namespace LeeTec.API.Data
         public DbSet<Permission> Permissions { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<RolePermission> RolePermissions { get; set; }
+        public DbSet<Student> Students { get; set; }
+        public DbSet<Family> Families { get; set; }
+        public DbSet<Guardian> Guardians { get; set; }
+        public DbSet<EmergencyContact> EmergencyContacts { get; set; }
+        public DbSet<InvoicingDetail> InvoicingDetails { get; set; }
     }
 }
