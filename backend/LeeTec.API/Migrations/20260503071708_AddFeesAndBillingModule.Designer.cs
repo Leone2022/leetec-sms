@@ -4,6 +4,7 @@ using LeeTec.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LeeTec.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260503071708_AddFeesAndBillingModule")]
+    partial class AddFeesAndBillingModule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -427,6 +430,9 @@ namespace LeeTec.API.Migrations
                     b.Property<DateTime>("PostedAt")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<int>("PostedById")
+                        .HasColumnType("int");
+
                     b.Property<int>("PostedByUserId")
                         .HasColumnType("int");
 
@@ -447,6 +453,8 @@ namespace LeeTec.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("InvoiceId");
+
+                    b.HasIndex("PostedById");
 
                     b.HasIndex("SchoolId");
 
@@ -924,6 +932,12 @@ namespace LeeTec.API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("LeeTec.API.Models.User", "PostedBy")
+                        .WithMany()
+                        .HasForeignKey("PostedById")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("LeeTec.API.Models.School", "School")
                         .WithMany()
                         .HasForeignKey("SchoolId")
@@ -937,6 +951,8 @@ namespace LeeTec.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Invoice");
+
+                    b.Navigation("PostedBy");
 
                     b.Navigation("School");
 
