@@ -41,5 +41,6 @@ namespace LeeTec.API.Models
         public ICollection<Guardian> Guardians { get; set; } = new List<Guardian>();
         public ICollection<EmergencyContact> EmergencyContacts { get; set; } = new List<EmergencyContact>();
         public InvoicingDetail? InvoicingDetail { get; set; }
+        public ICollection<StudentPortalAccount> StudentPortalAccounts { get; set; } = new List<StudentPortalAccount>();
     }
 }

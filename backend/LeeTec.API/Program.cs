@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
+using LeeTec.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
+// Email Service
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

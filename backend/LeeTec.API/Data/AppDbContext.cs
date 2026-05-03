@@ -33,6 +33,9 @@ namespace LeeTec.API.Data
         public DbSet<InvoiceItem> InvoiceItems { get; set; }
         public DbSet<Payment> Payments { get; set; }
 
+        // Student Portal
+        public DbSet<StudentPortalAccount> StudentPortalAccounts { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -65,6 +68,12 @@ namespace LeeTec.API.Data
                 .HasOne(rp => rp.Permission)
                 .WithMany(p => p.RolePermissions)
                 .HasForeignKey(rp => rp.PermissionId);
+
+            // Student Portal Account
+            modelBuilder.Entity<StudentPortalAccount>()
+                .HasOne(spa => spa.Student)
+                .WithMany(s => s.StudentPortalAccounts)
+                .HasForeignKey(spa => spa.StudentId);
 
             // Fee & Billing decimal precision
             modelBuilder.Entity<FeePackageItem>()
