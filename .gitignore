@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+bin/
+obj/
+
+# Environment & secrets
+**/appsettings.json
+**/appsettings.Production.json
+**/appsettings.Development.json
+
+# Visual Studio
+.vs/
+*.user
+
+# Logs
+*.log
