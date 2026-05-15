@@ -725,6 +725,13 @@ img {
   margin-bottom: 14px;
 }
 
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .toolbar-search {
   flex: 1;
   min-width: 240px;
@@ -790,6 +797,11 @@ img {
   background: #ffffff;
   color: #0f172a;
   box-shadow: var(--shadow-card);
+}
+
+.export-btn {
+  padding: 10px 12px;
+  font-size: 12px;
 }
 
 .data-table-wrap {

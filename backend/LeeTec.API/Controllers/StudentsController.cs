@@ -21,14 +21,53 @@ namespace LeeTec.API.Controllers
         [HttpPost("enrol")]
         public async Task<IActionResult> EnrolStudent([FromBody] EnrolStudentDTO dto)
         {
+            // Check if email already exists
+            var emailExists = await _context.Users
+                .AnyAsync(u => u.Email == dto.Email);
+            if (emailExists)
+                return BadRequest(new { message = "A user with this email already exists." });
+
+            // Generate student number
             var count = await _context.Students
                 .CountAsync(s => s.SchoolId == dto.SchoolId);
+            var studentNumber = $"WAH/{DateTime.Now.Year}/{(count + 1):D4}";
 
+            // Auto-create a User account for the student
+            var tempPassword = $"{dto.FirstName}{DateTime.Now.Year}!";
+            var user = new User
+            {
+                SchoolId = dto.SchoolId,
+                FirstName = dto.FirstName,
+                LastName = dto.Surname,
+                Email = dto.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword),
+                Status = "Active",
+                EmailVerified = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            // Assign Student role
+            var studentRole = await _context.Roles
+                .FirstOrDefaultAsync(r => r.Name == "Student");
+            if (studentRole != null)
+            {
+                _context.UserRoles.Add(new UserRole
+                {
+                    UserId = user.Id,
+                    RoleId = studentRole.Id
+                });
+                await _context.SaveChangesAsync();
+            }
+
+            // Create student record
             var student = new Student
             {
                 SchoolId = dto.SchoolId,
-                UserId = dto.UserId,
-                StudentNumber = $"WAH/{DateTime.Now.Year}/{(count + 1):D4}",
+                UserId = user.Id,
+                StudentNumber = studentNumber,
                 Surname = dto.Surname,
                 FirstName = dto.FirstName,
                 DateOfBirth = dto.DateOfBirth,
@@ -55,7 +94,10 @@ namespace LeeTec.API.Controllers
             return Ok(new {
                 message = "Student enrolled successfully",
                 studentNumber = student.StudentNumber,
-                studentId = student.Id
+                studentId = student.Id,
+                email = dto.Email,
+                temporaryPassword = tempPassword,
+                note = "Student can register on portal using their student number"
             });
         }
 
