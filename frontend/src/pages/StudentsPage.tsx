@@ -26,18 +26,26 @@ const WIZARD_STEPS = [
 
 const blankStep1 = () => ({
   firstName: '', surname: '', dateOfBirth: '', gender: 'Male',
-  race: '', birthCertificateNo: '', email: '',
+  race: '', birthCertificateNo: '',
 });
 const blankStep2 = () => ({
   form: 'Form 1', dateOfEntry: todayISO(), previousSchool: '',
   medicalAidSociety: '', medicalAidNo: '', familyDoctorName: '',
   familyDoctorPhone: '', allergies: '', denomination: '', otherInformation: '',
 });
-const blankStep3 = () => ({ homeAddress: '', homePhone: '', homeLanguage: '', religion: '' });
-const blankGuardian = (title: string) => ({
-  title, firstName: '', surname: '', phone: '', email: '', occupation: '', address: '',
+const blankStep3 = () => ({
+  homeAddress: '', homeTelephone: '', homeLanguage: '',
+  religion: '', maritalStatus: '', cell: '', email: '',
 });
-const blankContact = () => ({ name: '', phone: '', relationship: '' });
+const blankGuardian = (title: string) => ({
+  title, forenames: '', surname: '', nationality: '',
+  occupation: '', companyName: '', businessAddress: '',
+  businessTelephone: '', cell: '', email: '',
+});
+const blankContact = () => ({
+  name: '', homeTelephone: '', businessTelephone: '',
+  cell: '', relationship: '',
+});
 
 export default function StudentsPage() {
   const { user } = useAuth();
@@ -49,6 +57,7 @@ export default function StudentsPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [enrolledStudentNumber, setEnrolledStudentNumber] = useState<string | null>(null);
 
   const [step1, setStep1] = useState(blankStep1());
   const [step2, setStep2] = useState(blankStep2());
@@ -81,7 +90,7 @@ export default function StudentsPage() {
 
   const showMessage = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
-    setTimeout(() => setMessage(null), 5000);
+    setTimeout(() => setMessage(null), 8000);
   };
 
   const openWizard = () => {
@@ -93,15 +102,18 @@ export default function StudentsPage() {
     setContact1(blankContact());
     setContact2(blankContact());
     setWizardStep(1);
+    setEnrolledStudentNumber(null);
     setIsWizardOpen(true);
   };
 
   const closeWizard = () => {
     setIsWizardOpen(false);
     setWizardStep(1);
+    setEnrolledStudentNumber(null);
   };
 
   const handleFinalSubmit = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
     try {
       // Build payload matching EnrolStudentDTO exactly
@@ -109,12 +121,11 @@ export default function StudentsPage() {
         schoolId: 1,
         firstName: step1.firstName.trim(),
         surname: step1.surname.trim(),
-        email: step1.email.trim(),
-        dateOfBirth: step1.dateOfBirth,       // already YYYY-MM-DD from date input
+        dateOfBirth: step1.dateOfBirth,
         birthCertificateNo: step1.birthCertificateNo.trim(),
         gender: step1.gender,
         form: step2.form,
-        dateOfEntry: step2.dateOfEntry,        // already YYYY-MM-DD from date input
+        dateOfEntry: step2.dateOfEntry,
         race: step1.race.trim(),
         previousSchool: step2.previousSchool.trim(),
         otherInformation: step2.otherInformation.trim(),
@@ -130,44 +141,117 @@ export default function StudentsPage() {
 
       const enrolRes = await studentsAPI.enrol(payload);
 
-      console.log('Enrol response:', enrolRes.data);
+      console.log('Enrol full response:', enrolRes.data);
 
       const studentId = enrolRes.data?.id ?? enrolRes.data?.studentId ?? enrolRes.data?.data?.id;
       const studentNumber = enrolRes.data?.studentNumber ?? enrolRes.data?.data?.studentNumber ?? '';
-      const temporaryPassword = enrolRes.data?.temporaryPassword ?? enrolRes.data?.data?.temporaryPassword ?? '';
 
-      // Family
-      if (step3.homeAddress || step3.homePhone) {
-        await studentsAPI.addFamily(studentId, step3);
-      }
+      // Optional calls — each wrapped independently so failures never block the success screen
+      try {
+        if (step3.homeAddress.trim()) {
+          await studentsAPI.addFamily(studentId, {
+            homeAddress: step3.homeAddress,
+            homeTelephone: step3.homeTelephone,
+            homeLanguage: step3.homeLanguage,
+            religion: step3.religion,
+            maritalStatus: step3.maritalStatus,
+            cell: step3.cell,
+            email: step3.email,
+          });
+        }
+      } catch (e) { console.warn('Family save failed:', e); }
 
-      // Guardians
-      if (father.firstName) {
-        await studentsAPI.addGuardian(studentId, { ...father, guardianType: 'Father' });
-      }
-      if (mother.firstName) {
-        await studentsAPI.addGuardian(studentId, { ...mother, guardianType: 'Mother' });
-      }
+      try {
+        if (father.forenames.trim()) {
+          await studentsAPI.addGuardian(studentId, {
+            guardianType: 'Father',
+            title: father.title,
+            forenames: father.forenames,
+            surname: father.surname,
+            nationality: father.nationality,
+            occupation: father.occupation,
+            companyName: father.companyName,
+            businessAddress: father.businessAddress,
+            businessTelephone: father.businessTelephone,
+            cell: father.cell,
+            email: father.email,
+          });
+        }
+      } catch (e) { console.warn('Father save failed:', e); }
 
-      // Emergency contacts
-      if (contact1.name) await studentsAPI.addEmergencyContact(studentId, contact1);
-      if (contact2.name) await studentsAPI.addEmergencyContact(studentId, contact2);
+      try {
+        if (mother.forenames.trim()) {
+          await studentsAPI.addGuardian(studentId, {
+            guardianType: 'Mother',
+            title: mother.title,
+            forenames: mother.forenames,
+            surname: mother.surname,
+            nationality: mother.nationality,
+            occupation: mother.occupation,
+            companyName: mother.companyName,
+            businessAddress: mother.businessAddress,
+            businessTelephone: mother.businessTelephone,
+            cell: mother.cell,
+            email: mother.email,
+          });
+        }
+      } catch (e) { console.warn('Mother save failed:', e); }
 
-      showMessage(
-        `Student enrolled! Number: ${studentNumber} — Email: ${step1.email} — Temp Password: ${temporaryPassword}`,
-        'success'
-      );
-      closeWizard();
+      try {
+        if (contact1.name.trim()) {
+          await studentsAPI.addEmergencyContact(studentId, {
+            name: contact1.name,
+            homeTelephone: contact1.homeTelephone,
+            businessTelephone: contact1.businessTelephone,
+            cell: contact1.cell,
+            relationship: contact1.relationship,
+            contactOrder: 1,
+          });
+        }
+      } catch (e) { console.warn('Contact1 save failed:', e); }
+
+      try {
+        if (contact2.name.trim()) {
+          await studentsAPI.addEmergencyContact(studentId, {
+            name: contact2.name,
+            homeTelephone: contact2.homeTelephone,
+            businessTelephone: contact2.businessTelephone,
+            cell: contact2.cell,
+            relationship: contact2.relationship,
+            contactOrder: 2,
+          });
+        }
+      } catch (e) { console.warn('Contact2 save failed:', e); }
+
+      // Always show success if the main enrolment worked
       loadStudents();
+      setEnrolledStudentNumber(studentNumber);
     } catch (err: any) {
-      console.error('Enrol error — status:', err.response?.status);
-      console.error('Enrol error — data:', err.response?.data);
-      const msg =
-        err.response?.data?.message ??
-        err.response?.data?.title ??
-        (typeof err.response?.data === 'string' ? err.response.data : null) ??
-        `Server error ${err.response?.status ?? ''}`.trim();
-      showMessage(msg || 'Failed to enrol student', 'error');
+      const status = err.response?.status;
+      const data = err.response?.data;
+      console.error('=== ENROL ERROR ===');
+      console.error('Status:', status);
+      console.error('Response data:', JSON.stringify(data, null, 2));
+
+      // Extract specific field errors from ASP.NET Core's ProblemDetails format
+      const fieldErrors: string[] = [];
+      if (data?.errors && typeof data.errors === 'object') {
+        for (const [field, msgs] of Object.entries(data.errors)) {
+          fieldErrors.push(`${field}: ${(msgs as string[]).join(', ')}`);
+        }
+      }
+
+      const baseMsg =
+        data?.message ??
+        data?.title ??
+        (typeof data === 'string' ? data : null) ??
+        `Server error ${status ?? ''}`.trim();
+
+      const fullMsg = fieldErrors.length > 0
+        ? `${baseMsg}\n${fieldErrors.join('\n')}`
+        : baseMsg || 'Failed to enrol student';
+
+      showMessage(fullMsg, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -272,17 +356,50 @@ export default function StudentsPage() {
   );
 
   return (
-    <AdminLayout title="Students" subtitle={`${students.length} enrolled`}>
+    <>
+      {/* Toast rendered outside AdminLayout to avoid CSS stacking context issues */}
       {message && (
         <div style={{
-          position: 'fixed', top: 80, right: 20, padding: '14px 18px',
-          borderRadius: '10px', background: message.type === 'success' ? '#0ea5e9' : '#dc2626',
-          color: 'white', fontSize: '13px', fontWeight: '500', zIndex: 9999,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxWidth: '420px',
-        }}>
+          position: 'fixed',
+          top: message.type === 'success' ? '50%' : 20,
+          left: message.type === 'success' ? '50%' : 'auto',
+          right: message.type === 'success' ? 'auto' : 20,
+          transform: message.type === 'success' ? 'translate(-50%, -50%)' : 'none',
+          padding: message.type === 'success' ? '32px 40px' : '16px 24px',
+          borderRadius: '16px',
+          background: message.type === 'success' ? '#16a34a' : '#dc2626',
+          color: 'white',
+          fontSize: message.type === 'success' ? '16px' : '14px',
+          fontWeight: '600',
+          zIndex: 999999,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+          maxWidth: message.type === 'success' ? '480px' : '460px',
+          width: message.type === 'success' ? '90vw' : 'auto',
+          whiteSpace: 'pre-line',
+          lineHeight: '1.7',
+          textAlign: message.type === 'success' ? 'center' : 'left',
+          cursor: 'pointer',
+        }}
+          onClick={() => setMessage(null)}
+        >
           {message.text}
+          {message.type === 'success' && (
+            <p style={{ fontSize: '12px', marginTop: '12px', opacity: 0.8, fontWeight: 400 }}>
+              Click to dismiss
+            </p>
+          )}
         </div>
       )}
+      {/* Dim backdrop for success messages */}
+      {message?.type === 'success' && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 999998,
+        }}
+          onClick={() => setMessage(null)}
+        />
+      )}
+
+    <AdminLayout title="Students" subtitle={`${students.length} enrolled`}>
 
       <div className="toolbar">
         <div className="toolbar-search">
@@ -363,8 +480,58 @@ export default function StudentsPage() {
       {isWizardOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}
           onClick={undefined}>
-          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '640px', maxHeight: '92vh', overflow: 'auto' }}
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '640px', maxHeight: '92vh', overflow: 'auto', position: 'relative' }}
             onClick={(e) => e.stopPropagation()}>
+
+            {/* Loading overlay — prevents double-click */}
+            {isSubmitting && !enrolledStudentNumber && (
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.92)', zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: '12px', gap: 16 }}>
+                <div style={{ width: 44, height: 44, border: '4px solid #e2e8f0', borderTopColor: '#1a237e', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <p style={{ fontSize: '15px', fontWeight: '600', color: '#1a237e', margin: 0 }}>Enrolling student, please wait...</p>
+              </div>
+            )}
+
+            {/* Success screen */}
+            {enrolledStudentNumber ? (
+              <div style={{ padding: '48px 40px', textAlign: 'center' }}>
+                <div style={{ fontSize: '64px', marginBottom: '16px' }}>✅</div>
+                <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#0f172a', margin: '0 0 8px' }}>
+                  Student Enrolled Successfully!
+                </h2>
+                <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 24px' }}>
+                  The student can now register on the portal using their student number.
+                </p>
+                <div style={{ background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: '12px', padding: '20px 24px', marginBottom: '28px', display: 'inline-block', minWidth: '240px' }}>
+                  <p style={{ fontSize: '12px', color: '#15803d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Student Number</p>
+                  <p style={{ fontSize: '28px', fontWeight: '700', color: '#15803d', fontFamily: 'ui-monospace, monospace', margin: 0 }}>{enrolledStudentNumber}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <button
+                    onClick={closeWizard}
+                    style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEnrolledStudentNumber(null);
+                      setStep1(blankStep1());
+                      setStep2(blankStep2());
+                      setStep3(blankStep3());
+                      setFather(blankGuardian('Mr'));
+                      setMother(blankGuardian('Mrs'));
+                      setContact1(blankContact());
+                      setContact2(blankContact());
+                      setWizardStep(1);
+                    }}
+                    style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#1a237e', color: 'white', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                    Enrol Another Student
+                  </button>
+                </div>
+              </div>
+            ) : (
+            <>
 
             {/* Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, background: 'white', zIndex: 10 }}>
@@ -417,10 +584,6 @@ export default function StudentsPage() {
                     <div>
                       <label style={labelStyle}>Birth Certificate No.</label>
                       {inp(step1.birthCertificateNo, (v) => setStep1({ ...step1, birthCertificateNo: v }), { placeholder: 'BC123456' })}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Student Email *</label>
-                      {inp(step1.email, (v) => setStep1({ ...step1, email: v }), { type: 'email', required: true, placeholder: 'student@email.com' })}
                     </div>
                   </div>
                 </>
@@ -488,8 +651,12 @@ export default function StudentsPage() {
                       {inp(step3.homeAddress, (v) => setStep3({ ...step3, homeAddress: v }), { placeholder: '123 Main Street, Harare' })}
                     </div>
                     <div>
-                      <label style={labelStyle}>Home Phone</label>
-                      {inp(step3.homePhone, (v) => setStep3({ ...step3, homePhone: v }), { placeholder: '+263 4 123456' })}
+                      <label style={labelStyle}>Home Telephone</label>
+                      {inp(step3.homeTelephone, (v) => setStep3({ ...step3, homeTelephone: v }), { placeholder: '+263 4 123456' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Cell</label>
+                      {inp(step3.cell, (v) => setStep3({ ...step3, cell: v }), { placeholder: '+263 77 000 0000' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Home Language</label>
@@ -499,6 +666,14 @@ export default function StudentsPage() {
                       <label style={labelStyle}>Religion</label>
                       {inp(step3.religion, (v) => setStep3({ ...step3, religion: v }), { placeholder: 'e.g. Christian' })}
                     </div>
+                    <div>
+                      <label style={labelStyle}>Marital Status</label>
+                      {sel(step3.maritalStatus, (v) => setStep3({ ...step3, maritalStatus: v }), ['', 'Married', 'Single', 'Divorced', 'Widowed'])}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Email</label>
+                      {inp(step3.email, (v) => setStep3({ ...step3, email: v }), { type: 'email', placeholder: 'family@example.com' })}
+                    </div>
                   </div>
                 </>
               )}
@@ -507,34 +682,46 @@ export default function StudentsPage() {
               {wizardStep === 4 && (
                 <>
                   <h3 style={sectionHeadStyle}>Father / Guardian</h3>
-                  <div style={{ ...gridTwo, marginBottom: '20px' }}>
+                  <div style={{ ...gridTwo, marginBottom: '24px' }}>
                     <div>
                       <label style={labelStyle}>Title</label>
                       {sel(father.title, (v) => setFather({ ...father, title: v }), ['Mr', 'Dr', 'Prof', 'Rev'])}
                     </div>
                     <div>
-                      <label style={labelStyle}>First Name</label>
-                      {inp(father.firstName, (v) => setFather({ ...father, firstName: v }), { placeholder: 'John' })}
+                      <label style={labelStyle}>Forenames</label>
+                      {inp(father.forenames, (v) => setFather({ ...father, forenames: v }), { placeholder: 'John' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Surname</label>
                       {inp(father.surname, (v) => setFather({ ...father, surname: v }), { placeholder: 'Doe' })}
                     </div>
                     <div>
-                      <label style={labelStyle}>Phone</label>
-                      {inp(father.phone, (v) => setFather({ ...father, phone: v }), { placeholder: '+263 77 123 4567' })}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Email</label>
-                      {inp(father.email, (v) => setFather({ ...father, email: v }), { type: 'email', placeholder: 'john@example.com' })}
+                      <label style={labelStyle}>Nationality</label>
+                      {inp(father.nationality, (v) => setFather({ ...father, nationality: v }), { placeholder: 'e.g. Zimbabwean' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Occupation</label>
                       {inp(father.occupation, (v) => setFather({ ...father, occupation: v }), { placeholder: 'e.g. Engineer' })}
                     </div>
+                    <div>
+                      <label style={labelStyle}>Company Name</label>
+                      {inp(father.companyName, (v) => setFather({ ...father, companyName: v }), { placeholder: 'Employer name' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Business Telephone</label>
+                      {inp(father.businessTelephone, (v) => setFather({ ...father, businessTelephone: v }), { placeholder: '+263 4 123456' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Cell</label>
+                      {inp(father.cell, (v) => setFather({ ...father, cell: v }), { placeholder: '+263 77 123 4567' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Email</label>
+                      {inp(father.email, (v) => setFather({ ...father, email: v }), { type: 'email', placeholder: 'john@example.com' })}
+                    </div>
                     <div style={{ gridColumn: '1/-1' }}>
-                      <label style={labelStyle}>Address (if different)</label>
-                      {inp(father.address, (v) => setFather({ ...father, address: v }), { placeholder: 'Work or postal address' })}
+                      <label style={labelStyle}>Business Address</label>
+                      {inp(father.businessAddress, (v) => setFather({ ...father, businessAddress: v }), { placeholder: 'Work or postal address' })}
                     </div>
                   </div>
 
@@ -545,28 +732,40 @@ export default function StudentsPage() {
                       {sel(mother.title, (v) => setMother({ ...mother, title: v }), ['Mrs', 'Ms', 'Dr', 'Prof'])}
                     </div>
                     <div>
-                      <label style={labelStyle}>First Name</label>
-                      {inp(mother.firstName, (v) => setMother({ ...mother, firstName: v }), { placeholder: 'Jane' })}
+                      <label style={labelStyle}>Forenames</label>
+                      {inp(mother.forenames, (v) => setMother({ ...mother, forenames: v }), { placeholder: 'Jane' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Surname</label>
                       {inp(mother.surname, (v) => setMother({ ...mother, surname: v }), { placeholder: 'Doe' })}
                     </div>
                     <div>
-                      <label style={labelStyle}>Phone</label>
-                      {inp(mother.phone, (v) => setMother({ ...mother, phone: v }), { placeholder: '+263 77 123 4567' })}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Email</label>
-                      {inp(mother.email, (v) => setMother({ ...mother, email: v }), { type: 'email', placeholder: 'jane@example.com' })}
+                      <label style={labelStyle}>Nationality</label>
+                      {inp(mother.nationality, (v) => setMother({ ...mother, nationality: v }), { placeholder: 'e.g. Zimbabwean' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Occupation</label>
                       {inp(mother.occupation, (v) => setMother({ ...mother, occupation: v }), { placeholder: 'e.g. Teacher' })}
                     </div>
+                    <div>
+                      <label style={labelStyle}>Company Name</label>
+                      {inp(mother.companyName, (v) => setMother({ ...mother, companyName: v }), { placeholder: 'Employer name' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Business Telephone</label>
+                      {inp(mother.businessTelephone, (v) => setMother({ ...mother, businessTelephone: v }), { placeholder: '+263 4 123456' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Cell</label>
+                      {inp(mother.cell, (v) => setMother({ ...mother, cell: v }), { placeholder: '+263 77 123 4567' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Email</label>
+                      {inp(mother.email, (v) => setMother({ ...mother, email: v }), { type: 'email', placeholder: 'jane@example.com' })}
+                    </div>
                     <div style={{ gridColumn: '1/-1' }}>
-                      <label style={labelStyle}>Address (if different)</label>
-                      {inp(mother.address, (v) => setMother({ ...mother, address: v }), { placeholder: 'Work or postal address' })}
+                      <label style={labelStyle}>Business Address</label>
+                      {inp(mother.businessAddress, (v) => setMother({ ...mother, businessAddress: v }), { placeholder: 'Work or postal address' })}
                     </div>
                   </div>
                 </>
@@ -576,14 +775,22 @@ export default function StudentsPage() {
               {wizardStep === 5 && (
                 <>
                   <h3 style={sectionHeadStyle}>Emergency Contact 1</h3>
-                  <div style={{ ...gridThree, marginBottom: '20px' }}>
-                    <div>
+                  <div style={{ ...gridTwo, marginBottom: '20px' }}>
+                    <div style={{ gridColumn: '1/-1' }}>
                       <label style={labelStyle}>Full Name</label>
                       {inp(contact1.name, (v) => setContact1({ ...contact1, name: v }), { placeholder: 'Jane Doe' })}
                     </div>
                     <div>
-                      <label style={labelStyle}>Phone</label>
-                      {inp(contact1.phone, (v) => setContact1({ ...contact1, phone: v }), { placeholder: '+263...' })}
+                      <label style={labelStyle}>Home Telephone</label>
+                      {inp(contact1.homeTelephone, (v) => setContact1({ ...contact1, homeTelephone: v }), { placeholder: '+263 4 123456' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Cell</label>
+                      {inp(contact1.cell, (v) => setContact1({ ...contact1, cell: v }), { placeholder: '+263 77 000 0000' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Business Telephone</label>
+                      {inp(contact1.businessTelephone, (v) => setContact1({ ...contact1, businessTelephone: v }), { placeholder: '+263 4 000000' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Relationship</label>
@@ -591,14 +798,22 @@ export default function StudentsPage() {
                     </div>
                   </div>
                   <h3 style={sectionHeadStyle}>Emergency Contact 2</h3>
-                  <div style={gridThree}>
-                    <div>
+                  <div style={gridTwo}>
+                    <div style={{ gridColumn: '1/-1' }}>
                       <label style={labelStyle}>Full Name</label>
                       {inp(contact2.name, (v) => setContact2({ ...contact2, name: v }), { placeholder: 'John Smith' })}
                     </div>
                     <div>
-                      <label style={labelStyle}>Phone</label>
-                      {inp(contact2.phone, (v) => setContact2({ ...contact2, phone: v }), { placeholder: '+263...' })}
+                      <label style={labelStyle}>Home Telephone</label>
+                      {inp(contact2.homeTelephone, (v) => setContact2({ ...contact2, homeTelephone: v }), { placeholder: '+263 4 123456' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Cell</label>
+                      {inp(contact2.cell, (v) => setContact2({ ...contact2, cell: v }), { placeholder: '+263 77 000 0000' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Business Telephone</label>
+                      {inp(contact2.businessTelephone, (v) => setContact2({ ...contact2, businessTelephone: v }), { placeholder: '+263 4 000000' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Relationship</label>
@@ -625,8 +840,8 @@ export default function StudentsPage() {
                   type="button"
                   className="btn btn-primary"
                   onClick={() => {
-                    if (wizardStep === 1 && (!step1.firstName.trim() || !step1.surname.trim() || !step1.dateOfBirth || !step1.email.trim())) {
-                      showMessage('First name, surname, date of birth and email are required', 'error');
+                    if (wizardStep === 1 && (!step1.firstName.trim() || !step1.surname.trim() || !step1.dateOfBirth)) {
+                      showMessage('First name, surname, and date of birth are required', 'error');
                       return;
                     }
                     setWizardStep((s) => s + 1);
@@ -637,15 +852,26 @@ export default function StudentsPage() {
               ) : (
                 <button
                   type="button"
-                  className="btn btn-primary"
-                  onClick={handleFinalSubmit}
                   disabled={isSubmitting}
-                  style={{ opacity: isSubmitting ? 0.7 : 1 }}
+                  onClick={handleFinalSubmit}
+                  style={{
+                    opacity: isSubmitting ? 0.6 : 1,
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    background: '#1a237e',
+                    color: 'white',
+                    padding: '12px 32px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                  }}
                 >
                   {isSubmitting ? 'Enrolling...' : 'Enrol Student'}
                 </button>
               )}
             </div>
+            </>
+            )}
           </div>
         </div>
       )}
@@ -905,5 +1131,6 @@ export default function StudentsPage() {
         @keyframes spin { to { transform: rotate(360deg) } }
       `}</style>
     </AdminLayout>
+    </>
   );
 }

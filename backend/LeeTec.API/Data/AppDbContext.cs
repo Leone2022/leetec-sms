@@ -69,6 +69,14 @@ namespace LeeTec.API.Data
                 .WithMany(p => p.RolePermissions)
                 .HasForeignKey(rp => rp.PermissionId);
 
+            // Student → User (optional)
+            modelBuilder.Entity<Student>()
+                .HasOne(s => s.User)
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Student Portal Account
             modelBuilder.Entity<StudentPortalAccount>()
                 .HasOne(spa => spa.Student)

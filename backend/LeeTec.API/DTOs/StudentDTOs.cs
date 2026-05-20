@@ -5,7 +5,6 @@ namespace LeeTec.API.DTOs
         public int SchoolId { get; set; }
         public string Surname { get; set; } = string.Empty;
         public string FirstName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
         public string DateOfBirth { get; set; } = string.Empty;
         public string BirthCertificateNo { get; set; } = string.Empty;
         public string Gender { get; set; } = string.Empty;

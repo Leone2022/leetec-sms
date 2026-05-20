@@ -21,84 +21,56 @@ namespace LeeTec.API.Controllers
         [HttpPost("enrol")]
         public async Task<IActionResult> EnrolStudent([FromBody] EnrolStudentDTO dto)
         {
-            // Check if email already exists
-            var emailExists = await _context.Users
-                .AnyAsync(u => u.Email == dto.Email);
-            if (emailExists)
-                return BadRequest(new { message = "A user with this email already exists." });
-
-            // Generate student number
-            var count = await _context.Students
-                .CountAsync(s => s.SchoolId == dto.SchoolId);
-            var studentNumber = $"WAH/{DateTime.Now.Year}/{(count + 1):D4}";
-
-            // Auto-create a User account for the student
-            var tempPassword = $"{dto.FirstName}{DateTime.Now.Year}!";
-            var user = new User
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                SchoolId = dto.SchoolId,
-                FirstName = dto.FirstName,
-                LastName = dto.Surname,
-                Email = dto.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword),
-                Status = "Active",
-                EmailVerified = false,
-                CreatedAt = DateTime.UtcNow
-            };
+                var count = await _context.Students
+                    .CountAsync(s => s.SchoolId == dto.SchoolId);
+                var studentNumber = $"WAH/{DateTime.Now.Year}/{(count + 1):D4}";
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            // Assign Student role
-            var studentRole = await _context.Roles
-                .FirstOrDefaultAsync(r => r.Name == "Student");
-            if (studentRole != null)
-            {
-                _context.UserRoles.Add(new UserRole
+                var student = new Student
                 {
-                    UserId = user.Id,
-                    RoleId = studentRole.Id
-                });
+                    SchoolId = dto.SchoolId,
+                    UserId = null,
+                    StudentNumber = studentNumber,
+                    Surname = dto.Surname,
+                    FirstName = dto.FirstName,
+                    DateOfBirth = dto.DateOfBirth,
+                    BirthCertificateNo = dto.BirthCertificateNo,
+                    Gender = dto.Gender,
+                    Form = dto.Form,
+                    DateOfEntry = dto.DateOfEntry,
+                    Race = dto.Race,
+                    PreviousSchool = dto.PreviousSchool,
+                    OtherInformation = dto.OtherInformation,
+                    FamilyDoctorName = dto.FamilyDoctorName,
+                    FamilyDoctorPhone = dto.FamilyDoctorPhone,
+                    MedicalAidSociety = dto.MedicalAidSociety,
+                    MedicalAidNo = dto.MedicalAidNo,
+                    Allergies = dto.Allergies,
+                    Denomination = dto.Denomination,
+                    Status = "Active",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Students.Add(student);
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new {
+                    message = "Student enrolled successfully",
+                    studentNumber = student.StudentNumber,
+                    studentId = student.Id
+                });
             }
-
-            // Create student record
-            var student = new Student
+            catch (Exception ex)
             {
-                SchoolId = dto.SchoolId,
-                UserId = user.Id,
-                StudentNumber = studentNumber,
-                Surname = dto.Surname,
-                FirstName = dto.FirstName,
-                DateOfBirth = dto.DateOfBirth,
-                BirthCertificateNo = dto.BirthCertificateNo,
-                Gender = dto.Gender,
-                Form = dto.Form,
-                DateOfEntry = dto.DateOfEntry,
-                Race = dto.Race,
-                PreviousSchool = dto.PreviousSchool,
-                OtherInformation = dto.OtherInformation,
-                FamilyDoctorName = dto.FamilyDoctorName,
-                FamilyDoctorPhone = dto.FamilyDoctorPhone,
-                MedicalAidSociety = dto.MedicalAidSociety,
-                MedicalAidNo = dto.MedicalAidNo,
-                Allergies = dto.Allergies,
-                Denomination = dto.Denomination,
-                Status = "Active",
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Students.Add(student);
-            await _context.SaveChangesAsync();
-
-            return Ok(new {
-                message = "Student enrolled successfully",
-                studentNumber = student.StudentNumber,
-                studentId = student.Id,
-                email = dto.Email,
-                temporaryPassword = tempPassword,
-                note = "Student can register on portal using their student number"
-            });
+                await transaction.RollbackAsync();
+                return StatusCode(500, new {
+                    message = "Enrolment failed. Please try again.",
+                    error = ex.Message
+                });
+            }
         }
 
         // GET SINGLE STUDENT WITH ALL DETAILS

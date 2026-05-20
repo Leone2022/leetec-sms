@@ -6,7 +6,7 @@ namespace LeeTec.API.Models
     {
         public int Id { get; set; }
         public int SchoolId { get; set; }
-        public int UserId { get; set; }
+        public int? UserId { get; set; }
         public string StudentNumber { get; set; } = string.Empty;
 
         // A. PUPIL DETAILS
@@ -36,7 +36,7 @@ namespace LeeTec.API.Models
 
         // Navigation
         public School School { get; set; } = null!;
-        public User User { get; set; } = null!;
+        public User? User { get; set; }
         public Family? Family { get; set; }
         public ICollection<Guardian> Guardians { get; set; } = new List<Guardian>();
         public ICollection<EmergencyContact> EmergencyContacts { get; set; } = new List<EmergencyContact>();
