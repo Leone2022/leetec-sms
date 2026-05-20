@@ -145,12 +145,28 @@ export default function StudentsPage() {
 
       console.log('Enrol full response:', enrolRes.data);
 
-      const studentId = enrolRes.data?.id ?? enrolRes.data?.studentId ?? enrolRes.data?.data?.id;
-      const studentNumber = enrolRes.data?.studentNumber ?? enrolRes.data?.data?.studentNumber ?? '';
+      const studentId = enrolRes.data?.studentId;
+      const studentNumber = enrolRes.data?.studentNumber ?? '';
+
+      console.log('Enrolled student ID:', studentId);
+      console.log('Enrolled student number:', studentNumber);
+
+      if (!studentId) {
+        console.error('No studentId returned!', enrolRes.data);
+      }
 
       // Optional calls — each wrapped independently so failures never block the success screen
       try {
         if (step3.homeAddress.trim()) {
+          console.log('Saving family:', {
+            homeAddress: step3.homeAddress,
+            homeTelephone: step3.homeTelephone,
+            homeLanguage: step3.homeLanguage,
+            religion: step3.religion,
+            maritalStatus: step3.maritalStatus,
+            cell: step3.cell,
+            email: step3.email,
+          });
           await studentsAPI.addFamily(studentId, {
             homeAddress: step3.homeAddress,
             homeTelephone: step3.homeTelephone,
@@ -160,11 +176,15 @@ export default function StudentsPage() {
             cell: step3.cell,
             email: step3.email,
           });
+          console.log('Family saved!');
+        } else {
+          console.log('Family skipped - homeAddress empty');
         }
-      } catch (e) { console.warn('Family save failed:', e); }
+      } catch (e: any) { console.error('Family save FAILED:', e.response?.data); }
 
       try {
         if (father.forenames.trim()) {
+          console.log('Saving father:', father);
           await studentsAPI.addGuardian(studentId, {
             guardianType: 'Father',
             title: father.title,
@@ -178,11 +198,15 @@ export default function StudentsPage() {
             cell: father.cell,
             email: father.email,
           });
+          console.log('Father saved!');
+        } else {
+          console.log('Father skipped - forenames empty');
         }
-      } catch (e) { console.warn('Father save failed:', e); }
+      } catch (e: any) { console.error('Father save FAILED:', e.response?.data); }
 
       try {
         if (mother.forenames.trim()) {
+          console.log('Saving mother:', mother);
           await studentsAPI.addGuardian(studentId, {
             guardianType: 'Mother',
             title: mother.title,
@@ -196,11 +220,15 @@ export default function StudentsPage() {
             cell: mother.cell,
             email: mother.email,
           });
+          console.log('Mother saved!');
+        } else {
+          console.log('Mother skipped - forenames empty');
         }
-      } catch (e) { console.warn('Mother save failed:', e); }
+      } catch (e: any) { console.error('Mother save FAILED:', e.response?.data); }
 
       try {
         if (contact1.name.trim()) {
+          console.log('Saving contact1:', contact1);
           await studentsAPI.addEmergencyContact(studentId, {
             name: contact1.name,
             homeTelephone: contact1.homeTelephone,
@@ -209,11 +237,15 @@ export default function StudentsPage() {
             relationship: contact1.relationship,
             contactOrder: 1,
           });
+          console.log('Contact1 saved!');
+        } else {
+          console.log('Contact1 skipped - name empty');
         }
-      } catch (e) { console.warn('Contact1 save failed:', e); }
+      } catch (e: any) { console.error('Contact1 save FAILED:', e.response?.data); }
 
       try {
         if (contact2.name.trim()) {
+          console.log('Saving contact2:', contact2);
           await studentsAPI.addEmergencyContact(studentId, {
             name: contact2.name,
             homeTelephone: contact2.homeTelephone,
@@ -222,8 +254,11 @@ export default function StudentsPage() {
             relationship: contact2.relationship,
             contactOrder: 2,
           });
+          console.log('Contact2 saved!');
+        } else {
+          console.log('Contact2 skipped - name empty');
         }
-      } catch (e) { console.warn('Contact2 save failed:', e); }
+      } catch (e: any) { console.error('Contact2 save FAILED:', e.response?.data); }
 
       // Always show success if the main enrolment worked
       loadStudents();
@@ -271,6 +306,7 @@ export default function StudentsPage() {
         studentsAPI.getById(student.id),
         feesAPI.getStudentInvoices(student.id),
       ]);
+      console.log(detailRes.data);
       setProfileStudent(detailRes.data);
       setStudentInvoices(invoicesRes.data || []);
     } catch (err) {
@@ -291,7 +327,7 @@ export default function StudentsPage() {
   const handleDeleteStudent = async () => {
     if (!selectedStudent) return;
     const confirm = window.confirm(
-      `Are you sure you want to delete ${selectedStudent.firstName} ${selectedStudent.surname}? This cannot be undone.`
+      `Delete ${selectedStudent.firstName} ${selectedStudent.surname}?\nStudent number: ${selectedStudent.studentNumber}\nThis will permanently delete all their records.\nThis cannot be undone.`
     );
     if (!confirm) return;
     try {
@@ -300,7 +336,14 @@ export default function StudentsPage() {
       closeProfilePanel();
       loadStudents();
     } catch (err: any) {
-      showMessage(err.response?.data?.message || 'Failed to delete student', 'error');
+      console.error('Delete error:', err.response?.status);
+      console.error('Delete error data:', err.response?.data);
+      showMessage(
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        'Failed to delete student',
+        'error'
+      );
     }
   };
 
@@ -524,7 +567,8 @@ export default function StudentsPage() {
                 </p>
                 <div style={{ background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: '12px', padding: '20px 24px', marginBottom: '28px', display: 'inline-block', minWidth: '240px' }}>
                   <p style={{ fontSize: '12px', color: '#15803d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Student Number</p>
-                  <p style={{ fontSize: '28px', fontWeight: '700', color: '#15803d', fontFamily: 'ui-monospace, monospace', margin: 0 }}>{enrolledStudentNumber}</p>
+                  <p style={{ fontSize: '28px', fontWeight: '700', color: '#15803d', fontFamily: 'ui-monospace, monospace', margin: '0 0 10px' }}>{enrolledStudentNumber}</p>
+                  <p style={{ fontSize: '12px', color: '#15803d', fontWeight: '500', margin: 0 }}>Enrolled for Term 1 · 2026 Academic Year</p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                   <button
@@ -610,27 +654,27 @@ export default function StudentsPage() {
                   <div style={gridTwo}>
                     <div>
                       <label style={labelStyle}>First Name *</label>
-                      {inp(step1.firstName, (v) => setStep1({ ...step1, firstName: v }), { required: true, placeholder: 'John' })}
+                      {inp(step1.firstName, (v) => setStep1({ ...step1, firstName: v }), { required: true, placeholder: 'First name' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Surname *</label>
-                      {inp(step1.surname, (v) => setStep1({ ...step1, surname: v }), { required: true, placeholder: 'Doe' })}
+                      {inp(step1.surname, (v) => setStep1({ ...step1, surname: v }), { required: true, placeholder: 'Surname' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Date of Birth *</label>
                       {inp(step1.dateOfBirth, (v) => setStep1({ ...step1, dateOfBirth: v }), { type: 'date', required: true })}
                     </div>
                     <div>
-                      <label style={labelStyle}>Gender</label>
+                      <label style={labelStyle}>Gender *</label>
                       {sel(step1.gender, (v) => setStep1({ ...step1, gender: v }), ['Male', 'Female'])}
                     </div>
                     <div>
                       <label style={labelStyle}>Race</label>
-                      {inp(step1.race, (v) => setStep1({ ...step1, race: v }), { placeholder: 'e.g. African, Coloured' })}
+                      {inp(step1.race, (v) => setStep1({ ...step1, race: v }), { placeholder: 'e.g. African' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Birth Certificate No.</label>
-                      {inp(step1.birthCertificateNo, (v) => setStep1({ ...step1, birthCertificateNo: v }), { placeholder: 'BC123456' })}
+                      {inp(step1.birthCertificateNo, (v) => setStep1({ ...step1, birthCertificateNo: v }), { placeholder: 'Birth certificate number' })}
                     </div>
                   </div>
                 </>
@@ -655,38 +699,38 @@ export default function StudentsPage() {
                     </div>
                     <div>
                       <label style={labelStyle}>Previous School</label>
-                      {inp(step2.previousSchool, (v) => setStep2({ ...step2, previousSchool: v }), { placeholder: 'Primary school name' })}
+                      {inp(step2.previousSchool, (v) => setStep2({ ...step2, previousSchool: v }), { placeholder: 'Previous school name' })}
                     </div>
                   </div>
                   <h3 style={sectionHeadStyle}>Medical Information</h3>
                   <div style={{ ...gridTwo, marginBottom: '20px' }}>
                     <div>
                       <label style={labelStyle}>Medical Aid Society</label>
-                      {inp(step2.medicalAidSociety, (v) => setStep2({ ...step2, medicalAidSociety: v }), { placeholder: 'e.g. CIMAS, Medicore' })}
+                      {inp(step2.medicalAidSociety, (v) => setStep2({ ...step2, medicalAidSociety: v }), { placeholder: 'Medical aid society' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Medical Aid No.</label>
-                      {inp(step2.medicalAidNo, (v) => setStep2({ ...step2, medicalAidNo: v }), { placeholder: 'MA123456' })}
+                      {inp(step2.medicalAidNo, (v) => setStep2({ ...step2, medicalAidNo: v }), { placeholder: 'Medical aid number' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Family Doctor</label>
-                      {inp(step2.familyDoctorName, (v) => setStep2({ ...step2, familyDoctorName: v }), { placeholder: 'Dr. Name' })}
+                      {inp(step2.familyDoctorName, (v) => setStep2({ ...step2, familyDoctorName: v }), { placeholder: 'Doctor name' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Doctor Phone</label>
-                      {inp(step2.familyDoctorPhone, (v) => setStep2({ ...step2, familyDoctorPhone: v }), { placeholder: '+263...' })}
+                      {inp(step2.familyDoctorPhone, (v) => setStep2({ ...step2, familyDoctorPhone: v }), { placeholder: 'Doctor phone number' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Allergies</label>
-                      {inp(step2.allergies, (v) => setStep2({ ...step2, allergies: v }), { placeholder: 'e.g. Peanuts, Penicillin' })}
+                      {inp(step2.allergies, (v) => setStep2({ ...step2, allergies: v }), { placeholder: 'Any allergies or medical conditions' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Denomination</label>
-                      {inp(step2.denomination, (v) => setStep2({ ...step2, denomination: v }), { placeholder: 'e.g. Christian, Muslim' })}
+                      {inp(step2.denomination, (v) => setStep2({ ...step2, denomination: v }), { placeholder: 'Religious denomination' })}
                     </div>
                     <div style={{ gridColumn: '1/-1' }}>
                       <label style={labelStyle}>Other Information</label>
-                      {inp(step2.otherInformation, (v) => setStep2({ ...step2, otherInformation: v }), { placeholder: 'Any additional notes' })}
+                      {inp(step2.otherInformation, (v) => setStep2({ ...step2, otherInformation: v }), { placeholder: 'Any other relevant information' })}
                     </div>
                   </div>
                 </>
@@ -699,23 +743,23 @@ export default function StudentsPage() {
                   <div style={gridTwo}>
                     <div style={{ gridColumn: '1/-1' }}>
                       <label style={labelStyle}>Home Address</label>
-                      {inp(step3.homeAddress, (v) => setStep3({ ...step3, homeAddress: v }), { placeholder: '123 Main Street, Harare' })}
+                      {inp(step3.homeAddress, (v) => setStep3({ ...step3, homeAddress: v }), { placeholder: 'Home address' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Home Telephone</label>
-                      {inp(step3.homeTelephone, (v) => setStep3({ ...step3, homeTelephone: v }), { placeholder: '+263 4 123456' })}
+                      {inp(step3.homeTelephone, (v) => setStep3({ ...step3, homeTelephone: v }), { placeholder: 'Home telephone' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Cell</label>
-                      {inp(step3.cell, (v) => setStep3({ ...step3, cell: v }), { placeholder: '+263 77 000 0000' })}
+                      {inp(step3.cell, (v) => setStep3({ ...step3, cell: v }), { placeholder: 'Cell number' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Home Language</label>
-                      {inp(step3.homeLanguage, (v) => setStep3({ ...step3, homeLanguage: v }), { placeholder: 'e.g. English, Shona' })}
+                      {inp(step3.homeLanguage, (v) => setStep3({ ...step3, homeLanguage: v }), { placeholder: 'Home language' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Religion</label>
-                      {inp(step3.religion, (v) => setStep3({ ...step3, religion: v }), { placeholder: 'e.g. Christian' })}
+                      {inp(step3.religion, (v) => setStep3({ ...step3, religion: v }), { placeholder: 'Religion' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Marital Status</label>
@@ -723,7 +767,7 @@ export default function StudentsPage() {
                     </div>
                     <div>
                       <label style={labelStyle}>Email</label>
-                      {inp(step3.email, (v) => setStep3({ ...step3, email: v }), { type: 'email', placeholder: 'family@example.com' })}
+                      {inp(step3.email, (v) => setStep3({ ...step3, email: v }), { type: 'email', placeholder: 'Family email address' })}
                     </div>
                   </div>
                 </>
@@ -740,39 +784,39 @@ export default function StudentsPage() {
                     </div>
                     <div>
                       <label style={labelStyle}>Forenames</label>
-                      {inp(father.forenames, (v) => setFather({ ...father, forenames: v }), { placeholder: 'John' })}
+                      {inp(father.forenames, (v) => setFather({ ...father, forenames: v }), { placeholder: 'Forenames' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Surname</label>
-                      {inp(father.surname, (v) => setFather({ ...father, surname: v }), { placeholder: 'Doe' })}
+                      {inp(father.surname, (v) => setFather({ ...father, surname: v }), { placeholder: 'Surname' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Nationality</label>
-                      {inp(father.nationality, (v) => setFather({ ...father, nationality: v }), { placeholder: 'e.g. Zimbabwean' })}
+                      {inp(father.nationality, (v) => setFather({ ...father, nationality: v }), { placeholder: 'Nationality' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Occupation</label>
-                      {inp(father.occupation, (v) => setFather({ ...father, occupation: v }), { placeholder: 'e.g. Engineer' })}
+                      {inp(father.occupation, (v) => setFather({ ...father, occupation: v }), { placeholder: 'Occupation' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Company Name</label>
-                      {inp(father.companyName, (v) => setFather({ ...father, companyName: v }), { placeholder: 'Employer name' })}
+                      {inp(father.companyName, (v) => setFather({ ...father, companyName: v }), { placeholder: 'Company / Employer name' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Business Telephone</label>
-                      {inp(father.businessTelephone, (v) => setFather({ ...father, businessTelephone: v }), { placeholder: '+263 4 123456' })}
+                      {inp(father.businessTelephone, (v) => setFather({ ...father, businessTelephone: v }), { placeholder: 'Business telephone' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Cell</label>
-                      {inp(father.cell, (v) => setFather({ ...father, cell: v }), { placeholder: '+263 77 123 4567' })}
+                      {inp(father.cell, (v) => setFather({ ...father, cell: v }), { placeholder: 'Cell number' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Email</label>
-                      {inp(father.email, (v) => setFather({ ...father, email: v }), { type: 'email', placeholder: 'john@example.com' })}
+                      {inp(father.email, (v) => setFather({ ...father, email: v }), { type: 'email', placeholder: 'Email address' })}
                     </div>
                     <div style={{ gridColumn: '1/-1' }}>
                       <label style={labelStyle}>Business Address</label>
-                      {inp(father.businessAddress, (v) => setFather({ ...father, businessAddress: v }), { placeholder: 'Work or postal address' })}
+                      {inp(father.businessAddress, (v) => setFather({ ...father, businessAddress: v }), { placeholder: 'Business address' })}
                     </div>
                   </div>
 
@@ -784,39 +828,39 @@ export default function StudentsPage() {
                     </div>
                     <div>
                       <label style={labelStyle}>Forenames</label>
-                      {inp(mother.forenames, (v) => setMother({ ...mother, forenames: v }), { placeholder: 'Jane' })}
+                      {inp(mother.forenames, (v) => setMother({ ...mother, forenames: v }), { placeholder: 'Forenames' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Surname</label>
-                      {inp(mother.surname, (v) => setMother({ ...mother, surname: v }), { placeholder: 'Doe' })}
+                      {inp(mother.surname, (v) => setMother({ ...mother, surname: v }), { placeholder: 'Surname' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Nationality</label>
-                      {inp(mother.nationality, (v) => setMother({ ...mother, nationality: v }), { placeholder: 'e.g. Zimbabwean' })}
+                      {inp(mother.nationality, (v) => setMother({ ...mother, nationality: v }), { placeholder: 'Nationality' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Occupation</label>
-                      {inp(mother.occupation, (v) => setMother({ ...mother, occupation: v }), { placeholder: 'e.g. Teacher' })}
+                      {inp(mother.occupation, (v) => setMother({ ...mother, occupation: v }), { placeholder: 'Occupation' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Company Name</label>
-                      {inp(mother.companyName, (v) => setMother({ ...mother, companyName: v }), { placeholder: 'Employer name' })}
+                      {inp(mother.companyName, (v) => setMother({ ...mother, companyName: v }), { placeholder: 'Company / Employer name' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Business Telephone</label>
-                      {inp(mother.businessTelephone, (v) => setMother({ ...mother, businessTelephone: v }), { placeholder: '+263 4 123456' })}
+                      {inp(mother.businessTelephone, (v) => setMother({ ...mother, businessTelephone: v }), { placeholder: 'Business telephone' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Cell</label>
-                      {inp(mother.cell, (v) => setMother({ ...mother, cell: v }), { placeholder: '+263 77 123 4567' })}
+                      {inp(mother.cell, (v) => setMother({ ...mother, cell: v }), { placeholder: 'Cell number' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Email</label>
-                      {inp(mother.email, (v) => setMother({ ...mother, email: v }), { type: 'email', placeholder: 'jane@example.com' })}
+                      {inp(mother.email, (v) => setMother({ ...mother, email: v }), { type: 'email', placeholder: 'Email address' })}
                     </div>
                     <div style={{ gridColumn: '1/-1' }}>
                       <label style={labelStyle}>Business Address</label>
-                      {inp(mother.businessAddress, (v) => setMother({ ...mother, businessAddress: v }), { placeholder: 'Work or postal address' })}
+                      {inp(mother.businessAddress, (v) => setMother({ ...mother, businessAddress: v }), { placeholder: 'Business address' })}
                     </div>
                   </div>
                 </>
@@ -829,46 +873,46 @@ export default function StudentsPage() {
                   <div style={{ ...gridTwo, marginBottom: '20px' }}>
                     <div style={{ gridColumn: '1/-1' }}>
                       <label style={labelStyle}>Full Name</label>
-                      {inp(contact1.name, (v) => setContact1({ ...contact1, name: v }), { placeholder: 'Jane Doe' })}
+                      {inp(contact1.name, (v) => setContact1({ ...contact1, name: v }), { placeholder: 'Full name' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Home Telephone</label>
-                      {inp(contact1.homeTelephone, (v) => setContact1({ ...contact1, homeTelephone: v }), { placeholder: '+263 4 123456' })}
+                      {inp(contact1.homeTelephone, (v) => setContact1({ ...contact1, homeTelephone: v }), { placeholder: 'Home telephone' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Cell</label>
-                      {inp(contact1.cell, (v) => setContact1({ ...contact1, cell: v }), { placeholder: '+263 77 000 0000' })}
+                      {inp(contact1.cell, (v) => setContact1({ ...contact1, cell: v }), { placeholder: 'Cell number' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Business Telephone</label>
-                      {inp(contact1.businessTelephone, (v) => setContact1({ ...contact1, businessTelephone: v }), { placeholder: '+263 4 000000' })}
+                      {inp(contact1.businessTelephone, (v) => setContact1({ ...contact1, businessTelephone: v }), { placeholder: 'Business telephone' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Relationship</label>
-                      {inp(contact1.relationship, (v) => setContact1({ ...contact1, relationship: v }), { placeholder: 'e.g. Aunt' })}
+                      {inp(contact1.relationship, (v) => setContact1({ ...contact1, relationship: v }), { placeholder: 'Relationship to student' })}
                     </div>
                   </div>
                   <h3 style={sectionHeadStyle}>Emergency Contact 2</h3>
                   <div style={gridTwo}>
                     <div style={{ gridColumn: '1/-1' }}>
                       <label style={labelStyle}>Full Name</label>
-                      {inp(contact2.name, (v) => setContact2({ ...contact2, name: v }), { placeholder: 'John Smith' })}
+                      {inp(contact2.name, (v) => setContact2({ ...contact2, name: v }), { placeholder: 'Full name' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Home Telephone</label>
-                      {inp(contact2.homeTelephone, (v) => setContact2({ ...contact2, homeTelephone: v }), { placeholder: '+263 4 123456' })}
+                      {inp(contact2.homeTelephone, (v) => setContact2({ ...contact2, homeTelephone: v }), { placeholder: 'Home telephone' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Cell</label>
-                      {inp(contact2.cell, (v) => setContact2({ ...contact2, cell: v }), { placeholder: '+263 77 000 0000' })}
+                      {inp(contact2.cell, (v) => setContact2({ ...contact2, cell: v }), { placeholder: 'Cell number' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Business Telephone</label>
-                      {inp(contact2.businessTelephone, (v) => setContact2({ ...contact2, businessTelephone: v }), { placeholder: '+263 4 000000' })}
+                      {inp(contact2.businessTelephone, (v) => setContact2({ ...contact2, businessTelephone: v }), { placeholder: 'Business telephone' })}
                     </div>
                     <div>
                       <label style={labelStyle}>Relationship</label>
-                      {inp(contact2.relationship, (v) => setContact2({ ...contact2, relationship: v }), { placeholder: 'e.g. Uncle' })}
+                      {inp(contact2.relationship, (v) => setContact2({ ...contact2, relationship: v }), { placeholder: 'Relationship to student' })}
                     </div>
                   </div>
                 </>
@@ -892,7 +936,7 @@ export default function StudentsPage() {
                   className="btn btn-primary"
                   onClick={() => {
                     if (wizardStep === 1 && (!step1.firstName.trim() || !step1.surname.trim() || !step1.dateOfBirth)) {
-                      showMessage('First name, surname, and date of birth are required', 'error');
+                      showMessage('Please fill in First Name, Surname and Date of Birth', 'error');
                       return;
                     }
                     setWizardStep((s) => s + 1);
@@ -930,7 +974,7 @@ export default function StudentsPage() {
       {/* ─── PROFILE PANEL ─── */}
       {isProfileOpen && selectedStudent && (() => {
         const s = profileStudent || selectedStudent;
-        const TABS = ['Personal', 'Medical', 'Family', 'Guardians', 'Emergency', 'Invoices'];
+        const TABS = ['Personal', 'Medical', 'Family', 'Guardians', 'Emergency'];
         const tabBtn = (label: string) => (
           <button
             key={label}
@@ -1092,11 +1136,12 @@ export default function StudentsPage() {
                               {g.guardianType ?? (i === 0 ? 'Father / Guardian' : 'Mother / Guardian')}
                             </p>
                             <div style={grid3}>
-                              {field('Name', `${g.title ?? ''} ${g.firstName ?? ''} ${g.surname ?? ''}`.trim())}
-                              {field('Phone', g.phone)}
+                              {field('Name', `${g.title ?? ''} ${g.forenames ?? ''} ${g.surname ?? ''}`.trim())}
+                              {field('Cell', g.cell)}
+                              {field('Business Tel', g.businessTelephone)}
                               {field('Email', g.email)}
                               {field('Occupation', g.occupation)}
-                              {field('Address', g.address)}
+                              {field('Nationality', g.nationality)}
                             </div>
                           </div>
                         ))}
@@ -1117,7 +1162,8 @@ export default function StudentsPage() {
                             <p style={{ ...sectionHeadStyle, marginBottom: '10px' }}>Contact {i + 1}</p>
                             <div style={grid3}>
                               {field('Name', c.name)}
-                              {field('Phone', c.phone)}
+                              {field('Home Tel', c.homeTelephone)}
+                              {field('Cell', c.cell)}
                               {field('Relationship', c.relationship)}
                             </div>
                           </div>
@@ -1126,33 +1172,6 @@ export default function StudentsPage() {
                     ) : (
                       <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b', fontSize: '13px' }}>
                         No emergency contacts recorded.
-                      </div>
-                    )
-                  )}
-
-                  {/* ── Invoices ── */}
-                  {profileTab === 'invoices' && (
-                    studentInvoices.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {studentInvoices.map((inv: any) => (
-                          <div key={inv.id} style={{ padding: '14px 16px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                              <strong style={{ fontFamily: 'ui-monospace, monospace' }}>{inv.invoiceNumber}</strong>
-                              <span className={`pill ${inv.status === 'Paid' ? 'pill-success' : inv.status === 'PartiallyPaid' ? 'pill-warning' : 'pill-danger'}`} style={{ fontSize: '11px' }}>
-                                {inv.status === 'PartiallyPaid' ? 'Partial' : inv.status}
-                              </span>
-                            </div>
-                            <div style={grid3}>
-                              {field('Total', `$${Number(inv.totalAmount ?? 0).toLocaleString()}`)}
-                              {field('Paid', `$${Number(inv.amountPaid ?? 0).toLocaleString()}`)}
-                              {field('Balance', `$${Number(inv.balance ?? 0).toLocaleString()}`)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b', fontSize: '13px' }}>
-                        No invoices found for this student.
                       </div>
                     )
                   )}

@@ -27,7 +27,6 @@ namespace LeeTec.API.Controllers
                 var count = await _context.Students
                     .CountAsync(s => s.SchoolId == dto.SchoolId);
 
-                // Generate prefix based on campus
                 var prefix = dto.Campus switch
                 {
                     "AHJ" => "AHJ",
@@ -82,7 +81,7 @@ namespace LeeTec.API.Controllers
             }
         }
 
-        // GET SINGLE STUDENT WITH ALL DETAILS
+        // GET SINGLE STUDENT
         [HttpGet("{id}")]
         public async Task<IActionResult> GetStudent(int id)
         {
@@ -134,7 +133,7 @@ namespace LeeTec.API.Controllers
             return Ok(new { message = "Family details added", data = family });
         }
 
-        // ADD GUARDIAN (Father, Mother, or Legal Guardian)
+        // ADD GUARDIAN
         [HttpPost("{id}/guardian")]
         public async Task<IActionResult> AddGuardian(int id, [FromBody] Guardian guardian)
         {
@@ -186,6 +185,52 @@ namespace LeeTec.API.Controllers
             student.Status = status;
             await _context.SaveChangesAsync();
             return Ok($"Student status updated to {status}");
+        }
+
+        // DELETE STUDENT
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteStudent(int id)
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var student = await _context.Students.FindAsync(id);
+                if (student == null) return NotFound(new { message = "Student not found" });
+
+                var family = await _context.Families
+                    .FirstOrDefaultAsync(f => f.StudentId == id);
+                if (family != null) _context.Families.Remove(family);
+
+                var guardians = await _context.Guardians
+                    .Where(g => g.StudentId == id).ToListAsync();
+                _context.Guardians.RemoveRange(guardians);
+
+                var contacts = await _context.EmergencyContacts
+                    .Where(e => e.StudentId == id).ToListAsync();
+                _context.EmergencyContacts.RemoveRange(contacts);
+
+                var invoicing = await _context.InvoicingDetails
+                    .FirstOrDefaultAsync(i => i.StudentId == id);
+                if (invoicing != null) _context.InvoicingDetails.Remove(invoicing);
+
+                var portalAccounts = await _context.StudentPortalAccounts
+                    .Where(p => p.StudentId == id).ToListAsync();
+                _context.StudentPortalAccounts.RemoveRange(portalAccounts);
+
+                _context.Students.Remove(student);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return Ok(new { message = "Student deleted successfully" });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, new {
+                    message = "Failed to delete student.",
+                    error = ex.Message
+                });
+            }
         }
 
         // SEARCH STUDENTS

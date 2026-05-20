@@ -37,7 +37,7 @@ export const studentsAPI = {
   search: (schoolId: number, query: string) =>
     api.get(`/students/search?schoolId=${schoolId}&query=${query}`),
   updateStatus: (id: number, status: string) =>
-    api.put(`/students/${id}/status`, { status }),
+    api.put(`/students/${id}/status?status=${status}`),
   addFamily: (id: number, data: any) =>
     api.post(`/students/${id}/family`, data),
   addGuardian: (id: number, data: any) =>

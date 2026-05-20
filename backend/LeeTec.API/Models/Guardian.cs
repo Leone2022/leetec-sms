@@ -23,6 +23,6 @@ namespace LeeTec.API.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation
-        public Student Student { get; set; } = null!;
+        public Student? Student { get; set; }
     }
 }
