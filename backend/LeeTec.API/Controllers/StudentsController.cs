@@ -26,7 +26,15 @@ namespace LeeTec.API.Controllers
             {
                 var count = await _context.Students
                     .CountAsync(s => s.SchoolId == dto.SchoolId);
-                var studentNumber = $"WAH/{DateTime.Now.Year}/{(count + 1):D4}";
+
+                // Generate prefix based on campus
+                var prefix = dto.Campus switch
+                {
+                    "AHJ" => "AHJ",
+                    "AHS" => "AHS",
+                    _     => "AHA"
+                };
+                var studentNumber = $"{prefix}/{DateTime.Now.Year}/{(count + 1):D4}";
 
                 var student = new Student
                 {
@@ -60,7 +68,8 @@ namespace LeeTec.API.Controllers
                 return Ok(new {
                     message = "Student enrolled successfully",
                     studentNumber = student.StudentNumber,
-                    studentId = student.Id
+                    studentId = student.Id,
+                    campus = prefix
                 });
             }
             catch (Exception ex)

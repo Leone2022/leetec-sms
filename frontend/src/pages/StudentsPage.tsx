@@ -26,8 +26,9 @@ const WIZARD_STEPS = [
 
 const blankStep1 = () => ({
   firstName: '', surname: '', dateOfBirth: '', gender: 'Male',
-  race: '', birthCertificateNo: '',
+  race: '', birthCertificateNo: '', campus: 'AHA',
 });
+
 const blankStep2 = () => ({
   form: 'Form 1', dateOfEntry: todayISO(), previousSchool: '',
   medicalAidSociety: '', medicalAidNo: '', familyDoctorName: '',
@@ -126,6 +127,7 @@ export default function StudentsPage() {
         gender: step1.gender,
         form: step2.form,
         dateOfEntry: step2.dateOfEntry,
+        campus: step1.campus,
         race: step1.race.trim(),
         previousSchool: step2.previousSchool.trim(),
         otherInformation: step2.otherInformation.trim(),
@@ -284,6 +286,22 @@ export default function StudentsPage() {
     setProfileStudent(null);
     setStudentInvoices([]);
     setProfileTab('personal');
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!selectedStudent) return;
+    const confirm = window.confirm(
+      `Are you sure you want to delete ${selectedStudent.firstName} ${selectedStudent.surname}? This cannot be undone.`
+    );
+    if (!confirm) return;
+    try {
+      await studentsAPI.deleteStudent(selectedStudent.id);
+      showMessage('Student deleted successfully', 'success');
+      closeProfilePanel();
+      loadStudents();
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to delete student', 'error');
+    }
   };
 
   const handleToggleStatus = async () => {
@@ -498,6 +516,9 @@ export default function StudentsPage() {
                 <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#0f172a', margin: '0 0 8px' }}>
                   Student Enrolled Successfully!
                 </h2>
+                <p style={{ fontSize: '13px', color: '#1a237e', fontWeight: '600', margin: '0 0 6px' }}>
+                  {step1.campus === 'AHJ' ? 'Advent Hope Junior' : step1.campus === 'AHS' ? 'Advent Hope Senior' : 'Advent Hope Academy'}
+                </p>
                 <p style={{ fontSize: '13px', color: '#475569', margin: '0 0 24px' }}>
                   The student can now register on the portal using their student number.
                 </p>
@@ -559,6 +580,32 @@ export default function StudentsPage() {
               {/* ─ Step 1: Personal Details ─ */}
               {wizardStep === 1 && (
                 <>
+                  <div style={{ marginBottom: '24px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                      {[
+                        { code: 'AHJ', name: 'Advent Hope Junior', desc: 'Primary School' },
+                        { code: 'AHA', name: 'Advent Hope Academy', desc: 'Secondary - O Level' },
+                        { code: 'AHS', name: 'Advent Hope Senior', desc: 'A Level' },
+                      ].map(({ code, name, desc }) => (
+                        <div
+                          key={code}
+                          onClick={() => setStep1({ ...step1, campus: code })}
+                          style={{
+                            border: step1.campus === code ? '2px solid #1a237e' : '2px solid #e2e8f0',
+                            background: step1.campus === code ? '#eef2ff' : 'white',
+                            borderRadius: '8px',
+                            padding: '14px 12px',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <div style={{ fontWeight: '700', fontSize: '15px', color: '#0f172a', marginBottom: '4px' }}>{code}</div>
+                          <div style={{ fontWeight: '600', fontSize: '12px', color: '#1a237e', marginBottom: '2px' }}>{name}</div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>{desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <h3 style={sectionHeadStyle}>Personal Details</h3>
                   <div style={gridTwo}>
                     <div>
@@ -596,7 +643,11 @@ export default function StudentsPage() {
                   <div style={{ ...gridThree, marginBottom: '20px' }}>
                     <div>
                       <label style={labelStyle}>Form</label>
-                      {sel(step2.form, (v) => setStep2({ ...step2, form: v }), ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'])}
+                      {sel(step2.form, (v) => setStep2({ ...step2, form: v }),
+                        step1.campus === 'AHJ' ? ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'] :
+                        step1.campus === 'AHS' ? ['Lower 6', 'Upper 6'] :
+                        ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6']
+                      )}
                     </div>
                     <div>
                       <label style={labelStyle}>Date of Entry</label>
@@ -1117,6 +1168,13 @@ export default function StudentsPage() {
                   style={{ background: selectedStudent.status === 'Active' ? '#dc2626' : '#0ea5e9', color: 'white', border: 'none' }}
                 >
                   {selectedStudent.status === 'Active' ? <><Lock size={14} /> Deactivate</> : <><Unlock size={14} /> Activate</>}
+                </button>
+                <button
+                  onClick={handleDeleteStudent}
+                  className="btn"
+                  style={{ background: '#dc2626', color: 'white', border: 'none' }}
+                >
+                  🗑 Delete
                 </button>
               </div>
             </div>

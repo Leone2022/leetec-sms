@@ -19,5 +19,6 @@ namespace LeeTec.API.DTOs
         public string MedicalAidNo { get; set; } = string.Empty;
         public string Allergies { get; set; } = string.Empty;
         public string Denomination { get; set; } = string.Empty;
+        public string Campus { get; set; } = "AHA";
     }
 }

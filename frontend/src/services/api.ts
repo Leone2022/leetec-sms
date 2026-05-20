@@ -46,6 +46,7 @@ export const studentsAPI = {
     api.post(`/students/${id}/emergency-contact`, data),
   addInvoicing: (id: number, data: any) =>
     api.post(`/students/${id}/invoicing`, data),
+  deleteStudent: (id: number) => api.delete(`/students/${id}`),
 };
 
 export const feesAPI = {
