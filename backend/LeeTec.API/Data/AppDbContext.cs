@@ -36,6 +36,9 @@ namespace LeeTec.API.Data
         // Student Portal
         public DbSet<StudentPortalAccount> StudentPortalAccounts { get; set; }
 
+        // Term Registrations
+        public DbSet<TermRegistration> TermRegistrations { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -107,6 +110,30 @@ namespace LeeTec.API.Data
             modelBuilder.Entity<InvoiceItem>()
                 .Property(i => i.Amount)
                 .HasColumnType("decimal(18,2)");
+
+            // TermRegistration relationships
+            modelBuilder.Entity<TermRegistration>()
+                .HasOne(tr => tr.Student)
+                .WithMany()
+                .HasForeignKey(tr => tr.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TermRegistration>()
+                .HasOne(tr => tr.Term)
+                .WithMany()
+                .HasForeignKey(tr => tr.TermId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<TermRegistration>()
+                .HasOne(tr => tr.FeePackage)
+                .WithMany()
+                .HasForeignKey(tr => tr.FeePackageId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<TermRegistration>()
+                .Property(tr => tr.PromotionStatus)
+                .HasConversion<string>();
         }
     }
 }
