@@ -81,6 +81,23 @@ export const portalAPI = {
     api.get(`/student-portal/dashboard/${studentId}`),
 };
 
+export const termRegistrationsAPI = {
+  getDashboard: (termId: number, schoolId?: number) =>
+    api.get(`/termregistrations/dashboard/${termId}?schoolId=${schoolId || 1}`),
+  getUnregistered: (termId: number, schoolId?: number) =>
+    api.get(`/termregistrations/unregistered/${termId}?schoolId=${schoolId || 1}`),
+  register: (data: any) =>
+    api.post('/termregistrations/register', data),
+  promoteSingle: (data: any) =>
+    api.post('/termregistrations/promote-single', data),
+  promoteBulk: (data: any) =>
+    api.post('/termregistrations/promote-bulk', data),
+  updatePaymentStatus: (id: number, status: string) =>
+    api.put(`/termregistrations/${id}/payment-status?status=${status}`),
+  remove: (id: number) =>
+    api.delete(`/termregistrations/${id}`),
+};
+
 export const superadminAPI = {
   getStats: () => api.get('/superadmin/stats'),
   getSchools: () => api.get('/superadmin/schools'),
