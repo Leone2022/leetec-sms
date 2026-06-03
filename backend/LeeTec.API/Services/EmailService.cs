@@ -10,6 +10,7 @@ namespace LeeTec.API.Services
         Task SendPasswordResetAsync(string toEmail, string studentName, string resetLink);
         Task SendAccountApprovedAsync(string toEmail, string studentName);
         Task SendWelcomeEmailAsync(string toEmail, string studentName);
+        Task SendAsync(string toEmail, string subject, string htmlBody);
     }
 
     public class EmailService : IEmailService
@@ -139,6 +140,11 @@ namespace LeeTec.API.Services
                 </div>";
 
             await SendEmailAsync(toEmail, studentName, subject, body);
+        }
+
+        public async Task SendAsync(string toEmail, string subject, string htmlBody)
+        {
+            await SendEmailAsync(toEmail, toEmail, subject, htmlBody);
         }
 
         public async Task SendWelcomeEmailAsync(string toEmail, string studentName)

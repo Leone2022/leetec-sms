@@ -58,7 +58,9 @@ export const feesAPI = {
   deleteCategory: (id: number) => api.delete(`/fees/categories/${id}`),
   getPackages: (termId: number) => api.get(`/fees/packages/term/${termId}`),
   createPackage: (data: any) => api.post('/fees/packages', data),
+  updatePackage: (id: number, data: any) => api.put(`/fees/packages/${id}`, data),
   generateInvoices: (data: any) => api.post('/fees/invoices/generate', data),
+  sendBulkInvoiceEmails: (data: any) => api.post('/fees/invoices/send-bulk-email', data),
   getTermInvoices: (schoolId: number, termId: number) =>
     api.get(`/fees/invoices/school/${schoolId}/term/${termId}`),
   getStudentInvoices: (studentId: number) =>

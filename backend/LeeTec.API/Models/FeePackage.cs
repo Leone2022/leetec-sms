@@ -10,6 +10,8 @@ namespace LeeTec.API.Models
         public string Name { get; set; } = string.Empty; // e.g. "Day Scholar Term 1 2026"
         public string StudentType { get; set; } = string.Empty; // "Day" or "Boarding"
         public bool IsActive { get; set; } = true;
+        public DateTime? LockedAt { get; set; }
+        public string? LockedBy { get; set; }
 
         // Navigation
         public School School { get; set; } = null!;

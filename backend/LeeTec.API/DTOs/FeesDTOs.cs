@@ -38,7 +38,10 @@ namespace LeeTec.API.DTOs
     public class FeePackageItemRequest
     {
         public int FeeCategoryId { get; set; }
+        public int CategoryId { get; set; }
         public decimal Amount { get; set; }
+
+        public int ResolvedFeeCategoryId => FeeCategoryId > 0 ? FeeCategoryId : CategoryId;
     }
 
     // =====================
@@ -49,6 +52,15 @@ namespace LeeTec.API.DTOs
         public int SchoolId { get; set; }
         public int TermId { get; set; }
         public DateTime DueDate { get; set; }
+    }
+
+    // =====================
+    // BULK EMAIL
+    // =====================
+    public class SendBulkInvoiceRequest
+    {
+        public int SchoolId { get; set; }
+        public int TermId { get; set; }
     }
 
     // =====================
@@ -63,6 +75,7 @@ namespace LeeTec.API.DTOs
         public decimal Amount { get; set; }
         public string PaymentMethod { get; set; } = "BankDeposit";
         public string ReceiptNumber { get; set; } = string.Empty;
+        public string BankReceiptNumber { get; set; } = string.Empty;
         public string? Notes { get; set; }
         public DateTime PaymentDate { get; set; }
     }
