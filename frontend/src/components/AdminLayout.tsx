@@ -27,9 +27,9 @@ const NAV: NavItem[] = [
   { label: 'Dashboard', Icon: LayoutDashboard, path: '/dashboard' },
   { label: 'Students', Icon: Users, path: '/students' },
   { label: 'Fees & Billing', Icon: Receipt, path: '/fees' },
-  { label: 'Terms & Periods', Icon: Calendar, path: '/terms' },
   { label: 'Fee Setup', Icon: Settings, path: '/fee-setup' },
   { label: 'Portal Approvals', Icon: ClipboardCheck, path: '/approvals' },
+  { label: 'Terms & Periods', Icon: Calendar, path: '/terms' },
   { label: 'Super Admin', Icon: Shield, path: '/super-admin', superAdminOnly: true },
 ];
 

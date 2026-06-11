@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LeeTec.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+12b05a5dd24b8676ae84d36d29d11df83014a88e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9551a835920d8090ee965ec29d2f11e568c9684c")]
 [assembly: System.Reflection.AssemblyProductAttribute("LeeTec.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LeeTec.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

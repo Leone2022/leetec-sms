@@ -295,7 +295,7 @@ namespace LeeTec.API.Migrations
                     b.Property<DateTime>("DueDate")
                         .HasColumnType("datetime(6)");
 
-                    b.Property<int>("FeePackageId")
+                    b.Property<int?>("FeePackageId")
                         .HasColumnType("int");
 
                     b.Property<string>("InvoiceNumber")
@@ -982,8 +982,7 @@ namespace LeeTec.API.Migrations
                     b.HasOne("LeeTec.API.Models.FeePackage", "FeePackage")
                         .WithMany("Invoices")
                         .HasForeignKey("FeePackageId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("LeeTec.API.Models.School", "School")
                         .WithMany()

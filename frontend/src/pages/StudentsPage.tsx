@@ -49,7 +49,7 @@ const blankContact = () => ({
 });
 
 export default function StudentsPage() {
-  const { user } = useAuth();
+  useAuth();
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -73,7 +73,8 @@ export default function StudentsPage() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileTab, setProfileTab] = useState('personal');
-  const [studentInvoices, setStudentInvoices] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
 
   useEffect(() => { loadStudents(); }, []);
 
@@ -297,18 +298,24 @@ export default function StudentsPage() {
   const openProfilePanel = async (student: any) => {
     setSelectedStudent(student);
     setProfileStudent(null);
-    setStudentInvoices([]);
     setProfileTab('personal');
     setIsProfileOpen(true);
     setProfileLoading(true);
     try {
-      const [detailRes, invoicesRes] = await Promise.all([
-        studentsAPI.getById(student.id),
-        feesAPI.getStudentInvoices(student.id),
-      ]);
+      const detailRes = await studentsAPI.getById(student.id);
       console.log(detailRes.data);
       setProfileStudent(detailRes.data);
-      setStudentInvoices(invoicesRes.data || []);
+      // Load invoices for this student
+      setInvoicesLoading(true);
+      try {
+        const invRes = await feesAPI.getStudentInvoices(student.id);
+        setInvoices(invRes.data || []);
+      } catch (e) {
+        console.error('Failed to load student invoices', e);
+        setInvoices([]);
+      } finally {
+        setInvoicesLoading(false);
+      }
     } catch (err) {
       console.error('Failed to load student details:', err);
     } finally {
@@ -320,7 +327,6 @@ export default function StudentsPage() {
     setIsProfileOpen(false);
     setSelectedStudent(null);
     setProfileStudent(null);
-    setStudentInvoices([]);
     setProfileTab('personal');
   };
 
@@ -359,6 +365,59 @@ export default function StudentsPage() {
       );
     } catch (err: any) {
       showMessage(err.response?.data?.message || 'Failed to update status', 'error');
+    }
+  };
+
+  const handleDeleteInvoiceItem = async (itemId: number) => {
+    if (!selectedStudent) return;
+    const confirmDelete = window.confirm('Remove this invoice line? This cannot be undone.');
+    if (!confirmDelete) return;
+    try {
+      await feesAPI.deleteInvoiceItem(itemId);
+      showMessage('Invoice item removed', 'success');
+      const invRes = await feesAPI.getStudentInvoices(selectedStudent.id);
+      setInvoices(invRes.data || []);
+    } catch (err: any) {
+      console.error('Delete invoice item failed', err);
+      showMessage(err.response?.data?.message || 'Failed to remove invoice item', 'error');
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId: number) => {
+    if (!selectedStudent) return;
+    const confirmDelete = window.confirm('Delete this invoice? This will remove all its items.');
+    if (!confirmDelete) return;
+    try {
+      await feesAPI.deleteInvoice(invoiceId);
+      showMessage('Invoice deleted', 'success');
+      const invRes = await feesAPI.getStudentInvoices(selectedStudent.id);
+      setInvoices(invRes.data || []);
+    } catch (err: any) {
+      console.error('Delete invoice failed', err);
+      showMessage(err.response?.data?.message || 'Failed to delete invoice', 'error');
+    }
+  };
+
+  const handleRefundInvoice = async (invoiceId: number, maxRefund: number) => {
+    if (!selectedStudent) return;
+    const input = window.prompt(`Refund amount (max $${Number(maxRefund).toFixed(2)}). Enter amount:`);
+    if (!input) return;
+    const amount = Number(input);
+    if (isNaN(amount) || amount <= 0 || amount > Number(maxRefund)) {
+      showMessage('Invalid refund amount', 'error');
+      return;
+    }
+    const reason = window.prompt('Reason for refund (optional):') || undefined;
+    const confirmRefund = window.confirm(`Process refund of $${amount.toFixed(2)}?`);
+    if (!confirmRefund) return;
+    try {
+      await feesAPI.refundInvoice({ invoiceId, amount, reason });
+      showMessage('Refund processed', 'success');
+      const invRes = await feesAPI.getStudentInvoices(selectedStudent.id);
+      setInvoices(invRes.data || []);
+    } catch (err: any) {
+      console.error('Refund failed', err);
+      showMessage(err.response?.data?.message || 'Failed to process refund', 'error');
     }
   };
 
@@ -974,7 +1033,7 @@ export default function StudentsPage() {
       {/* ─── PROFILE PANEL ─── */}
       {isProfileOpen && selectedStudent && (() => {
         const s = profileStudent || selectedStudent;
-        const TABS = ['Personal', 'Medical', 'Family', 'Guardians', 'Emergency'];
+        const TABS = ['Personal', 'Medical', 'Family', 'Guardians', 'Emergency', 'Fees'];
         const tabBtn = (label: string) => (
           <button
             key={label}
@@ -1174,6 +1233,60 @@ export default function StudentsPage() {
                         No emergency contacts recorded.
                       </div>
                     )
+                  )}
+
+                  {/* ── Fees / Invoices ── */}
+                  {profileTab === 'fees' && (
+                    <div>
+                      <p style={sectionHeadStyle}>Invoices</p>
+                      {invoicesLoading ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: '#475569' }}>Loading invoices...</div>
+                      ) : invoices.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No invoices recorded.</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          {invoices.map((inv: any) => (
+                            <div key={inv.id} style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <div style={{ fontWeight: 700 }}>{inv.invoiceNumber}</div>
+                                  <div style={{ fontSize: 13, color: '#475569' }}>{inv.term?.name ?? ''} · {inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString() : ''}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontWeight: 700 }}>${Number(inv.totalAmount).toFixed(2)}</div>
+                                  <div style={{ fontSize: 13, color: '#15803d' }}>{Number(inv.amountPaid) > 0 ? `Paid $${Number(inv.amountPaid).toFixed(2)}` : 'Not paid'}</div>
+                                  <div style={{ color: '#dc2626', fontWeight: 700 }}>Balance ${Number(inv.balance).toFixed(2)}</div>
+                                </div>
+                              </div>
+                              <div style={{ marginTop: 10 }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                  <tbody>
+                                    {inv.items?.map((it: any) => (
+                                      <tr key={it.id}>
+                                        <td style={{ padding: '8px 6px' }}>{it.description}</td>
+                                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>${Number(it.amount).toFixed(2)}</td>
+                                        <td style={{ padding: '8px 6px', width: 120, textAlign: 'right' }}>
+                                          {Number(inv.amountPaid) === 0 ? (
+                                            <button className="btn" onClick={() => handleDeleteInvoiceItem(it.id)} style={{ background: 'transparent', border: '1px solid #e2e8f0' }}>Remove</button>
+                                          ) : null}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div style={{ marginTop: 10, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                {Number(inv.amountPaid) === 0 ? (
+                                  <button className="btn" onClick={() => handleDeleteInvoice(inv.id)} style={{ background: '#dc2626', color: 'white', border: 'none' }}>Delete Invoice</button>
+                                ) : (
+                                  <button className="btn" onClick={() => handleRefundInvoice(inv.id, inv.amountPaid)} style={{ background: '#f59e0b', color: 'white', border: 'none' }}>Refund</button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                 </div>

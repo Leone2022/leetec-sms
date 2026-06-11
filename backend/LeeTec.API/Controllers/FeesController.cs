@@ -266,6 +266,118 @@ namespace LeeTec.API.Controllers
                     : null,
             });
         }
+
+        // =====================
+        // DIRECT CHARGES
+        // =====================
+
+        [HttpGet("student-balances/{termId}")]
+        public async Task<IActionResult> GetStudentBalances(int termId, int schoolId = 1)
+        {
+            var invoiceRows = await _context.Invoices
+                .Where(i => i.SchoolId == schoolId
+                    && i.TermId == termId)
+                .Include(i => i.Student)
+                .ToListAsync();
+
+            var invoices = invoiceRows
+                .Select(i => new
+                {
+                    i.StudentId,
+                    StudentName = i.Student.FirstName + " " + i.Student.Surname,
+                    StudentNumber = i.Student.StudentNumber,
+                    Campus = i.Student.StudentNumber.Contains('/')
+                        ? i.Student.StudentNumber.Substring(0, i.Student.StudentNumber.IndexOf('/'))
+                        : i.Student.StudentNumber,
+                    i.Student.Form,
+                    i.TotalAmount,
+                    i.AmountPaid,
+                    i.Balance,
+                    i.Status,
+                    i.InvoiceNumber,
+                    i.Id
+                })
+                .OrderBy(i => i.StudentName)
+                .ToList();
+
+            var summary = new
+            {
+                TotalStudents = invoices.Count,
+                TotalCharged = invoices.Sum(i => i.TotalAmount),
+                TotalPaid = invoices.Sum(i => i.AmountPaid),
+                TotalOutstanding = invoices.Sum(i => i.Balance)
+            };
+
+            return Ok(new { summary, students = invoices });
+        }
+
+        [HttpPost("charge-individual")]
+        public async Task<IActionResult> ChargeIndividual([FromBody] IndividualChargeDTO dto)
+        {
+            var student = await _context.Students.FindAsync(dto.StudentId);
+            if (student == null)
+                return NotFound(new { message = "Student not found" });
+
+            var term = await _context.Terms
+                .FirstOrDefaultAsync(t => t.IsActive && t.SchoolId == dto.SchoolId);
+            if (term == null)
+                return BadRequest(new { message = "No active term" });
+
+            var existing = await _context.Invoices
+                .FirstOrDefaultAsync(i => i.StudentId == dto.StudentId
+                    && i.TermId == term.Id);
+
+            if (existing != null)
+            {
+                existing.TotalAmount += dto.Amount;
+                existing.Balance += dto.Amount;
+                if (existing.Balance > 0)
+                    existing.Status = existing.AmountPaid > 0
+                        ? "PartiallyPaid" : "Unpaid";
+
+                _context.InvoiceItems.Add(new InvoiceItem
+                {
+                    InvoiceId = existing.Id,
+                    FeeCategoryId = dto.FeeCategoryId ?? 1,
+                    Description = dto.Description,
+                    Amount = dto.Amount
+                });
+            }
+            else
+            {
+                var count = await _context.Invoices.CountAsync() + 1;
+                var campus = student.StudentNumber.Split('/')[0];
+                var invoice = new Invoice
+                {
+                    SchoolId = dto.SchoolId,
+                    StudentId = dto.StudentId,
+                    TermId = term.Id,
+                    FeePackageId = null,
+                    InvoiceNumber = $"INV/{campus}/{term.Id}/{count:D4}",
+                    TotalAmount = dto.Amount,
+                    AmountPaid = 0,
+                    Balance = dto.Amount,
+                    Status = "Unpaid",
+                    IssuedDate = DateTime.UtcNow,
+                    DueDate = term.EndDate,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Invoices.Add(invoice);
+                await _context.SaveChangesAsync();
+
+                _context.InvoiceItems.Add(new InvoiceItem
+                {
+                    InvoiceId = invoice.Id,
+                    FeeCategoryId = dto.FeeCategoryId ?? 1,
+                    Description = dto.Description,
+                    Amount = dto.Amount
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Charge applied" });
+        }
         // =====================
         // INVOICES
         // =====================
@@ -487,6 +599,118 @@ namespace LeeTec.API.Controllers
             return Ok(payments);
         }
 
+        [HttpPost("refunds")]
+        public async Task<IActionResult> RefundPayment([FromBody] DTOs.RefundRequest request)
+        {
+            var invoice = await _context.Invoices.FindAsync(request.InvoiceId);
+            if (invoice == null) return NotFound(new { message = "Invoice not found" });
+
+            if (request.Amount <= 0)
+                return BadRequest(new { message = "Refund amount must be greater than zero" });
+
+            if (invoice.AmountPaid <= 0)
+                return BadRequest(new { message = "No payments recorded for this invoice" });
+
+            if (request.Amount > invoice.AmountPaid)
+                return BadRequest(new { message = "Refund amount exceeds amount paid" });
+
+            var postingUserId = request.PostedByUserId > 0 ? request.PostedByUserId : GetCurrentUserId();
+            if (!postingUserId.HasValue)
+                return BadRequest(new { message = "Unable to determine the user performing this refund" });
+
+            var paymentCount = await _context.Payments.CountAsync() + 1;
+            var receiptRef = $"REF/WAH/{System.DateTime.UtcNow.Year}/{paymentCount:D4}";
+
+            var refund = new Payment
+            {
+                SchoolId = invoice.SchoolId,
+                InvoiceId = invoice.Id,
+                StudentId = invoice.StudentId,
+                PostedByUserId = postingUserId.Value,
+                Amount = -Math.Abs(request.Amount),
+                PaymentMethod = request.PaymentMethod ?? "Refund",
+                ReceiptNumber = request.ReceiptNumber ?? $"REF-{System.Guid.NewGuid().ToString().Substring(0,8)}",
+                Notes = request.Reason,
+                PaymentDate = request.RefundDate ?? System.DateTime.UtcNow,
+                PostedAt = System.DateTime.UtcNow,
+                ReceiptReference = receiptRef
+            };
+
+            _context.Payments.Add(refund);
+
+            invoice.AmountPaid += refund.Amount; // refund.Amount is negative
+            invoice.Balance = invoice.TotalAmount - invoice.AmountPaid;
+
+            if (invoice.Balance <= 0)
+                invoice.Status = "Paid";
+            else if (invoice.AmountPaid > 0)
+                invoice.Status = "PartiallyPaid";
+            else
+                invoice.Status = "Unpaid";
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Refund processed", refundId = refund.Id, newBalance = invoice.Balance, invoiceStatus = invoice.Status });
+        }
+
+        // =====================
+        // DELETION / REVERSALS
+        // =====================
+
+        [HttpDelete("invoice-items/{id}")]
+        public async Task<IActionResult> DeleteInvoiceItem(int id)
+        {
+            var item = await _context.InvoiceItems
+                .Include(i => i.Invoice)
+                .FirstOrDefaultAsync(i => i.Id == id);
+            if (item == null) return NotFound(new { message = "Invoice item not found" });
+
+            var invoice = item.Invoice;
+
+            // Do not allow removing items if invoice has payments recorded
+            if (invoice.AmountPaid > 0)
+                return BadRequest(new { message = "Cannot remove invoice item after payments have been posted. Please refund or adjust payments first." });
+
+            // Adjust invoice totals
+            invoice.TotalAmount -= item.Amount;
+            invoice.Balance -= item.Amount;
+
+            _context.InvoiceItems.Remove(item);
+
+            // If invoice has no more items and no payments, delete the invoice too
+            var remainingItems = await _context.InvoiceItems.CountAsync(ii => ii.InvoiceId == invoice.Id);
+            if (remainingItems == 0 && invoice.AmountPaid == 0)
+            {
+                _context.Invoices.Remove(invoice);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Invoice item removed", invoiceId = invoice.Id });
+        }
+
+        [HttpDelete("invoices/{id}")]
+        public async Task<IActionResult> DeleteInvoice(int id)
+        {
+            var invoice = await _context.Invoices
+                .Include(i => i.Items)
+                .Include(i => i.Payments)
+                .FirstOrDefaultAsync(i => i.Id == id);
+            if (invoice == null) return NotFound(new { message = "Invoice not found" });
+
+            if (invoice.AmountPaid > 0 || (invoice.Payments != null && invoice.Payments.Any()))
+                return BadRequest(new { message = "Cannot delete invoice with payments. Please process refunds before deleting." });
+
+            // Remove items first
+            if (invoice.Items != null && invoice.Items.Any())
+                _context.InvoiceItems.RemoveRange(invoice.Items);
+
+            _context.Invoices.Remove(invoice);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Invoice deleted" });
+        }
+
         // =====================
         // BULK EMAIL
         // =====================
@@ -577,6 +801,105 @@ namespace LeeTec.API.Controllers
                 sent,
                 failed,
             });
+        }
+
+        // =====================
+        // SINGLE INVOICE EMAIL
+        // =====================
+
+        [HttpPost("invoices/send-single-email")]
+        public async Task<IActionResult> SendSingleInvoiceEmail([FromBody] SendSingleInvoiceRequest request)
+        {
+            var invoice = await _context.Invoices
+                .Include(i => i.Student)
+                .Include(i => i.Items)
+                .Include(i => i.Term)
+                .OrderByDescending(i => i.CreatedAt)
+                .FirstOrDefaultAsync(i => i.StudentId == request.StudentId);
+
+            if (invoice == null)
+                return NotFound(new { message = "No invoice found for this student" });
+
+            var emailService = HttpContext.RequestServices.GetRequiredService<IEmailService>();
+
+            var itemsHtml = string.Join("", invoice.Items.Select(i =>
+                $"<tr>" +
+                $"<td style='padding:8px;border-bottom:1px solid #e2e8f0'>{i.Description}</td>" +
+                $"<td style='padding:8px;border-bottom:1px solid #e2e8f0;text-align:right'>${i.Amount:N2}</td>" +
+                $"</tr>"));
+
+            var balanceColor = invoice.Balance > 0 ? "#dc2626" : "#16a34a";
+
+            var body = $@"
+<div style='font-family:Arial,sans-serif;max-width:650px;margin:auto;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden'>
+    <div style='background:#1a237e;padding:24px;color:white'>
+        <h1 style='margin:0;font-size:24px'>Advent Hope Academy</h1>
+        <p style='margin:4px 0 0;opacity:0.8'>Fee Invoice Statement</p>
+    </div>
+    <div style='padding:24px'>
+        <table style='width:100%;margin-bottom:24px'>
+            <tr>
+                <td>
+                    <strong>Student:</strong> {invoice.Student.FirstName} {invoice.Student.Surname}<br/>
+                    <strong>Student No:</strong> {invoice.Student.StudentNumber}<br/>
+                    <strong>Form:</strong> {invoice.Student.Form}
+                </td>
+                <td style='text-align:right'>
+                    <strong>Invoice:</strong> {invoice.InvoiceNumber}<br/>
+                    <strong>Term:</strong> {invoice.Term.Name} {invoice.Term.Year}<br/>
+                    <strong>Status:</strong> {invoice.Status}
+                </td>
+            </tr>
+        </table>
+        <table style='width:100%;border-collapse:collapse;margin-bottom:24px'>
+            <thead>
+                <tr style='background:#f8fafc'>
+                    <th style='padding:10px 8px;text-align:left;border-bottom:2px solid #1a237e'>Description</th>
+                    <th style='padding:10px 8px;text-align:right;border-bottom:2px solid #1a237e'>Amount</th>
+                </tr>
+            </thead>
+            <tbody>{itemsHtml}</tbody>
+            <tfoot>
+                <tr>
+                    <td style='padding:8px;font-weight:bold'>Total Fees</td>
+                    <td style='padding:8px;text-align:right;font-weight:bold'>${invoice.TotalAmount:N2}</td>
+                </tr>
+                <tr style='background:#f0fdf4'>
+                    <td style='padding:8px'>Amount Paid</td>
+                    <td style='padding:8px;text-align:right;color:#16a34a'>-${invoice.AmountPaid:N2}</td>
+                </tr>
+                <tr style='background:#fef2f2'>
+                    <td style='padding:10px 8px;font-weight:bold;font-size:16px'>BALANCE DUE</td>
+                    <td style='padding:10px 8px;text-align:right;font-weight:bold;font-size:16px;color:{balanceColor}'>${invoice.Balance:N2}</td>
+                </tr>
+            </tfoot>
+        </table>
+        <div style='background:#f8fafc;padding:16px;border-radius:8px;margin-bottom:16px'>
+            <strong>Banking Details:</strong><br/>
+            Bank: ZB Bank &nbsp;|&nbsp; Branch: Msasa<br/>
+            Name: Advent Hope Academy<br/>
+            NOSTRO: 413400523382405 &nbsp;|&nbsp; ZWL: 413400523382200
+        </div>
+        <p style='color:#64748b;font-size:12px;text-align:center'>
+            This is a computer generated invoice from LeeTec SMS · Advent Hope Academy<br/>
+            Please retain this email for your records.
+        </p>
+    </div>
+</div>";
+
+            try
+            {
+                await emailService.SendAsync(
+                    request.Email,
+                    $"Fee Invoice - {invoice.Term.Name} {invoice.Term.Year} - {invoice.Student.FirstName} {invoice.Student.Surname}",
+                    body);
+
+                return Ok(new { message = "Invoice emailed successfully", email = request.Email });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Failed to send email", error = ex.Message });
+            }
         }
     }
 }

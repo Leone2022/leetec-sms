@@ -9,7 +9,7 @@ namespace LeeTec.API.Models
         public int SchoolId { get; set; }
         public int StudentId { get; set; }
         public int TermId { get; set; }
-        public int FeePackageId { get; set; }
+        public int? FeePackageId { get; set; }
         public string InvoiceNumber { get; set; } = string.Empty; // e.g. "INV/WAH/2026/T1/0001"
         public decimal TotalAmount { get; set; }
         public decimal AmountPaid { get; set; } = 0;
@@ -23,7 +23,7 @@ namespace LeeTec.API.Models
         public School School { get; set; } = null!;
         public Student Student { get; set; } = null!;
         public Term Term { get; set; } = null!;
-        public FeePackage FeePackage { get; set; } = null!;
+        public FeePackage? FeePackage { get; set; }
         public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
         public ICollection<Payment> Payments { get; set; } = new List<Payment>();
     }

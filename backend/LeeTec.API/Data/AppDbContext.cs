@@ -134,6 +134,13 @@ namespace LeeTec.API.Data
             modelBuilder.Entity<TermRegistration>()
                 .Property(tr => tr.PromotionStatus)
                 .HasConversion<string>();
+
+            modelBuilder.Entity<Invoice>()
+                .HasOne(i => i.FeePackage)
+                .WithMany(p => p.Invoices)
+                .HasForeignKey(i => i.FeePackageId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

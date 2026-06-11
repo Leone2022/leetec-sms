@@ -79,4 +79,42 @@ namespace LeeTec.API.DTOs
         public string? Notes { get; set; }
         public DateTime PaymentDate { get; set; }
     }
+
+    // =====================
+    // DIRECT CHARGES
+    // =====================
+    public class IndividualChargeDTO
+    {
+        public int StudentId { get; set; }
+        public int SchoolId { get; set; } = 1;
+        public string Description { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+        public int? FeeCategoryId { get; set; }
+    }
+
+    // =====================
+    // SINGLE INVOICE EMAIL
+    // =====================
+    public class SendSingleInvoiceRequest
+    {
+        public int StudentId { get; set; }
+        public int? InvoiceId { get; set; }
+        public string Email { get; set; } = string.Empty;
+        public int SchoolId { get; set; } = 1;
+    }
+
+    // =====================
+    // REFUNDS
+    // =====================
+    public class RefundRequest
+    {
+        public int InvoiceId { get; set; }
+        public decimal Amount { get; set; }
+        public int PostedByUserId { get; set; }
+        public string? Reason { get; set; }
+        public DateTime? RefundDate { get; set; }
+        public string? PaymentMethod { get; set; }
+        public string? ReceiptNumber { get; set; }
+        public string? ReceiptReference { get; set; }
+    }
 }

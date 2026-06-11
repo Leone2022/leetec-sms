@@ -59,13 +59,20 @@ export const feesAPI = {
   getPackages: (termId: number) => api.get(`/fees/packages/term/${termId}`),
   createPackage: (data: any) => api.post('/fees/packages', data),
   updatePackage: (id: number, data: any) => api.put(`/fees/packages/${id}`, data),
+  getStudentBalances: (termId: number, schoolId?: number) =>
+    api.get(`/fees/student-balances/${termId}?schoolId=${schoolId || 1}`),
+  chargeIndividual: (data: any) => api.post('/fees/charge-individual', data),
   generateInvoices: (data: any) => api.post('/fees/invoices/generate', data),
   sendBulkInvoiceEmails: (data: any) => api.post('/fees/invoices/send-bulk-email', data),
+  sendSingleInvoiceEmail: (data: any) => api.post('/fees/invoices/send-single-email', data),
   getTermInvoices: (schoolId: number, termId: number) =>
     api.get(`/fees/invoices/school/${schoolId}/term/${termId}`),
   getStudentInvoices: (studentId: number) =>
     api.get(`/fees/invoices/student/${studentId}`),
   postPayment: (data: any) => api.post('/fees/payments', data),
+  deleteInvoiceItem: (id: number) => api.delete(`/fees/invoice-items/${id}`),
+  deleteInvoice: (id: number) => api.delete(`/fees/invoices/${id}`),
+  refundInvoice: (data: any) => api.post('/fees/refunds', data),
 };
 
 export const portalAPI = {
