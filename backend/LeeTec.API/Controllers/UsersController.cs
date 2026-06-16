@@ -16,6 +16,37 @@ namespace LeeTec.API.Controllers
             _context = context;
         }
 
+        // GET /api/users?schoolId=1&role=Teacher
+        [HttpGet]
+        public async Task<IActionResult> GetUsers(
+            [FromQuery] int schoolId = 1,
+            [FromQuery] string? role = null)
+        {
+            var query = _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .Where(u => u.SchoolId == schoolId)
+                .AsQueryable();
+
+            if (!string.IsNullOrEmpty(role))
+                query = query.Where(u => u.UserRoles.Any(ur => ur.Role.Name == role));
+
+            var users = await query
+                .OrderBy(u => u.LastName).ThenBy(u => u.FirstName)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.FirstName,
+                    u.LastName,
+                    u.Email,
+                    u.Status,
+                    Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList(),
+                })
+                .ToListAsync();
+
+            return Ok(users);
+        }
+
         [HttpPost("assign-role")]
         public async Task<IActionResult> AssignRole(int userId, int roleId)
         {

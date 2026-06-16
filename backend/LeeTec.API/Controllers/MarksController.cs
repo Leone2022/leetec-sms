@@ -25,8 +25,21 @@ namespace LeeTec.API.Controllers
             [FromQuery] string form,
             [FromQuery] int subjectId,
             [FromQuery] string assessmentType,
-            [FromQuery] int schoolId = 1)
+            [FromQuery] int schoolId = 1,
+            [FromQuery] int? teacherId = null)
         {
+            if (teacherId.HasValue)
+            {
+                var hasAssignment = await _context.TeacherSubjectAssignments.AnyAsync(a =>
+                    a.TeacherId == teacherId.Value &&
+                    a.SubjectId == subjectId &&
+                    a.Campus == campus &&
+                    a.Form == form &&
+                    a.IsActive);
+                if (!hasAssignment)
+                    return StatusCode(403, new { message = "You are not assigned to teach this subject for this class." });
+            }
+
             var subject = await _context.Subjects.FindAsync(subjectId);
             if (subject == null) return NotFound(new { message = "Subject not found" });
 
@@ -68,6 +81,18 @@ namespace LeeTec.API.Controllers
         [HttpPost("bulk-save")]
         public async Task<IActionResult> BulkSaveMarks([FromBody] BulkSaveMarksDTO dto)
         {
+            if (dto.TeacherId.HasValue && dto.Campus != null && dto.Form != null)
+            {
+                var hasAssignment = await _context.TeacherSubjectAssignments.AnyAsync(a =>
+                    a.TeacherId == dto.TeacherId.Value &&
+                    a.SubjectId == dto.SubjectId &&
+                    a.Campus == dto.Campus &&
+                    a.Form == dto.Form &&
+                    a.IsActive);
+                if (!hasAssignment)
+                    return StatusCode(403, new { message = "You are not assigned to teach this subject for this class." });
+            }
+
             var studentIds = dto.Entries.Select(e => e.StudentId).ToList();
 
             var existingMarks = await _context.Marks

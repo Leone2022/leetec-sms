@@ -28,6 +28,9 @@ namespace LeeTec.API.DTOs
         public int SubjectId { get; set; }
         public string AssessmentType { get; set; } = string.Empty;
         public List<StudentMarkEntry> Entries { get; set; } = new();
+        public int? TeacherId { get; set; }
+        public string? Campus { get; set; }
+        public string? Form { get; set; }
     }
 
     public class MarkResponseDTO

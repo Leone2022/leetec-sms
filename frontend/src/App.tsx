@@ -13,7 +13,10 @@ import SubjectsPage from './pages/SubjectsPage.tsx';
 import MarksEntryPage from './pages/MarksEntryPage.tsx';
 import BulkReportsPage from './pages/BulkReportsPage.tsx';
 import AnnouncementsPage from './pages/AnnouncementsPage.tsx';
+import TeacherAssignmentsPage from './pages/TeacherAssignmentsPage.tsx';
 import StudentPortalLoginPage from './pages/StudentPortalLoginPage.tsx';
+import TeacherLoginPage from './pages/TeacherLoginPage.tsx';
+import TeacherDashboardPage from './pages/TeacherDashboardPage.tsx';
 import StudentDashboardPage from './pages/StudentDashboardPage.tsx';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -41,6 +44,11 @@ function App() {
       <Route path="/marks-entry" element={<ProtectedRoute><MarksEntryPage /></ProtectedRoute>} />
       <Route path="/bulk-reports" element={<ProtectedRoute><BulkReportsPage /></ProtectedRoute>} />
       <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
+      <Route path="/teacher-assignments" element={<ProtectedRoute><TeacherAssignmentsPage /></ProtectedRoute>} />
+
+      {/* Teacher Portal */}
+      <Route path="/teacher-login" element={<TeacherLoginPage />} />
+      <Route path="/teacher-dashboard" element={<TeacherDashboardPage />} />
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/login" />} />

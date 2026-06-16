@@ -38,6 +38,7 @@ const NAV: NavItem[] = [
   { label: 'Marks Entry', Icon: ClipboardList, path: '/marks-entry' },
   { label: 'Bulk Reports', Icon: FileStack, path: '/bulk-reports' },
   { label: 'Announcements', Icon: Bell, path: '/announcements' },
+  { label: 'Staff Assignments', Icon: Users, path: '/teacher-assignments' },
   { label: 'Super Admin', Icon: Shield, path: '/super-admin', superAdminOnly: true },
 ];
 

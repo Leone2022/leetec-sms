@@ -125,7 +125,7 @@ export const subjectsAPI = {
 };
 
 export const marksAPI = {
-  getEntrySheet: (params: { termId: number; campus: string; form: string; subjectId: number; assessmentType: string; schoolId?: number }) => {
+  getEntrySheet: (params: { termId: number; campus: string; form: string; subjectId: number; assessmentType: string; schoolId?: number; teacherId?: number }) => {
     const qs = new URLSearchParams({
       termId: String(params.termId),
       campus: params.campus,
@@ -134,6 +134,7 @@ export const marksAPI = {
       assessmentType: params.assessmentType,
       schoolId: String(params.schoolId || 1),
     });
+    if (params.teacherId) qs.append('teacherId', String(params.teacherId));
     return api.get(`/marks/entry-sheet?${qs.toString()}`);
   },
   bulkSave: (data: any) => api.post('/marks/bulk-save', data),
@@ -175,6 +176,28 @@ export const superadminAPI = {
   createSchool: (data: any) => api.post('/superadmin/schools', data),
   toggleSchoolActive: (id: number) => api.put(`/superadmin/schools/${id}/toggle-active`),
   getUsers: () => api.get('/superadmin/users'),
+};
+
+export const usersAPI = {
+  getAll: (schoolId = 1, role?: string) => {
+    const params = new URLSearchParams({ schoolId: String(schoolId) });
+    if (role) params.append('role', role);
+    return api.get(`/users?${params.toString()}`);
+  },
+};
+
+export const teacherAuthAPI = {
+  login: (email: string, password: string) =>
+    api.post('/teacher-auth/login', { email, password }),
+};
+
+export const teacherAssignmentsAPI = {
+  getAll: (schoolId = 1) => api.get(`/teacher-assignments?schoolId=${schoolId}`),
+  getMySubjects: (teacherId: number) =>
+    api.get(`/teacher-assignments/my-subjects?teacherId=${teacherId}`),
+  create: (data: { schoolId: number; teacherId: number; subjectId: number; campus: string; form: string }) =>
+    api.post('/teacher-assignments', data),
+  delete: (id: number) => api.delete(`/teacher-assignments/${id}`),
 };
 
 export default api;
