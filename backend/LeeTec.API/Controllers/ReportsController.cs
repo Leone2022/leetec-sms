@@ -216,69 +216,82 @@ namespace LeeTec.API.Controllers
         [HttpGet("completion-status")]
         public async Task<IActionResult> GetCompletionStatus([FromQuery] int termId, [FromQuery] int schoolId = 1)
         {
-            var registrations = await _context.TermRegistrations
-                .Where(tr => tr.TermId == termId && tr.SchoolId == schoolId)
-                .Include(tr => tr.Student)
-                .OrderBy(tr => tr.Student!.Surname)
-                .ThenBy(tr => tr.Student!.FirstName)
-                .ToListAsync();
-
-            var studentIds = registrations.Select(r => r.StudentId).ToList();
-
-            var subjects = await _context.Subjects
-                .Where(s => s.SchoolId == schoolId && s.IsActive)
-                .ToListAsync();
-
-            // Distinct subject IDs per student that have at least one mark in this term
-            var enteredSubjectMap = await _context.Marks
-                .Where(m => m.TermId == termId && studentIds.Contains(m.StudentId))
-                .GroupBy(m => m.StudentId)
-                .Select(g => new
-                {
-                    StudentId = g.Key,
-                    EnteredSubjectIds = g.Select(m => m.SubjectId).Distinct().ToList()
-                })
-                .ToListAsync();
-
-            var enteredByStudent = enteredSubjectMap.ToDictionary(e => e.StudentId, e => e.EnteredSubjectIds);
-
-            var result = registrations.Select(reg =>
+            try
             {
-                var student = reg.Student!;
-                var campus = reg.Campus;
-                var curriculumType = student.Curriculum.StartsWith("ZIMSEC", StringComparison.OrdinalIgnoreCase)
-                    ? "ZIMSEC" : "Cambridge";
+                var registrations = await _context.TermRegistrations
+                    .Where(tr => tr.TermId == termId && tr.SchoolId == schoolId)
+                    .Include(tr => tr.Student)
+                    .OrderBy(tr => tr.Student!.Surname)
+                    .ThenBy(tr => tr.Student!.FirstName)
+                    .ToListAsync();
 
-                var campusSubjectIds = subjects
-                    .Where(s => s.Campus == campus && s.CurriculumType == curriculumType)
-                    .Select(s => s.Id)
-                    .ToHashSet();
+                var studentIds = registrations.Select(r => r.StudentId).ToList();
 
-                var totalSubjects = campusSubjectIds.Count;
+                var subjects = await _context.Subjects
+                    .Where(s => s.SchoolId == schoolId && s.IsActive)
+                    .ToListAsync();
 
-                var entered = enteredByStudent.TryGetValue(reg.StudentId, out var ids)
-                    ? ids.Count(id => campusSubjectIds.Contains(id))
-                    : 0;
+                // Materialise flat rows first — avoids ToList() inside EF projection which
+                // MariaDB provider cannot translate to SQL.
+                var rawMarks = await _context.Marks
+                    .Where(m => m.TermId == termId && studentIds.Contains(m.StudentId))
+                    .Select(m => new { m.StudentId, m.SubjectId })
+                    .ToListAsync();
 
-                var fullyEntered = entered >= totalSubjects && totalSubjects > 0;
-                var status = fullyEntered ? "Ready" : entered > 0 ? "Partial" : "Not Started";
+                var enteredByStudent = rawMarks
+                    .GroupBy(m => m.StudentId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(m => m.SubjectId).Distinct().ToHashSet()
+                    );
 
-                return new
+                var result = registrations.Select(reg =>
                 {
-                    studentId = reg.StudentId,
-                    studentName = $"{student.FirstName} {student.Surname}",
-                    studentNumber = student.StudentNumber,
-                    form = reg.Form,
-                    campus,
-                    curriculum = student.Curriculum,
-                    totalSubjects,
-                    enteredSubjects = entered,
-                    fullyEntered,
-                    status,
-                };
-            }).ToList();
+                    var student = reg.Student!;
+                    var campus = reg.Campus ?? "";
+                    var curriculumStr = student.Curriculum ?? "";
 
-            return Ok(result);
+                    // If curriculum is blank, infer from campus:
+                    // AHJ uses Cambridge Checkpoint; AHA/AHS use ZIMSEC.
+                    var curriculumType = curriculumStr.StartsWith("ZIMSEC", StringComparison.OrdinalIgnoreCase)
+                        ? "ZIMSEC"
+                        : (curriculumStr.Length == 0 && campus != "AHJ") ? "ZIMSEC" : "Cambridge";
+
+                    var campusSubjectIds = subjects
+                        .Where(s => s.Campus == campus && s.CurriculumType == curriculumType)
+                        .Select(s => s.Id)
+                        .ToHashSet();
+
+                    var totalSubjects = campusSubjectIds.Count;
+
+                    var entered = enteredByStudent.TryGetValue(reg.StudentId, out var ids)
+                        ? ids.Count(id => campusSubjectIds.Contains(id))
+                        : 0;
+
+                    var fullyEntered = entered >= totalSubjects && totalSubjects > 0;
+                    var status = fullyEntered ? "Ready" : entered > 0 ? "Partial" : "Not Started";
+
+                    return new
+                    {
+                        studentId = reg.StudentId,
+                        studentName = $"{student.FirstName} {student.Surname}",
+                        studentNumber = student.StudentNumber,
+                        form = reg.Form,
+                        campus,
+                        curriculum = curriculumStr,
+                        totalSubjects,
+                        enteredSubjects = entered,
+                        fullyEntered,
+                        status,
+                    };
+                }).ToList();
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message, stackTrace = ex.StackTrace });
+            }
         }
 
         // ── POST /api/reports/publish ─────────────────────────────────────────────

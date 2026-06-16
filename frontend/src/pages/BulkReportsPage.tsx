@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { feesAPI, bulkReportsAPI, reportsAPI } from '../services/api';
+import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI } from '../services/api';
 import { generateReportCard } from '../utils/reportCard';
+import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } from '../utils/credentials';
 import AdminLayout from '../components/AdminLayout';
 import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
 
@@ -27,6 +28,7 @@ export default function BulkReportsPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [generating, setGenerating] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [exportingCreds, setExportingCreds] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -108,6 +110,37 @@ export default function BulkReportsPage() {
     setProgress(null);
     setGenerating(false);
     showMsg(`Done — ${done} report card${done !== 1 ? 's' : ''} generated`, 'success');
+  };
+
+  const getTermLabel = () => {
+    const term = terms.find(t => t.id === termId);
+    return term ? `${term.name} ${term.year}` : String(termId);
+  };
+
+  const handleExportCredentialsPdf = async () => {
+    if (!termId) return;
+    setExportingCreds(true);
+    try {
+      const res = await adminAPI.getStudentCredentials(termId as number);
+      exportCredentialsToPdf(res.data as CredentialRow[], getTermLabel());
+    } catch {
+      showMsg('Failed to export credentials', 'error');
+    } finally {
+      setExportingCreds(false);
+    }
+  };
+
+  const handleExportCredentialsExcel = async () => {
+    if (!termId) return;
+    setExportingCreds(true);
+    try {
+      const res = await adminAPI.getStudentCredentials(termId as number);
+      exportCredentialsToExcel(res.data as CredentialRow[], getTermLabel());
+    } catch {
+      showMsg('Failed to export credentials', 'error');
+    } finally {
+      setExportingCreds(false);
+    }
   };
 
   const handleSendToPortal = async () => {
@@ -232,6 +265,28 @@ export default function BulkReportsPage() {
             </button>
           </div>
         </div>
+
+        {/* Credentials export bar */}
+        {termId && (
+          <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Export Credentials:</span>
+            <button
+              onClick={handleExportCredentialsPdf}
+              disabled={exportingCreds}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 12, fontWeight: 600, color: '#0f172a', cursor: exportingCreds ? 'not-allowed' : 'pointer', opacity: exportingCreds ? 0.6 : 1 }}
+            >
+              📄 Print Credentials (PDF)
+            </button>
+            <button
+              onClick={handleExportCredentialsExcel}
+              disabled={exportingCreds}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: 12, fontWeight: 600, color: '#0f172a', cursor: exportingCreds ? 'not-allowed' : 'pointer', opacity: exportingCreds ? 0.6 : 1 }}
+            >
+              📊 Export Credentials (Excel)
+            </button>
+            {exportingCreds && <span style={{ fontSize: 12, color: '#64748b' }}>Exporting...</span>}
+          </div>
+        )}
 
         {/* Student table */}
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>

@@ -186,6 +186,20 @@ export const usersAPI = {
   },
 };
 
+export const adminAPI = {
+  createTeacher: (data: {
+    firstName: string;
+    surname: string;
+    email: string;
+    password: string;
+    phoneNumber?: string;
+    schoolId?: number;
+  }) => api.post('/admin/create-teacher', data),
+  getTeachers: (schoolId = 1) => api.get(`/admin/teachers?schoolId=${schoolId}`),
+  getStudentCredentials: (termId: number, schoolId = 1) =>
+    api.get(`/admin/student-credentials?termId=${termId}&schoolId=${schoolId}`),
+};
+
 export const teacherAuthAPI = {
   login: (email: string, password: string) =>
     api.post('/teacher-auth/login', { email, password }),
