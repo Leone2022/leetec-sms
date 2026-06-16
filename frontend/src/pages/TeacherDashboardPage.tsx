@@ -407,13 +407,14 @@ export default function TeacherDashboardPage() {
       <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '20px 24px' }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 16px' }}>Account Details</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
-          {[
+          {([
             ['First Name', firstName],
             ['Surname', surname],
             ['Email', teacherInfo?.email],
+            ['Phone Number', teacherInfo?.phoneNumber || null],
             ['Role', 'Teacher'],
-            ['Assigned Classes', String(assignments.length)],
-          ].map(([label, value]) => (
+            ['School', 'Advent Hope Academy'],
+          ] as [string, string | null][]).filter(([, v]) => v !== null).map(([label, value]) => (
             <div key={label}>
               <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>{label}</p>
               <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 }}>{value || '—'}</p>

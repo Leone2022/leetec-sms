@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, CheckCircle2, GraduationCap } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, GraduationCap } from 'lucide-react';
 
 const FEATURES = [
   'Student Information System',
@@ -20,7 +20,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -173,10 +173,16 @@ export default function LoginPage() {
 
               <div className="auth-divider" />
 
-              <Link to="/student-login" className="btn btn-ghost auth-secondary">
-                <CheckCircle2 size={15} />
-                Student sign in
-              </Link>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                <Link to="/teacher-login" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none' }}>
+                  Are you a teacher?{' '}
+                  <span style={{ color: '#1a237e', fontWeight: 600, textDecoration: 'underline' }}>Login here</span>
+                </Link>
+                <Link to="/student-login" style={{ fontSize: 12, color: '#64748b', textDecoration: 'none' }}>
+                  Are you a student?{' '}
+                  <span style={{ color: '#1a237e', fontWeight: 600, textDecoration: 'underline' }}>Login here</span>
+                </Link>
+              </div>
             </div>
           </div>
         </div>

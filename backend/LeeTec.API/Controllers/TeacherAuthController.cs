@@ -52,6 +52,7 @@ namespace LeeTec.API.Controllers
                     firstName = user.FirstName,
                     surname = user.LastName,
                     email = user.Email,
+                    phoneNumber = user.PhoneNumber,
                     role = "Teacher",
                     schoolId = user.SchoolId,
                 }
