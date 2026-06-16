@@ -14,6 +14,93 @@ const todayISO = () => new Date().toISOString().split('T')[0];
 const CATEGORY_TYPES = ['Core Fees', 'Levies', 'Incidentals'];
 const PAY_METHODS = ['Cash', 'Bank Transfer', 'EcoCash', 'OneMoney', 'Swipe', 'Other'];
 
+function getBankDetails(studentNumber: string) {
+  const campus = (studentNumber || '').split('/')[0];
+  if (campus === 'AHJ') {
+    return { name: 'Advent Hope Junior', branch: 'Msasa', nostro: '413400324548405', zwl: '4134324548080' };
+  }
+  return { name: 'Advent Hope Academy', branch: 'Msasa', nostro: '413400523382405', zwl: '413400523382200' };
+}
+
+const FEE_PRESETS = [
+  {
+    label: 'AHJ Day', sub: 'Cambridge Primary',
+    items: [
+      { name: 'Tuition Fee', amount: 400 },
+      { name: 'Administration Fee', amount: 50 },
+      { name: 'School Development Fee', amount: 50 },
+    ],
+    total: 500,
+  },
+  {
+    label: 'AHJ Boarding', sub: 'Cambridge Check-Point',
+    items: [
+      { name: 'Tuition & Boarding', amount: 1200 },
+      { name: 'Administration Fee', amount: 50 },
+      { name: 'Lab Fee', amount: 50 },
+    ],
+    total: 1300,
+  },
+  {
+    label: 'AHA Day', sub: 'ZIMSEC O-Level',
+    items: [
+      { name: 'Tuition Fee', amount: 450 },
+      { name: 'Administration Fee', amount: 50 },
+      { name: 'Lab Fee', amount: 30 },
+      { name: 'School Development Fee', amount: 50 },
+    ],
+    total: 580,
+  },
+  {
+    label: 'AHA Day', sub: 'Cambridge IGCSE',
+    items: [
+      { name: 'Tuition Fee', amount: 450 },
+      { name: 'Administration Fee', amount: 50 },
+      { name: 'Lab Fee', amount: 30 },
+      { name: 'School Development Fee', amount: 50 },
+    ],
+    total: 580,
+  },
+  {
+    label: 'AHA Boarding', sub: 'ZIMSEC',
+    items: [
+      { name: 'Tuition & Boarding', amount: 1150 },
+      { name: 'Administration Fee', amount: 50 },
+      { name: 'Lab Fee', amount: 30 },
+    ],
+    total: 1230,
+  },
+  {
+    label: 'AHA Boarding', sub: 'Cambridge',
+    items: [
+      { name: 'Tuition & Boarding', amount: 1150 },
+      { name: 'Administration Fee', amount: 50 },
+      { name: 'Lab Fee', amount: 30 },
+    ],
+    total: 1230,
+  },
+  {
+    label: 'AHS Day', sub: 'ZIMSEC A-Level',
+    items: [
+      { name: 'Tuition Fee', amount: 500 },
+      { name: 'Administration Fee', amount: 50 },
+      { name: 'Lab Fee', amount: 50 },
+      { name: 'School Development Fee', amount: 50 },
+    ],
+    total: 650,
+  },
+  {
+    label: 'AHS Day', sub: 'Cambridge A-Level',
+    items: [
+      { name: 'Tuition Fee', amount: 500 },
+      { name: 'Administration Fee', amount: 50 },
+      { name: 'Lab Fee', amount: 50 },
+      { name: 'School Development Fee', amount: 50 },
+    ],
+    total: 650,
+  },
+];
+
 export default function FeeSetupPage() {
   // ── Shared ──────────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>('charge');
@@ -220,6 +307,7 @@ export default function FeeSetupPage() {
       const invs: any[] = res.data || [];
       if (invs.length === 0) { showMsg('No invoices found for this student', 'error'); return; }
       const inv = invs[0];
+      const invBank = getBankDetails(b.studentNumber);
       const doc = new jsPDF();
 
       // Navy banner
@@ -230,7 +318,7 @@ export default function FeeSetupPage() {
       doc.text('Advent Hope Academy', 14, 17);
       doc.setFontSize(9); doc.setFont('helvetica', 'normal');
       doc.text('64 Jason Moyo Ave, Harare  |  Tel: +263 773 102 003  |  adventhope01@gmail.com', 14, 26);
-      doc.text('Bank: ZB Bank, Msasa  |  NOSTRO: 413400523382405', 14, 34);
+      doc.text(`Bank: ZB Bank, ${invBank.branch}  |  NOSTRO: ${invBank.nostro}`, 14, 34);
       doc.setFontSize(22); doc.setFont('helvetica', 'bold');
       doc.text('INVOICE', 196, 28, { align: 'right' });
 
@@ -295,8 +383,8 @@ export default function FeeSetupPage() {
       doc.rect(14, footY, 182, 26, 'F');
       doc.setFontSize(9); doc.setTextColor(71, 85, 105);
       doc.text('Banking Details:', 18, footY + 7);
-      doc.text('Bank: ZB Bank  |  Branch: Msasa  |  Name: Advent Hope Academy', 18, footY + 14);
-      doc.text('NOSTRO: 413400523382405  |  ZWL: 413400523382200', 18, footY + 21);
+      doc.text(`Bank: ZB Bank  |  Branch: ${invBank.branch}  |  Name: ${invBank.name}`, 18, footY + 14);
+      doc.text(`NOSTRO: ${invBank.nostro}  |  ZWL: ${invBank.zwl}`, 18, footY + 21);
       doc.setFontSize(8); doc.setTextColor(150);
       doc.text('Thank you for your continued support.  This is a computer generated invoice — LeeTec SMS', 105, footY + 34, { align: 'center' });
 
@@ -396,6 +484,7 @@ export default function FeeSetupPage() {
     const form = payStudent.form || '—';
     const campus = payStudent.campus || (studentNum.split('/')[0]) || '—';
     const finalBal = statementRows[statementRows.length - 1].balance;
+    const stmtBank = getBankDetails(payStudent.studentNumber);
 
     // Navy banner
     doc.setFillColor(26, 35, 126);
@@ -405,7 +494,7 @@ export default function FeeSetupPage() {
     doc.text('Advent Hope Academy', 14, 17);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     doc.text('64 Jason Moyo Ave, Harare  |  Tel: +263 773 102 003  |  adventhope01@gmail.com', 14, 26);
-    doc.text('Bank: ZB Bank, Msasa  |  NOSTRO: 413400523382405', 14, 34);
+    doc.text(`Bank: ZB Bank, ${stmtBank.branch}  |  NOSTRO: ${stmtBank.nostro}`, 14, 34);
     doc.setFontSize(16); doc.setFont('helvetica', 'bold');
     doc.text('ACCOUNT STATEMENT', 196, 22, { align: 'right' });
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
@@ -464,8 +553,8 @@ export default function FeeSetupPage() {
     doc.line(14, footY, 196, footY);
     doc.setFontSize(9); doc.setTextColor(71, 85, 105);
     doc.text('Banking Details:', 14, footY + 8);
-    doc.text('Bank: ZB Bank  |  Branch: Msasa  |  Name: Advent Hope Academy', 14, footY + 15);
-    doc.text('NOSTRO: 413400523382405  |  ZWL: 413400523382200', 14, footY + 22);
+    doc.text(`Bank: ZB Bank  |  Branch: ${stmtBank.branch}  |  Name: ${stmtBank.name}`, 14, footY + 15);
+    doc.text(`NOSTRO: ${stmtBank.nostro}  |  ZWL: ${stmtBank.zwl}`, 14, footY + 22);
     doc.setFontSize(8); doc.setTextColor(150);
     doc.text('This is a computer generated statement.', 105, footY + 30, { align: 'center' });
 
@@ -665,6 +754,39 @@ export default function FeeSetupPage() {
                 >
                   <Plus size={14} /> Individual Charge
                 </button>
+              </div>
+
+              {/* Fee Structure Reference */}
+              <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0' }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>Standard Fee Structures</h3>
+                  <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>Official fee schedules per campus and curriculum type</p>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 1, background: '#f1f5f9' }}>
+                  {FEE_PRESETS.map((preset, idx) => (
+                    <div key={idx} style={{ background: 'white', padding: '14px 18px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: '#0f172a' }}>{preset.label}</p>
+                          <p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>{preset.sub}</p>
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#1a237e', fontFamily: 'ui-monospace, monospace' }}>${preset.total.toLocaleString()}</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {preset.items.map((item, i) => (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                            <span style={{ color: '#475569' }}>{item.name}</span>
+                            <span style={{ color: '#0f172a', fontFamily: 'ui-monospace, monospace' }}>${item.amount.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700 }}>
+                        <span style={{ color: '#0f172a' }}>TOTAL</span>
+                        <span style={{ color: '#1a237e', fontFamily: 'ui-monospace, monospace' }}>${preset.total.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Student Balances */}

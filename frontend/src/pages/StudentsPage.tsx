@@ -24,9 +24,18 @@ const WIZARD_STEPS = [
   'Emergency Contacts',
 ];
 
+const CURRICULUM_OPTIONS: Record<string, string[] | null> = {
+  AHJ: null,
+  AHA: ['ZIMSEC O-Level', 'Cambridge IGCSE'],
+  AHS: ['ZIMSEC A-Level', 'Cambridge A-Level'],
+};
+
+const defaultCurriculum = (campus: string) =>
+  campus === 'AHJ' ? 'Cambridge' : (CURRICULUM_OPTIONS[campus]?.[0] ?? 'Cambridge');
+
 const blankStep1 = () => ({
   firstName: '', surname: '', dateOfBirth: '', gender: 'Male',
-  race: '', birthCertificateNo: '', campus: 'AHA',
+  race: '', birthCertificateNo: '', campus: 'AHA', curriculum: defaultCurriculum('AHA'),
 });
 
 const blankStep2 = () => ({
@@ -129,6 +138,7 @@ export default function StudentsPage() {
         form: step2.form,
         dateOfEntry: step2.dateOfEntry,
         campus: step1.campus,
+        curriculum: step1.curriculum,
         race: step1.race.trim(),
         previousSchool: step2.previousSchool.trim(),
         otherInformation: step2.otherInformation.trim(),
@@ -431,6 +441,7 @@ export default function StudentsPage() {
     name: `${s.firstName ?? ''} ${s.surname ?? ''}`.trim(),
     number: s.studentNumber ?? '',
     form: s.form ?? '',
+    curriculum: s.curriculum ?? '',
     gender: s.gender ?? '',
     status: s.status ?? '',
   }));
@@ -438,6 +449,7 @@ export default function StudentsPage() {
     { header: 'Student Name', value: (r: typeof exportRows[number]) => r.name },
     { header: 'Student Number', value: (r: typeof exportRows[number]) => r.number },
     { header: 'Form', value: (r: typeof exportRows[number]) => r.form },
+    { header: 'Curriculum', value: (r: typeof exportRows[number]) => r.curriculum },
     { header: 'Gender', value: (r: typeof exportRows[number]) => r.gender },
     { header: 'Status', value: (r: typeof exportRows[number]) => r.status },
   ];
@@ -561,7 +573,7 @@ export default function StudentsPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Student</th><th>Student No.</th><th>Form</th><th>Gender</th><th>Status</th>
+                    <th>Student</th><th>Student No.</th><th>Form</th><th>Curriculum</th><th>Gender</th><th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -577,6 +589,7 @@ export default function StudentsPage() {
                         </td>
                         <td style={{ fontFamily: 'ui-monospace, monospace' }}>{s.studentNumber}</td>
                         <td><span className="pill" style={{ background: fs.bg, color: fs.text }}>{s.form}</span></td>
+                        <td>{s.curriculum}</td>
                         <td>{s.gender}</td>
                         <td>
                           <span className={`pill ${s.status === 'Active' ? 'pill-success' : 'pill-danger'}`}>
@@ -692,7 +705,7 @@ export default function StudentsPage() {
                       ].map(({ code, name, desc }) => (
                         <div
                           key={code}
-                          onClick={() => setStep1({ ...step1, campus: code })}
+                          onClick={() => setStep1({ ...step1, campus: code, curriculum: defaultCurriculum(code) })}
                           style={{
                             border: step1.campus === code ? '2px solid #1a237e' : '2px solid #e2e8f0',
                             background: step1.campus === code ? '#eef2ff' : 'white',
@@ -708,6 +721,15 @@ export default function StudentsPage() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={labelStyle}>Curriculum</label>
+                    {CURRICULUM_OPTIONS[step1.campus] === null ? (
+                      <input className="text-field" style={{ background: '#f8fafc', color: '#64748b', width: '100%', boxSizing: 'border-box' }}
+                        value={step1.curriculum} readOnly title="Fixed for AHJ" />
+                    ) : (
+                      sel(step1.curriculum, (v) => setStep1({ ...step1, curriculum: v }), CURRICULUM_OPTIONS[step1.campus] ?? [])
+                    )}
                   </div>
                   <h3 style={sectionHeadStyle}>Personal Details</h3>
                   <div style={gridTwo}>

@@ -9,6 +9,10 @@ import TermsPage from './pages/TermsPage.tsx';
 import FeeSetupPage from './pages/FeeSetupPage.tsx';
 import ApprovalsPage from './pages/ApprovalsPage.tsx';
 import SuperAdminPage from './pages/SuperAdminPage.tsx';
+import SubjectsPage from './pages/SubjectsPage.tsx';
+import MarksEntryPage from './pages/MarksEntryPage.tsx';
+import BulkReportsPage from './pages/BulkReportsPage.tsx';
+import AnnouncementsPage from './pages/AnnouncementsPage.tsx';
 import StudentPortalLoginPage from './pages/StudentPortalLoginPage.tsx';
 import StudentDashboardPage from './pages/StudentDashboardPage.tsx';
 
@@ -33,6 +37,10 @@ function App() {
       <Route path="/fee-setup" element={<ProtectedRoute><FeeSetupPage /></ProtectedRoute>} />
       <Route path="/approvals" element={<ProtectedRoute><ApprovalsPage /></ProtectedRoute>} />
       <Route path="/super-admin" element={<ProtectedRoute><SuperAdminPage /></ProtectedRoute>} />
+      <Route path="/subjects" element={<ProtectedRoute><SubjectsPage /></ProtectedRoute>} />
+      <Route path="/marks-entry" element={<ProtectedRoute><MarksEntryPage /></ProtectedRoute>} />
+      <Route path="/bulk-reports" element={<ProtectedRoute><BulkReportsPage /></ProtectedRoute>} />
+      <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/login" />} />

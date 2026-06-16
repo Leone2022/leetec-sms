@@ -563,6 +563,18 @@ namespace LeeTec.API.Controllers
             else if (invoice.AmountPaid > 0)
                 invoice.Status = "PartiallyPaid";
 
+            var registrations = await _context.TermRegistrations
+                .Where(tr => tr.StudentId == invoice.StudentId
+                    && tr.TermId == invoice.TermId
+                    && tr.SchoolId == invoice.SchoolId)
+                .ToListAsync();
+
+            foreach (var registration in registrations)
+            {
+                registration.PaymentStatus = invoice.Status;
+                registration.HasPaidFees = invoice.Status == "Paid";
+            }
+
             await _context.SaveChangesAsync();
 
             return Ok(new
@@ -648,6 +660,18 @@ namespace LeeTec.API.Controllers
             else
                 invoice.Status = "Unpaid";
 
+            var registrations = await _context.TermRegistrations
+                .Where(tr => tr.StudentId == invoice.StudentId
+                    && tr.TermId == invoice.TermId
+                    && tr.SchoolId == invoice.SchoolId)
+                .ToListAsync();
+
+            foreach (var registration in registrations)
+            {
+                registration.PaymentStatus = invoice.Status;
+                registration.HasPaidFees = invoice.Status == "Paid";
+            }
+
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Refund processed", refundId = refund.Id, newBalance = invoice.Balance, invoiceStatus = invoice.Status });
@@ -709,6 +733,15 @@ namespace LeeTec.API.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Invoice deleted" });
+        }
+
+        // ── Banking details helper ────────────────────────────────────────────────
+        private static (string BankName, string Nostro, string Zwl) GetBankingDetails(string studentNumber)
+        {
+            var campus = studentNumber.Split('/').FirstOrDefault() ?? "";
+            if (campus.Equals("AHJ", StringComparison.OrdinalIgnoreCase))
+                return ("Advent Hope Junior", "413400324548405", "4134324548080");
+            return ("Advent Hope Academy", "413400523382405", "413400523382200");
         }
 
         // =====================
@@ -776,8 +809,9 @@ namespace LeeTec.API.Controllers
     </tfoot>
   </table>
   <p><strong>Banking Details:</strong><br/>
-     Bank: ZB Bank&nbsp;&nbsp;|&nbsp;&nbsp;Name: Advent Hope Academy<br/>
-     Branch: Msasa&nbsp;&nbsp;|&nbsp;&nbsp;NOSTRO: 413400523382405</p>
+     Bank: ZB Bank&nbsp;&nbsp;|&nbsp;&nbsp;Name: {GetBankingDetails(invoice.Student.StudentNumber).BankName}<br/>
+     Branch: Msasa&nbsp;&nbsp;|&nbsp;&nbsp;NOSTRO: {GetBankingDetails(invoice.Student.StudentNumber).Nostro}<br/>
+     ZWL: {GetBankingDetails(invoice.Student.StudentNumber).Zwl}</p>
   <p style='color:#64748b;font-size:12px'>This is an automated invoice from LeeTec SMS.</p>
 </div>";
 
@@ -810,6 +844,8 @@ namespace LeeTec.API.Controllers
         [HttpPost("invoices/send-single-email")]
         public async Task<IActionResult> SendSingleInvoiceEmail([FromBody] SendSingleInvoiceRequest request)
         {
+            try
+            {
             var invoice = await _context.Invoices
                 .Include(i => i.Student)
                 .Include(i => i.Items)
@@ -819,6 +855,9 @@ namespace LeeTec.API.Controllers
 
             if (invoice == null)
                 return NotFound(new { message = "No invoice found for this student" });
+
+            if (string.IsNullOrWhiteSpace(request.Email))
+                return BadRequest(new { message = "No email address provided for this student/guardian" });
 
             var emailService = HttpContext.RequestServices.GetRequiredService<IEmailService>();
 
@@ -877,8 +916,8 @@ namespace LeeTec.API.Controllers
         <div style='background:#f8fafc;padding:16px;border-radius:8px;margin-bottom:16px'>
             <strong>Banking Details:</strong><br/>
             Bank: ZB Bank &nbsp;|&nbsp; Branch: Msasa<br/>
-            Name: Advent Hope Academy<br/>
-            NOSTRO: 413400523382405 &nbsp;|&nbsp; ZWL: 413400523382200
+            Name: {GetBankingDetails(invoice.Student.StudentNumber).BankName}<br/>
+            NOSTRO: {GetBankingDetails(invoice.Student.StudentNumber).Nostro} &nbsp;|&nbsp; ZWL: {GetBankingDetails(invoice.Student.StudentNumber).Zwl}
         </div>
         <p style='color:#64748b;font-size:12px;text-align:center'>
             This is a computer generated invoice from LeeTec SMS · Advent Hope Academy<br/>
@@ -887,18 +926,25 @@ namespace LeeTec.API.Controllers
     </div>
 </div>";
 
-            try
-            {
-                await emailService.SendAsync(
-                    request.Email,
-                    $"Fee Invoice - {invoice.Term.Name} {invoice.Term.Year} - {invoice.Student.FirstName} {invoice.Student.Surname}",
-                    body);
+            await emailService.SendAsync(
+                request.Email,
+                $"Fee Invoice - {invoice.Term.Name} {invoice.Term.Year} - {invoice.Student.FirstName} {invoice.Student.Surname}",
+                body);
 
-                return Ok(new { message = "Invoice emailed successfully", email = request.Email });
+            return Ok(new { message = "Invoice emailed successfully", email = request.Email });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Failed to send email", error = ex.Message });
+                Console.WriteLine($"[SendSingleInvoiceEmail] ERROR: {ex.Message}");
+                Console.WriteLine($"[SendSingleInvoiceEmail] StackTrace: {ex.StackTrace}");
+                Console.WriteLine($"[SendSingleInvoiceEmail] InnerException: {ex.InnerException?.Message}");
+
+                return StatusCode(500, new
+                {
+                    message = "Failed to send email",
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message
+                });
             }
         }
     }

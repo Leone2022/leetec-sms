@@ -14,6 +14,10 @@ import {
   Calendar,
   Settings,
   Shield,
+  BookOpen,
+  ClipboardList,
+  FileStack,
+  Bell,
 } from 'lucide-react';
 
 interface NavItem {
@@ -30,6 +34,10 @@ const NAV: NavItem[] = [
   { label: 'Fee Setup', Icon: Settings, path: '/fee-setup' },
   { label: 'Portal Approvals', Icon: ClipboardCheck, path: '/approvals' },
   { label: 'Terms & Periods', Icon: Calendar, path: '/terms' },
+  { label: 'Subjects', Icon: BookOpen, path: '/subjects' },
+  { label: 'Marks Entry', Icon: ClipboardList, path: '/marks-entry' },
+  { label: 'Bulk Reports', Icon: FileStack, path: '/bulk-reports' },
+  { label: 'Announcements', Icon: Bell, path: '/announcements' },
   { label: 'Super Admin', Icon: Shield, path: '/super-admin', superAdminOnly: true },
 ];
 

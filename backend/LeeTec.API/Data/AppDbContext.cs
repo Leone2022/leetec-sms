@@ -36,8 +36,20 @@ namespace LeeTec.API.Data
         // Student Portal
         public DbSet<StudentPortalAccount> StudentPortalAccounts { get; set; }
 
+        // Subjects
+        public DbSet<Subject> Subjects { get; set; }
+
         // Term Registrations
         public DbSet<TermRegistration> TermRegistrations { get; set; }
+
+        // Marks
+        public DbSet<Mark> Marks { get; set; }
+
+        // Report Cards
+        public DbSet<ReportCardRecord> ReportCardRecords { get; set; }
+
+        // Announcements
+        public DbSet<Announcement> Announcements { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -141,6 +153,37 @@ namespace LeeTec.API.Data
                 .HasForeignKey(i => i.FeePackageId)
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // Marks
+            modelBuilder.Entity<Mark>()
+                .Property(m => m.Paper1Score)
+                .HasColumnType("decimal(5,2)");
+
+            modelBuilder.Entity<Mark>()
+                .Property(m => m.Paper2Score)
+                .HasColumnType("decimal(5,2)");
+
+            modelBuilder.Entity<Mark>()
+                .Property(m => m.Score)
+                .HasColumnType("decimal(5,2)");
+
+            modelBuilder.Entity<Mark>()
+                .HasOne(m => m.Student)
+                .WithMany()
+                .HasForeignKey(m => m.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Mark>()
+                .HasOne(m => m.Subject)
+                .WithMany()
+                .HasForeignKey(m => m.SubjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Mark>()
+                .HasOne(m => m.Term)
+                .WithMany()
+                .HasForeignKey(m => m.TermId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

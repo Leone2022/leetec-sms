@@ -88,6 +88,8 @@ export const portalAPI = {
     api.post('/student-portal/reset-password', { token, newPassword }),
   getDashboard: (studentId: number) =>
     api.get(`/student-portal/dashboard/${studentId}`),
+  getReportCard: (studentId: number, termId: number) =>
+    api.get(`/student-portal/report-card?studentId=${studentId}&termId=${termId}`),
 };
 
 export const termRegistrationsAPI = {
@@ -105,6 +107,66 @@ export const termRegistrationsAPI = {
     api.put(`/termregistrations/${id}/payment-status?status=${status}`),
   remove: (id: number) =>
     api.delete(`/termregistrations/${id}`),
+};
+
+export const subjectsAPI = {
+  getAll: (schoolId: number, campus?: string, curriculumType?: string) => {
+    const params = new URLSearchParams();
+    if (campus) params.append('campus', campus);
+    if (curriculumType && curriculumType !== 'All') params.append('curriculumType', curriculumType);
+    const qs = params.toString();
+    return api.get(`/subjects/school/${schoolId}${qs ? `?${qs}` : ''}`);
+  },
+  seed: (data: { schoolId: number; campus: string; curriculumType: string }) =>
+    api.post('/subjects/seed', data),
+  create: (data: any) => api.post('/subjects', data),
+  update: (id: number, data: any) => api.put(`/subjects/${id}`, data),
+  delete: (id: number) => api.delete(`/subjects/${id}`),
+};
+
+export const marksAPI = {
+  getEntrySheet: (params: { termId: number; campus: string; form: string; subjectId: number; assessmentType: string; schoolId?: number }) => {
+    const qs = new URLSearchParams({
+      termId: String(params.termId),
+      campus: params.campus,
+      form: params.form,
+      subjectId: String(params.subjectId),
+      assessmentType: params.assessmentType,
+      schoolId: String(params.schoolId || 1),
+    });
+    return api.get(`/marks/entry-sheet?${qs.toString()}`);
+  },
+  bulkSave: (data: any) => api.post('/marks/bulk-save', data),
+  getStudentMarks: (studentId: number, termId: number) =>
+    api.get(`/marks/student/${studentId}?termId=${termId}`),
+};
+
+export const reportsAPI = {
+  getAHJReportCard: (studentId: number, termId: number) =>
+    api.get(`/reports/ahj-report-card/${studentId}?termId=${termId}`),
+  getReportCard: (studentId: number, termId: number) =>
+    api.get(`/reports/report-card/${studentId}?termId=${termId}`),
+  getStudentView: (studentId: number, termId: number) =>
+    api.get(`/reports/student-view/${studentId}?termId=${termId}`),
+};
+
+export const announcementsAPI = {
+  getAll: (schoolId = 1, campus?: string, includeInactive = false) => {
+    const params = new URLSearchParams({ schoolId: String(schoolId) });
+    if (campus) params.append('campus', campus);
+    if (includeInactive) params.append('includeInactive', 'true');
+    return api.get(`/announcements?${params.toString()}`);
+  },
+  create: (data: { schoolId: number; title: string; content: string; targetCampus: string }) =>
+    api.post('/announcements', data),
+  delete: (id: number) => api.delete(`/announcements/${id}`),
+};
+
+export const bulkReportsAPI = {
+  getCompletionStatus: (termId: number, schoolId = 1) =>
+    api.get(`/reports/completion-status?termId=${termId}&schoolId=${schoolId}`),
+  publishReports: (schoolId: number, termId: number, studentIds: number[]) =>
+    api.post('/reports/publish', { schoolId, termId, studentIds }),
 };
 
 export const superadminAPI = {

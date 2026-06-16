@@ -217,10 +217,14 @@ namespace LeeTec.API.Controllers
                 token,
                 student = new
                 {
+                    id = account.StudentId,
+                    studentId = account.StudentId,
                     account.Student.StudentNumber,
                     account.Student.FirstName,
                     account.Student.Surname,
                     account.Student.Form,
+                    campus = account.Student.StudentNumber.Split('/')[0],
+                    account.Student.Curriculum,
                     account.Email,
                     account.LastLoginAt
                 }
@@ -307,15 +311,34 @@ namespace LeeTec.API.Controllers
             {
                 student = new
                 {
+                    student.Id,
                     student.StudentNumber,
                     student.FirstName,
                     student.Surname,
                     student.Form,
                     student.Gender,
+                    student.Curriculum,
+                    campus = student.StudentNumber.Split('/')[0],
                     student.Status
                 },
                 latestInvoice
             });
+        }
+
+        // =====================
+        // PORTAL — GET REPORT CARD
+        // =====================
+        [HttpGet("report-card")]
+        public async Task<IActionResult> GetPortalReportCard([FromQuery] int studentId, [FromQuery] int termId)
+        {
+            var record = await _context.ReportCardRecords
+                .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == termId && r.Status == "Published");
+
+            if (record == null)
+                return NotFound(new { message = "Your report card for this term has not been published yet. Please check back later." });
+
+            var data = System.Text.Json.JsonDocument.Parse(record.ReportData);
+            return Ok(data.RootElement);
         }
 
         // =====================

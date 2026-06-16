@@ -24,6 +24,16 @@ namespace LeeTec.API.Services
 
         private async Task SendEmailAsync(string toEmail, string toName, string subject, string htmlBody)
         {
+            var smtpHost = _config["Email:SmtpHost"];
+            var smtpUser = _config["Email:SenderEmail"];
+            var smtpPass = _config["Email:AppPassword"];
+            var fromAddress = _config["Email:SenderEmail"];
+
+            Console.WriteLine($"[EmailService] SmtpHost is null/empty: {string.IsNullOrEmpty(smtpHost)}");
+            Console.WriteLine($"[EmailService] SmtpUser (SenderEmail) is null/empty: {string.IsNullOrEmpty(smtpUser)}");
+            Console.WriteLine($"[EmailService] SmtpPass (AppPassword) is null/empty: {string.IsNullOrEmpty(smtpPass)}");
+            Console.WriteLine($"[EmailService] FromAddress (SenderEmail) is null/empty: {string.IsNullOrEmpty(fromAddress)}");
+
             var email = new MimeMessage();
             email.From.Add(new MailboxAddress(
                 _config["Email:SenderName"],

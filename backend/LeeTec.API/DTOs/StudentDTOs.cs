@@ -9,6 +9,7 @@ namespace LeeTec.API.DTOs
         public string BirthCertificateNo { get; set; } = string.Empty;
         public string Gender { get; set; } = string.Empty;
         public string Form { get; set; } = string.Empty;
+        public string Curriculum { get; set; } = string.Empty;
         public string DateOfEntry { get; set; } = string.Empty;
         public string Race { get; set; } = string.Empty;
         public string PreviousSchool { get; set; } = string.Empty;

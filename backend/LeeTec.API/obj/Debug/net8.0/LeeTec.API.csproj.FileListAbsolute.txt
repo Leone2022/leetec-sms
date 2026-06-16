@@ -118,3 +118,10 @@ C:\leetec-sms\backend\LeeTec.API\bin\Debug\net8.0\MailKit.dll
 C:\leetec-sms\backend\LeeTec.API\bin\Debug\net8.0\MimeKit.dll
 C:\leetec-sms\backend\LeeTec.API\bin\Debug\net8.0\System.Security.Cryptography.Pkcs.dll
 C:\leetec-sms\backend\LeeTec.API\bin\Debug\net8.0\runtimes\win\lib\net8.0\System.Security.Cryptography.Pkcs.dll
+C:\Users\LEONE CHIRODZA\AppData\Local\Temp\leetec-build\appsettings.Development.json
+C:\Users\LEONE CHIRODZA\AppData\Local\Temp\leetec-build\appsettings.json
+C:\Users\LEONE CHIRODZA\AppData\Local\Temp\leetec-build\LeeTec.API.exe
+C:\Users\LEONE CHIRODZA\AppData\Local\Temp\leetec-build\LeeTec.API.deps.json
+C:\Users\LEONE CHIRODZA\AppData\Local\Temp\leetec-build\LeeTec.API.runtimeconfig.json
+C:\Users\LEONE CHIRODZA\AppData\Local\Temp\leetec-build\LeeTec.API.dll
+C:\Users\LEONE CHIRODZA\AppData\Local\Temp\leetec-build\LeeTec.API.pdb

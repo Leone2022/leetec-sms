@@ -25,34 +25,62 @@ namespace LeeTec.API.Controllers
             if (term == null)
                 return NotFound(new { message = "Term not found" });
 
+            var invoicePayments = await _context.Invoices
+                .Where(i => i.TermId == termId && i.SchoolId == schoolId)
+                .GroupBy(i => i.StudentId)
+                .Select(g => new
+                {
+                    StudentId = g.Key,
+                    HasPaidFees = g.All(i => i.Status == "Paid"),
+                    PaymentStatus = g.All(i => i.Status == "Paid")
+                        ? "Paid"
+                        : g.Any(i => i.AmountPaid > 0)
+                            ? "PartiallyPaid"
+                            : "Pending"
+                })
+                .ToListAsync();
+
+            var invoiceLookup = invoicePayments.ToDictionary(x => x.StudentId, x => x);
+
             var registrations = await _context.TermRegistrations
                 .Where(tr => tr.TermId == termId && tr.SchoolId == schoolId)
                 .Include(tr => tr.Student)
-                .Select(tr => new
-                {
-                    tr.Id,
-                    tr.StudentId,
-                    StudentName = tr.Student!.FirstName + " " + tr.Student.Surname,
-                    StudentNumber = tr.Student.StudentNumber,
-                    tr.Form,
-                    tr.ClassSection,
-                    tr.Campus,
-                    tr.HasPaidFees,
-                    tr.PaymentStatus,
-                    PromotionStatus = tr.PromotionStatus.ToString(),
-                    tr.Status,
-                    tr.FeePackageId,
-                    tr.RegisteredAt
-                })
-                .OrderBy(tr => tr.StudentName)
+                .OrderBy(tr => tr.Student!.FirstName)
+                .ThenBy(tr => tr.Student!.Surname)
                 .ToListAsync();
+
+            var registrationRows = registrations
+                .Select(tr =>
+                {
+                    var payment = invoiceLookup.TryGetValue(tr.StudentId, out var invoicePayment)
+                        ? invoicePayment
+                        : null;
+
+                    return new
+                    {
+                        tr.Id,
+                        tr.StudentId,
+                        StudentName = tr.Student!.FirstName + " " + tr.Student.Surname,
+                        StudentNumber = tr.Student.StudentNumber,
+                        tr.Form,
+                        tr.ClassSection,
+                        tr.Campus,
+                        HasPaidFees = payment?.HasPaidFees ?? tr.HasPaidFees,
+                        PaymentStatus = payment?.PaymentStatus ?? tr.PaymentStatus,
+                        PromotionStatus = tr.PromotionStatus.ToString(),
+                        tr.Status,
+                        tr.FeePackageId,
+                        tr.RegisteredAt
+                    };
+                })
+                .ToList();
 
             var stats = new
             {
-                TotalRegistered = registrations.Count,
-                FullyPaid = registrations.Count(r => r.HasPaidFees),
-                PendingPayment = registrations.Count(r => !r.HasPaidFees),
-                Active = registrations.Count(r => r.Status == "Active")
+                TotalRegistered = registrationRows.Count,
+                FullyPaid = registrationRows.Count(r => r.HasPaidFees),
+                PendingPayment = registrationRows.Count(r => !r.HasPaidFees),
+                Active = registrationRows.Count(r => r.Status == "Active")
             };
 
             return Ok(new
@@ -68,7 +96,7 @@ namespace LeeTec.API.Controllers
                     term.IsActive
                 },
                 stats,
-                registrations
+                registrations = registrationRows
             });
         }
 

@@ -46,6 +46,7 @@ namespace LeeTec.API.Controllers
                     BirthCertificateNo = dto.BirthCertificateNo,
                     Gender = dto.Gender,
                     Form = dto.Form,
+                    Curriculum = dto.Curriculum,
                     DateOfEntry = dto.DateOfEntry,
                     Race = dto.Race,
                     PreviousSchool = dto.PreviousSchool,
@@ -110,6 +111,7 @@ namespace LeeTec.API.Controllers
                     s.Surname,
                     s.FirstName,
                     s.Form,
+                    s.Curriculum,
                     s.Gender,
                     s.Status,
                     s.CreatedAt
