@@ -40,9 +40,19 @@ export default function StudentDashboardPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
 
+  const [loadError, setLoadError] = useState(false);
+
   const studentInfo = JSON.parse(localStorage.getItem('student_info') || '{}');
   const studentId: number | undefined = studentInfo?.id ?? studentInfo?.studentId;
   const studentCampus = studentInfo?.campus || (studentInfo?.studentNumber || '').split('/')[0];
+
+  useEffect(() => {
+    if (!localStorage.getItem('student_token')) navigate('/student-login');
+  }, [navigate]);
+
+  useEffect(() => {
+    document.title = 'LeeTec SMS — Student Portal';
+  }, []);
 
   useEffect(() => { loadData(); }, []);
 
@@ -80,8 +90,8 @@ export default function StudentDashboardPage() {
           studentsAPI.getById(studentId).then(r => setFullProfile(r.data)),
         ]);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -140,6 +150,24 @@ export default function StudentDashboardPage() {
         <div style={{ textAlign: 'center' }}>
           <GraduationCap size={36} style={{ color: '#1a237e', margin: '0 auto 12px' }} />
           <p style={{ color: '#475569', fontSize: '14px' }}>Loading your portal...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8fafc' }}>
+        <div style={{ textAlign: 'center', maxWidth: 360, padding: 24 }}>
+          <GraduationCap size={36} style={{ color: '#94a3b8', margin: '0 auto 16px' }} />
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>Unable to connect to server</h2>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Please check your connection and try again.</p>
+          <button
+            onClick={() => { setLoadError(false); setLoading(true); loadData(); }}
+            style={{ padding: '9px 20px', background: '#1a237e', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -445,7 +473,7 @@ export default function StudentDashboardPage() {
       </div>
 
       {/* Summary totals */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 20 }}>
         {[
           { label: 'Total Charged', value: fmtAmt(totalCharged), color: '#1a237e', bg: '#eef2ff' },
           { label: 'Total Paid', value: fmtAmt(totalPaid), color: '#15803d', bg: '#f0fdf4' },

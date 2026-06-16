@@ -36,6 +36,8 @@ export default function TeacherDashboardPage() {
     }
   }, [navigate, teacherInfo]);
 
+  useEffect(() => { document.title = 'LeeTec SMS — Teacher Portal'; }, []);
+
   const [view, setView] = useState<View>('classes');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [assignments, setAssignments] = useState<any[]>([]);

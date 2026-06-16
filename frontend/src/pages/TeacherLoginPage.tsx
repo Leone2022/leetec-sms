@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { teacherAuthAPI } from '../services/api';
 import { Mail, Lock, ArrowRight, GraduationCap, BookOpen, ClipboardList, Users } from 'lucide-react';
@@ -16,7 +16,9 @@ export default function TeacherLoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  useEffect(() => { document.title = 'LeeTec SMS — Teacher Portal'; }, []);
+
+  const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     setLoading(true);
     setError('');

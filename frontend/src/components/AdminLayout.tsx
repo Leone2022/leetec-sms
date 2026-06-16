@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -53,6 +53,10 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = `LeeTec SMS — ${title}`;
+  }, [title]);
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}` || 'A';
   const isSuperAdmin = user?.role === 'SuperAdmin';

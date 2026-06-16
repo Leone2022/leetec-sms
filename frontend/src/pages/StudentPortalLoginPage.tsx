@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { portalAPI } from '../services/api';
 import { Mail, Lock, ArrowRight, GraduationCap, Receipt, BarChart3, Bell, BookOpen, Hash, CheckCircle } from 'lucide-react';
@@ -15,6 +15,8 @@ const PORTAL_FEATURES = [
 export default function StudentPortalLoginPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('login');
+
+  useEffect(() => { document.title = 'LeeTec SMS — Student Portal'; }, []);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -38,7 +40,7 @@ export default function StudentPortalLoginPage() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError('');
@@ -64,7 +66,7 @@ export default function StudentPortalLoginPage() {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     setRegError('');
     if (regPassword !== regConfirm) { setRegError('Passwords do not match'); return; }
@@ -85,7 +87,7 @@ export default function StudentPortalLoginPage() {
     }
   };
 
-  const handleForgot = async (e: React.FormEvent) => {
+  const handleForgot = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     setForgotError('');
     setForgotLoading(true);
