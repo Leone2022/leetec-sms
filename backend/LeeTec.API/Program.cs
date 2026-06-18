@@ -20,6 +20,23 @@ var dbPort = Environment.GetEnvironmentVariable("MYSQLPORT") ?? "3306";
 var dbName = Environment.GetEnvironmentVariable("MYSQLDATABASE") ?? "leetec_sms";
 var dbUser = Environment.GetEnvironmentVariable("MYSQLUSER") ?? "root";
 var dbPass = Environment.GetEnvironmentVariable("MYSQLPASSWORD") ?? "";
+
+var mysqlUrl = Environment.GetEnvironmentVariable("MYSQL_URL")
+               ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
+if (!string.IsNullOrEmpty(mysqlUrl))
+{
+    // Parse mysql://user:password@host:port/database
+    var uri = new Uri(mysqlUrl);
+    dbHost = uri.Host;
+    dbPort = uri.Port.ToString();
+    dbName = uri.AbsolutePath.TrimStart('/');
+    dbUser = uri.UserInfo.Split(':')[0];
+    dbPass = uri.UserInfo.Split(':')[1];
+}
+
+Console.WriteLine($"DB Host: {dbHost}, Port: {dbPort}, DB: {dbName}, User: {dbUser}");
+
 var connStr = $"Server={dbHost};Port={dbPort};Database={dbName};User={dbUser};Password={dbPass};";
 
 // ── Email: overlay env vars onto appsettings values ──────────────────────────
