@@ -14,25 +14,17 @@ string[] allowedOrigins = [
     "http://localhost:5173",
 ];
 
-// ── Database: build connection string from Railway env vars ──────────────────
-var dbHost = Environment.GetEnvironmentVariable("MYSQLHOST") ?? "localhost";
+var dbHost = Environment.GetEnvironmentVariable("MYSQLHOST");
 var dbPort = Environment.GetEnvironmentVariable("MYSQLPORT") ?? "3306";
-var dbName = Environment.GetEnvironmentVariable("MYSQLDATABASE") ?? "leetec_sms";
+var dbName = Environment.GetEnvironmentVariable("MYSQLDATABASE") ?? "railway";
 var dbUser = Environment.GetEnvironmentVariable("MYSQLUSER") ?? "root";
 var dbPass = Environment.GetEnvironmentVariable("MYSQLPASSWORD") ?? "";
 
-var mysqlUrl = Environment.GetEnvironmentVariable("MYSQL_URL")
-               ?? Environment.GetEnvironmentVariable("DATABASE_URL");
-
-if (!string.IsNullOrEmpty(mysqlUrl))
+if (string.IsNullOrEmpty(dbHost))
 {
-    // Parse mysql://user:password@host:port/database
-    var uri = new Uri(mysqlUrl);
-    dbHost = uri.Host;
-    dbPort = uri.Port.ToString();
-    dbName = uri.AbsolutePath.TrimStart('/');
-    dbUser = uri.UserInfo.Split(':')[0];
-    dbPass = uri.UserInfo.Split(':')[1];
+    // fallback to appsettings for local dev
+    dbHost = "localhost";
+    dbName = "leetec_sms";
 }
 
 Console.WriteLine($"DB Host: {dbHost}, Port: {dbPort}, DB: {dbName}, User: {dbUser}");
