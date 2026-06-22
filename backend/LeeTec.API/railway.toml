@@ -6,3 +6,4 @@ dockerfilePath = "Dockerfile"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
+startCommand = "dotnet LeeTec.API.dll"
