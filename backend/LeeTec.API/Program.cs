@@ -121,7 +121,14 @@ app.MapGet("/health", () => Results.Ok("LeeTec SMS API is running"));
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    context.Database.Migrate();
+    try
+    {
+        context.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Migration warning (tables may already exist): {ex.Message}");
+    }
     DataSeeder.SeedData(context);
 }
 
