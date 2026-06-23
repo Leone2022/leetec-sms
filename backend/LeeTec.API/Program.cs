@@ -129,7 +129,14 @@ using (var scope = app.Services.CreateScope())
     {
         Console.WriteLine($"Migration warning (tables may already exist): {ex.Message}");
     }
-    DataSeeder.SeedData(context);
+    try
+    {
+        DataSeeder.SeedData(context);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Seeder warning: {ex.Message}");
+    }
 }
 
 app.Run();
