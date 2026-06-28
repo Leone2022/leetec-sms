@@ -35,6 +35,7 @@ namespace LeeTec.API.Data
 
         // Student Portal
         public DbSet<StudentPortalAccount> StudentPortalAccounts { get; set; }
+        public DbSet<ActivationToken> ActivationTokens { get; set; }
 
         // Subjects
         public DbSet<Subject> Subjects { get; set; }
@@ -187,6 +188,13 @@ namespace LeeTec.API.Data
                 .WithMany()
                 .HasForeignKey(m => m.TermId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Activation Tokens
+            modelBuilder.Entity<ActivationToken>()
+                .HasOne(at => at.Student)
+                .WithMany()
+                .HasForeignKey(at => at.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Teacher Subject Assignments
             modelBuilder.Entity<TeacherSubjectAssignment>()

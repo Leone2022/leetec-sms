@@ -205,6 +205,11 @@ export const teacherAuthAPI = {
     api.post('/teacher-auth/login', { email, password }),
 };
 
+export const activationAPI = {
+  activate: (token: string, password: string, confirmPassword: string) =>
+    api.post('/auth/activate', { token, password, confirmPassword }),
+};
+
 export const teacherAssignmentsAPI = {
   getAll: (schoolId = 1) => api.get(`/teacher-assignments?schoolId=${schoolId}`),
   getMySubjects: (teacherId: number) =>

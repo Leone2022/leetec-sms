@@ -21,5 +21,13 @@ namespace LeeTec.API.DTOs
         public string Allergies { get; set; } = string.Empty;
         public string Denomination { get; set; } = string.Empty;
         public string Campus { get; set; } = "AHA";
+        public string? Email { get; set; }
+    }
+
+    public class ActivateDTO
+    {
+        public string Token { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
     }
 }

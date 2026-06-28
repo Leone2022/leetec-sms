@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
 using LeeTec.API.Models;
 using LeeTec.API.DTOs;
+using LeeTec.API.Services;
 
 namespace LeeTec.API.Controllers
 {
@@ -11,10 +12,12 @@ namespace LeeTec.API.Controllers
     public class StudentsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IEmailService _emailService;
 
-        public StudentsController(AppDbContext context)
+        public StudentsController(AppDbContext context, IEmailService emailService)
         {
             _context = context;
+            _emailService = emailService;
         }
 
         // ENROL A NEW STUDENT
@@ -63,13 +66,34 @@ namespace LeeTec.API.Controllers
 
                 _context.Students.Add(student);
                 await _context.SaveChangesAsync();
+
+                // Generate activation token
+                var tokenValue = Guid.NewGuid().ToString();
+                _context.ActivationTokens.Add(new ActivationToken
+                {
+                    StudentId = student.Id,
+                    Token = tokenValue,
+                    ExpiresAt = DateTime.UtcNow.AddHours(48),
+                });
+                await _context.SaveChangesAsync();
+
                 await transaction.CommitAsync();
+
+                // Send activation email if address provided (non-blocking)
+                var activationUrl = $"https://www.adventhopeacademy.com/activate?token={tokenValue}";
+                if (!string.IsNullOrEmpty(dto.Email))
+                {
+                    try { await _emailService.SendActivationEmailAsync(dto.Email, dto.FirstName, student.StudentNumber, activationUrl); }
+                    catch { /* don't fail enrolment if email fails */ }
+                }
 
                 return Ok(new {
                     message = "Student enrolled successfully",
                     studentNumber = student.StudentNumber,
                     studentId = student.Id,
-                    campus = prefix
+                    campus = prefix,
+                    activationToken = tokenValue,
+                    activationUrl
                 });
             }
             catch (Exception ex)

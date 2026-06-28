@@ -18,6 +18,7 @@ import StudentPortalLoginPage from './pages/StudentPortalLoginPage.tsx';
 import TeacherLoginPage from './pages/TeacherLoginPage.tsx';
 import TeacherDashboardPage from './pages/TeacherDashboardPage.tsx';
 import StudentDashboardPage from './pages/StudentDashboardPage.tsx';
+import ActivatePage from './pages/ActivatePage.tsx';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -45,6 +46,9 @@ function App() {
       <Route path="/bulk-reports" element={<ProtectedRoute><BulkReportsPage /></ProtectedRoute>} />
       <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
       <Route path="/teacher-assignments" element={<ProtectedRoute><TeacherAssignmentsPage /></ProtectedRoute>} />
+
+      {/* Student Activation */}
+      <Route path="/activate" element={<ActivatePage />} />
 
       {/* Teacher Portal */}
       <Route path="/teacher-login" element={<TeacherLoginPage />} />
