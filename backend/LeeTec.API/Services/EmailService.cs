@@ -98,28 +98,34 @@ namespace LeeTec.API.Services
 
         public async Task SendPasswordResetAsync(string toEmail, string studentName, string resetLink)
         {
-            var subject = "Password Reset - LeeTec School System";
+            // Extract token and always use production URL
+            var tokenIndex = resetLink.IndexOf("token=", StringComparison.OrdinalIgnoreCase);
+            var token = tokenIndex >= 0 ? resetLink[(tokenIndex + 6)..] : "";
+            var link = $"https://www.adventhopeacademy.com/reset-password?token={token}";
+
+            var subject = "Reset Your Password — Advent Hope Academy Student Portal";
             var body = $@"
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                    <div style='background-color: #1a5276; padding: 20px; text-align: center;'>
-                        <h1 style='color: white; margin: 0;'>LeeTec School System</h1>
+                    <div style='background-color: #1a237e; padding: 20px; text-align: center;'>
+                        <h1 style='color: white; margin: 0;'>Advent Hope Academy</h1>
+                        <p style='color: #c5cae9; margin: 6px 0 0;'>Student Portal</p>
                     </div>
                     <div style='padding: 30px; background-color: #f9f9f9;'>
                         <h2>Hello {studentName}!</h2>
                         <p>We received a request to reset your password.</p>
-                        <p>Click the button below to reset your password:</p>
+                        <p>Click the button below to set a new password:</p>
                         <div style='text-align: center; margin: 30px 0;'>
-                            <a href='{resetLink}' 
-                               style='background-color: #e74c3c; color: white; padding: 15px 30px; 
-                                      text-decoration: none; border-radius: 5px; font-size: 16px;'>
+                            <a href='{link}'
+                               style='background-color: #dc2626; color: white; padding: 15px 30px;
+                                      text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;'>
                                 Reset My Password
                             </a>
                         </div>
                         <p>This link expires in <strong>1 hour</strong>.</p>
-                        <p>If you did not request a password reset, please ignore this email.</p>
+                        <p style='font-size: 13px; color: #757575;'>If you did not request a password reset, please ignore this email.</p>
                     </div>
-                    <div style='background-color: #1a5276; padding: 15px; text-align: center;'>
-                        <p style='color: white; margin: 0;'>LeeTec School Management System</p>
+                    <div style='background-color: #1a237e; padding: 15px; text-align: center;'>
+                        <p style='color: #c5cae9; margin: 0; font-size: 13px;'>Advent Hope Academy — Education for Service and Eternity</p>
                     </div>
                 </div>";
 
@@ -144,9 +150,9 @@ namespace LeeTec.API.Services
                             <li>School notices</li>
                         </ul>
                         <div style='text-align: center; margin: 30px 0;'>
-                            <a href='http://localhost:5173/login' 
-                               style='background-color: #27ae60; color: white; padding: 15px 30px; 
-                                      text-decoration: none; border-radius: 5px; font-size: 16px;'>
+                            <a href='https://www.adventhopeacademy.com/student-login'
+                               style='background-color: #16a34a; color: white; padding: 15px 30px;
+                                      text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;'>
                                 Login to Portal
                             </a>
                         </div>

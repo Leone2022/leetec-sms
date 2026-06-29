@@ -85,8 +85,8 @@ export const portalAPI = {
   suspendAccount: (id: number) => api.put(`/student-portal/suspend/${id}`),
   forgotPassword: (email: string) =>
     api.post('/student-portal/forgot-password', { email }),
-  resetPassword: (token: string, newPassword: string) =>
-    api.post('/student-portal/reset-password', { token, newPassword }),
+  resetPassword: (token: string, newPassword: string, confirmPassword: string) =>
+    api.post('/student-portal/reset-password', { token, newPassword, confirmPassword }),
   getDashboard: (studentId: number) =>
     api.get(`/student-portal/dashboard/${studentId}`),
   getReportCard: (studentId: number, termId: number) =>
@@ -97,6 +97,8 @@ export const portalAPI = {
     api.put(`/admin/portal-accounts/${id}/approve`),
   remove: (id: number) =>
     api.delete(`/admin/portal-accounts/${id}`),
+  adminResetPassword: (id: number, newPassword: string) =>
+    api.post(`/admin/portal-accounts/${id}/reset-password`, { newPassword }),
 };
 
 export const termRegistrationsAPI = {

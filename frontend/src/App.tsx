@@ -20,6 +20,7 @@ import TeacherDashboardPage from './pages/TeacherDashboardPage.tsx';
 import StudentDashboardPage from './pages/StudentDashboardPage.tsx';
 import ActivatePage from './pages/ActivatePage.tsx';
 import PortalAccountsPage from './pages/PortalAccountsPage.tsx';
+import ResetPasswordPage from './pages/ResetPasswordPage.tsx';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -50,6 +51,7 @@ function App() {
 
       {/* Student Activation */}
       <Route path="/activate" element={<ActivatePage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Portal Accounts */}
       <Route path="/portal-accounts" element={<ProtectedRoute><PortalAccountsPage /></ProtectedRoute>} />

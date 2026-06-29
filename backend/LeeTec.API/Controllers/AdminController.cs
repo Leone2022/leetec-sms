@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
@@ -181,6 +182,22 @@ namespace LeeTec.API.Controllers
             return Ok(new { message = "Portal account deleted" });
         }
 
+        // POST /api/admin/portal-accounts/{id}/reset-password
+        [Authorize]
+        [HttpPost("portal-accounts/{id}/reset-password")]
+        public async Task<IActionResult> AdminResetPortalPassword(int id, [FromBody] AdminResetPasswordRequest dto)
+        {
+            var account = await _context.StudentPortalAccounts.FindAsync(id);
+            if (account == null) return NotFound(new { message = "Portal account not found" });
+
+            account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            account.PasswordResetToken = null;
+            account.PasswordResetExpiry = null;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password reset successfully" });
+        }
+
         // GET /api/admin/teachers?schoolId=1
         [HttpGet("teachers")]
         public async Task<IActionResult> GetTeachers([FromQuery] int schoolId = 1)
@@ -206,5 +223,10 @@ namespace LeeTec.API.Controllers
 
             return Ok(teachers);
         }
+    }
+
+    public class AdminResetPasswordRequest
+    {
+        public string NewPassword { get; set; } = string.Empty;
     }
 }

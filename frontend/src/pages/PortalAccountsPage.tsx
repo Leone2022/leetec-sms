@@ -13,6 +13,10 @@ export default function PortalAccountsPage() {
   const [filter, setFilter] = useState<PortalFilter>('All');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [resetModalId, setResetModalId] = useState<number | null>(null);
+  const [resetNewPwd, setResetNewPwd] = useState('');
+  const [resetPwdError, setResetPwdError] = useState('');
+  const [resetPwdSubmitting, setResetPwdSubmitting] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -43,6 +47,23 @@ export default function PortalAccountsPage() {
       showMessage('Failed to approve account', 'error');
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleAdminReset = async () => {
+    if (!resetModalId) return;
+    if (resetNewPwd.length < 8) { setResetPwdError('Password must be at least 8 characters'); return; }
+    setResetPwdSubmitting(true);
+    setResetPwdError('');
+    try {
+      await portalAPI.adminResetPassword(resetModalId, resetNewPwd);
+      setResetModalId(null);
+      setResetNewPwd('');
+      showMessage('Password reset successfully', 'success');
+    } catch {
+      setResetPwdError('Failed to reset password. Please try again.');
+    } finally {
+      setResetPwdSubmitting(false);
     }
   };
 
@@ -206,6 +227,16 @@ export default function PortalAccountsPage() {
                               {processingId === r.portalAccountId ? '...' : 'Approve'}
                             </button>
                           )}
+                          {r.portalStatus === 'Active' && (
+                            <button
+                              className="btn"
+                              disabled={processingId === r.portalAccountId}
+                              onClick={() => { setResetModalId(r.portalAccountId); setResetNewPwd(''); setResetPwdError(''); }}
+                              style={{ background: 'white', color: '#0ea5e9', border: '1px solid #0ea5e9', fontSize: 12 }}
+                            >
+                              🔑 Reset Pwd
+                            </button>
+                          )}
                           {r.portalStatus !== 'None' && (
                             <button
                               className="btn"
@@ -229,6 +260,51 @@ export default function PortalAccountsPage() {
           </>
         )}
       </div>
+      {resetModalId !== null && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}
+          onClick={() => setResetModalId(null)}
+        >
+          <div
+            style={{ background: 'white', borderRadius: 12, padding: 28, width: 360, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700 }}>Reset Portal Password</h3>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 18px' }}>
+              Enter a new password for this student's portal account.
+            </p>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', display: 'block', marginBottom: 6 }}>
+              New Password
+            </label>
+            <input
+              type="password"
+              className="text-field"
+              style={{ paddingLeft: 14, paddingRight: 14, marginBottom: 10 }}
+              value={resetNewPwd}
+              onChange={e => setResetNewPwd(e.target.value)}
+              placeholder="Min. 8 characters"
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') handleAdminReset(); }}
+            />
+            {resetPwdError && (
+              <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 10 }}>{resetPwdError}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setResetModalId(null)} disabled={resetPwdSubmitting}>
+                Cancel
+              </button>
+              <button
+                className="btn"
+                onClick={handleAdminReset}
+                disabled={resetPwdSubmitting}
+                style={{ background: '#0ea5e9', color: 'white', border: 'none' }}
+              >
+                {resetPwdSubmitting ? 'Resetting...' : 'Reset Password'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
