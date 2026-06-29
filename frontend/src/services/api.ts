@@ -91,6 +91,12 @@ export const portalAPI = {
     api.get(`/student-portal/dashboard/${studentId}`),
   getReportCard: (studentId: number, termId: number) =>
     api.get(`/student-portal/report-card?studentId=${studentId}&termId=${termId}`),
+  getAll: (schoolId = 1) =>
+    api.get(`/admin/portal-accounts?schoolId=${schoolId}`),
+  approve: (id: number) =>
+    api.put(`/admin/portal-accounts/${id}/approve`),
+  remove: (id: number) =>
+    api.delete(`/admin/portal-accounts/${id}`),
 };
 
 export const termRegistrationsAPI = {
@@ -199,6 +205,12 @@ export const adminAPI = {
   getTeachers: (schoolId = 1) => api.get(`/admin/teachers?schoolId=${schoolId}`),
   getStudentCredentials: (termId: number, schoolId = 1) =>
     api.get(`/admin/student-credentials?termId=${termId}&schoolId=${schoolId}`),
+  getPortalRegistrations: (schoolId = 1) =>
+    api.get(`/admin/portal-registrations?schoolId=${schoolId}`),
+  approvePortalRegistration: (id: number) =>
+    api.put(`/admin/portal-registrations/${id}/approve`),
+  rejectPortalRegistration: (id: number) =>
+    api.put(`/admin/portal-registrations/${id}/reject`),
 };
 
 export const teacherAuthAPI = {

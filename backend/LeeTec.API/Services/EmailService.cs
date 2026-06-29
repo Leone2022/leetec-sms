@@ -62,28 +62,34 @@ namespace LeeTec.API.Services
 
         public async Task SendEmailVerificationAsync(string toEmail, string studentName, string verificationLink)
         {
-            var subject = "Verify Your Email - LeeTec School System";
+            // Extract token and always use production frontend URL
+            var tokenIndex = verificationLink.IndexOf("token=", StringComparison.OrdinalIgnoreCase);
+            var token = tokenIndex >= 0 ? verificationLink[(tokenIndex + 6)..] : "";
+            var link = $"https://www.adventhopeacademy.com/verify-email?token={token}";
+
+            var subject = "Verify Your Email — Advent Hope Academy Student Portal";
             var body = $@"
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                    <div style='background-color: #1a5276; padding: 20px; text-align: center;'>
-                        <h1 style='color: white; margin: 0;'>LeeTec School System</h1>
+                    <div style='background-color: #1a237e; padding: 20px; text-align: center;'>
+                        <h1 style='color: white; margin: 0;'>Advent Hope Academy</h1>
+                        <p style='color: #c5cae9; margin: 6px 0 0;'>Student Portal</p>
                     </div>
                     <div style='padding: 30px; background-color: #f9f9f9;'>
                         <h2>Hello {studentName}!</h2>
-                        <p>Thank you for registering on the LeeTec Student Portal.</p>
+                        <p>Thank you for registering on the Advent Hope Academy Student Portal.</p>
                         <p>Please verify your email address by clicking the button below:</p>
                         <div style='text-align: center; margin: 30px 0;'>
-                            <a href='{verificationLink}' 
-                               style='background-color: #1a5276; color: white; padding: 15px 30px; 
-                                      text-decoration: none; border-radius: 5px; font-size: 16px;'>
+                            <a href='{link}'
+                               style='background-color: #1a237e; color: white; padding: 15px 30px;
+                                      text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;'>
                                 Verify My Email
                             </a>
                         </div>
                         <p>This link expires in <strong>24 hours</strong>.</p>
-                        <p>If you did not register, please ignore this email.</p>
+                        <p style='font-size: 13px; color: #757575;'>If you did not register, please ignore this email.</p>
                     </div>
-                    <div style='background-color: #1a5276; padding: 15px; text-align: center;'>
-                        <p style='color: white; margin: 0;'>LeeTec School Management System</p>
+                    <div style='background-color: #1a237e; padding: 15px; text-align: center;'>
+                        <p style='color: #c5cae9; margin: 0; font-size: 13px;'>Advent Hope Academy — Education for Service and Eternity</p>
                     </div>
                 </div>";
 
