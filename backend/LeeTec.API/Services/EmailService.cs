@@ -160,32 +160,24 @@ namespace LeeTec.API.Services
 
         public async Task SendActivationEmailAsync(string toEmail, string studentName, string studentNumber, string activationUrl)
         {
-            var subject = "Activate Your Advent Hope Academy Student Account";
+            var subject = "Welcome to Advent Hope Academy — Your Student Number";
             var body = $@"
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
                     <div style='background-color: #1a237e; padding: 20px; text-align: center;'>
                         <h1 style='color: white; margin: 0;'>Advent Hope Academy</h1>
-                        <p style='color: #c5cae9; margin: 6px 0 0;'>Student Portal Activation</p>
                     </div>
                     <div style='padding: 30px; background-color: #f9f9f9;'>
-                        <h2>Welcome, {studentName}!</h2>
-                        <p>You have been enrolled at Advent Hope Academy. Your student account is ready to activate.</p>
+                        <p>Dear {studentName},</p>
+                        <p>You have been successfully enrolled at Advent Hope Academy.</p>
                         <table style='background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px; margin: 20px 0; width: 100%;'>
-                            <tr><td style='color: #757575; font-size: 13px;'>Student Number</td></tr>
-                            <tr><td style='font-size: 20px; font-weight: 700; color: #1a237e; letter-spacing: 1px;'>{studentNumber}</td></tr>
+                            <tr><td style='color: #757575; font-size: 13px;'>Your Student Number</td></tr>
+                            <tr><td style='font-size: 24px; font-weight: 700; color: #1a237e; letter-spacing: 1px;'>{studentNumber}</td></tr>
                         </table>
-                        <p>Click the button below to set your password and activate your account:</p>
-                        <div style='text-align: center; margin: 30px 0;'>
-                            <a href='{activationUrl}'
-                               style='background-color: #1a237e; color: white; padding: 15px 36px;
-                                      text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;'>
-                                Activate My Account
-                            </a>
-                        </div>
-                        <p style='font-size: 13px; color: #757575;'>This link is valid for <strong>48 hours</strong>. If you did not expect this email, please ignore it.</p>
+                        <p>To access your student portal, visit <strong>www.adventhopeacademy.com/student-login</strong> and use your student number to register your account.</p>
+                        <p>If you have any questions, please contact the school office.</p>
                     </div>
                     <div style='background-color: #1a237e; padding: 15px; text-align: center;'>
-                        <p style='color: #c5cae9; margin: 0; font-size: 13px;'>Advent Hope Academy — Education for Service and Eternity</p>
+                        <p style='color: #c5cae9; margin: 0; font-size: 13px;'>Advent Hope Academy</p>
                     </div>
                 </div>";
 

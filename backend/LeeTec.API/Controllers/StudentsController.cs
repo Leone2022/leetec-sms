@@ -67,23 +67,12 @@ namespace LeeTec.API.Controllers
                 _context.Students.Add(student);
                 await _context.SaveChangesAsync();
 
-                // Generate activation token
-                var tokenValue = Guid.NewGuid().ToString();
-                _context.ActivationTokens.Add(new ActivationToken
-                {
-                    StudentId = student.Id,
-                    Token = tokenValue,
-                    ExpiresAt = DateTime.UtcNow.AddHours(48),
-                });
-                await _context.SaveChangesAsync();
-
                 await transaction.CommitAsync();
 
-                // Send activation email if address provided (non-blocking)
-                var activationUrl = $"https://www.adventhopeacademy.com/activate?token={tokenValue}";
+                // Send welcome email with student number if address provided (non-blocking)
                 if (!string.IsNullOrEmpty(dto.Email))
                 {
-                    try { await _emailService.SendActivationEmailAsync(dto.Email, dto.FirstName, student.StudentNumber, activationUrl); }
+                    try { await _emailService.SendActivationEmailAsync(dto.Email, dto.FirstName, student.StudentNumber, "https://www.adventhopeacademy.com/student-login"); }
                     catch { /* don't fail enrolment if email fails */ }
                 }
 
@@ -92,8 +81,6 @@ namespace LeeTec.API.Controllers
                     studentNumber = student.StudentNumber,
                     studentId = student.Id,
                     campus = prefix,
-                    activationToken = tokenValue,
-                    activationUrl
                 });
             }
             catch (Exception ex)
