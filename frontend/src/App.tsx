@@ -7,7 +7,6 @@ import StudentsPage from './pages/StudentsPage.tsx';
 import FeesPage from './pages/FeesPage.tsx';
 import TermsPage from './pages/TermsPage.tsx';
 import FeeSetupPage from './pages/FeeSetupPage.tsx';
-import ApprovalsPage from './pages/ApprovalsPage.tsx';
 import SuperAdminPage from './pages/SuperAdminPage.tsx';
 import SubjectsPage from './pages/SubjectsPage.tsx';
 import MarksEntryPage from './pages/MarksEntryPage.tsx';
@@ -41,7 +40,6 @@ function App() {
       <Route path="/fees" element={<ProtectedRoute><FeesPage /></ProtectedRoute>} />
       <Route path="/terms" element={<ProtectedRoute><TermsPage /></ProtectedRoute>} />
       <Route path="/fee-setup" element={<ProtectedRoute><FeeSetupPage /></ProtectedRoute>} />
-      <Route path="/approvals" element={<ProtectedRoute><ApprovalsPage /></ProtectedRoute>} />
       <Route path="/super-admin" element={<ProtectedRoute><SuperAdminPage /></ProtectedRoute>} />
       <Route path="/subjects" element={<ProtectedRoute><SubjectsPage /></ProtectedRoute>} />
       <Route path="/marks-entry" element={<ProtectedRoute><MarksEntryPage /></ProtectedRoute>} />

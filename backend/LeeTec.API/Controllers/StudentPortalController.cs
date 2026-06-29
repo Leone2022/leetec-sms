@@ -49,61 +49,24 @@ namespace LeeTec.API.Controllers
             if (emailExists != null)
                 return BadRequest(new { message = "This email is already registered." });
 
-            // Generate email verification token
-            var verificationToken = Guid.NewGuid().ToString("N");
-
             var account = new StudentPortalAccount
             {
                 StudentId = student.Id,
                 Email = request.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Status = "Pending",
-                EmailVerified = false,
-                EmailVerificationToken = verificationToken,
-                EmailVerificationExpiry = DateTime.UtcNow.AddHours(24),
+                Status = "Active",
+                EmailVerified = true,
                 CreatedAt = DateTime.UtcNow
             };
 
             _context.StudentPortalAccounts.Add(account);
             await _context.SaveChangesAsync();
 
-            // Send verification email
-            var verificationLink = $"http://localhost:5208/api/student-portal/verify-email?token={verificationToken}";
-            await _emailService.SendEmailVerificationAsync(
-                request.Email,
-                $"{student.FirstName} {student.Surname}",
-                verificationLink
-            );
-
             return Ok(new
             {
-                message = "Registration successful! Please check your email to verify your account.",
+                message = "Registration successful! You can now log in.",
                 studentName = $"{student.FirstName} {student.Surname}"
             });
-        }
-
-        // =====================
-        // VERIFY EMAIL
-        // =====================
-        [HttpGet("verify-email")]
-        public async Task<IActionResult> VerifyEmail([FromQuery] string token)
-        {
-            var account = await _context.StudentPortalAccounts
-                .FirstOrDefaultAsync(a => a.EmailVerificationToken == token);
-
-            if (account == null)
-                return NotFound(new { message = "Invalid verification link." });
-
-            if (account.EmailVerificationExpiry < DateTime.UtcNow)
-                return BadRequest(new { message = "Verification link has expired. Please register again." });
-
-            account.EmailVerified = true;
-            account.EmailVerificationToken = null;
-            account.EmailVerificationExpiry = null;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Email verified successfully! Please wait for admin approval before logging in." });
         }
 
         // =====================
