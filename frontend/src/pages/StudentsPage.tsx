@@ -86,6 +86,14 @@ export default function StudentsPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
 
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    firstName: string; surname: string; dateOfBirth: string; gender: string;
+    race: string; form: string; curriculum: string; email: string;
+  }>({ firstName: '', surname: '', dateOfBirth: '', gender: 'Male', race: '', form: '', curriculum: '', email: '' });
+  const [editError, setEditError] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
   useEffect(() => { loadStudents(); }, []);
 
   const loadStudents = async () => {
@@ -430,6 +438,60 @@ export default function StudentsPage() {
     } catch (err: any) {
       console.error('Refund failed', err);
       showMessage(err.response?.data?.message || 'Failed to process refund', 'error');
+    }
+  };
+
+  const openEditModal = () => {
+    const s = profileStudent || selectedStudent;
+    setEditForm({
+      firstName: s.firstName ?? '',
+      surname: s.surname ?? '',
+      dateOfBirth: s.dateOfBirth ? new Date(s.dateOfBirth).toISOString().split('T')[0] : '',
+      gender: s.gender ?? 'Male',
+      race: s.race ?? '',
+      form: s.form ?? '',
+      curriculum: s.curriculum ?? '',
+      email: '',
+    });
+    setEditError('');
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (editSubmitting) return;
+    if (!editForm.firstName.trim() || !editForm.surname.trim()) {
+      setEditError('First Name and Surname are required');
+      return;
+    }
+    setEditSubmitting(true);
+    setEditError('');
+    try {
+      await studentsAPI.updateStudent(selectedStudent.id, {
+        firstName: editForm.firstName.trim(),
+        surname: editForm.surname.trim(),
+        dateOfBirth: editForm.dateOfBirth,
+        gender: editForm.gender,
+        race: editForm.race.trim(),
+        form: editForm.form,
+        curriculum: editForm.curriculum,
+        email: editForm.email.trim() || undefined,
+      });
+      setIsEditModalOpen(false);
+      showMessage('Student updated successfully', 'success');
+      loadStudents();
+      const detailRes = await studentsAPI.getById(selectedStudent.id);
+      setProfileStudent(detailRes.data);
+      setSelectedStudent((prev: any) => ({
+        ...prev,
+        firstName: editForm.firstName.trim(),
+        surname: editForm.surname.trim(),
+        form: editForm.form,
+        gender: editForm.gender,
+      }));
+    } catch (err: any) {
+      setEditError(err.response?.data?.message || 'Failed to update student');
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -1324,6 +1386,13 @@ export default function StudentsPage() {
               {/* Footer */}
               <div style={{ padding: '14px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '8px', background: 'white', flexShrink: 0 }}>
                 <button
+                  onClick={openEditModal}
+                  className="btn"
+                  style={{ background: '#1a237e', color: 'white', border: 'none' }}
+                >
+                  ✏️ Edit
+                </button>
+                <button
                   onClick={handleToggleStatus}
                   className="btn"
                   style={{ background: selectedStudent.status === 'Active' ? '#dc2626' : '#0ea5e9', color: 'white', border: 'none' }}
@@ -1340,6 +1409,145 @@ export default function StudentsPage() {
               </div>
             </div>
           </>
+        );
+      })()}
+
+      {/* ─── EDIT MODAL ─── */}
+      {isEditModalOpen && selectedStudent && (() => {
+        const campus = (selectedStudent.studentNumber ?? '').split('/')[0];
+        const campusLabel = campus === 'AHJ' ? 'Advent Hope Junior' : campus === 'AHS' ? 'Advent Hope Senior' : 'Advent Hope Academy';
+        const formOptions = campus === 'AHJ'
+          ? ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7']
+          : campus === 'AHS' ? ['Lower 6', 'Upper 6']
+          : ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
+        const curriculumOptions = campus === 'AHJ' ? ['Cambridge']
+          : campus === 'AHS' ? ['ZIMSEC A-Level', 'Cambridge A-Level']
+          : ['ZIMSEC O-Level', 'Cambridge IGCSE'];
+        const roStyle: React.CSSProperties = {
+          padding: '8px 14px', background: '#f1f5f9', color: '#64748b',
+          borderRadius: '6px', fontSize: '13px', fontWeight: '600',
+          border: '1px solid #e2e8f0', minHeight: '36px', display: 'flex', alignItems: 'center',
+        };
+        const ef = (
+          val: string,
+          onChange: (v: string) => void,
+          opts?: { type?: string; placeholder?: string }
+        ) => (
+          <input
+            type={opts?.type ?? 'text'}
+            value={val}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={opts?.placeholder}
+            className="text-field"
+            style={{ paddingLeft: 14, paddingRight: 14 }}
+          />
+        );
+        const esel = (val: string, onChange: (v: string) => void, options: string[]) => (
+          <select
+            value={val}
+            onChange={(e) => onChange(e.target.value)}
+            className="text-field"
+            style={{ paddingLeft: 14, paddingRight: 14, appearance: 'auto', cursor: 'pointer' }}
+          >
+            {options.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        );
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px' }}
+            onClick={() => setIsEditModalOpen(false)}>
+            <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflow: 'auto', position: 'relative' }}
+              onClick={(e) => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white', zIndex: 10 }}>
+                <div>
+                  <h2 style={{ fontSize: '17px', fontWeight: '700', margin: 0 }}>Edit Student</h2>
+                  <p style={{ fontSize: '12px', color: '#475569', margin: '3px 0 0' }}>{selectedStudent.firstName} {selectedStudent.surname}</p>
+                </div>
+                <button onClick={() => setIsEditModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Read-only fields */}
+                <div>
+                  <p style={sectionHeadStyle}>Read-Only</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={labelStyle}>Student Number</label>
+                      <div style={roStyle}>{selectedStudent.studentNumber}</div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Campus</label>
+                      <div style={roStyle}>{campusLabel}</div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Birth Cert. No.</label>
+                      <div style={roStyle}>{(profileStudent || selectedStudent).birthCertificateNo || '—'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Editable fields */}
+                <div>
+                  <p style={sectionHeadStyle}>Personal Details</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={labelStyle}>First Name *</label>
+                      {ef(editForm.firstName, (v) => setEditForm((f) => ({ ...f, firstName: v })), { placeholder: 'First name' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Surname *</label>
+                      {ef(editForm.surname, (v) => setEditForm((f) => ({ ...f, surname: v })), { placeholder: 'Surname' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Date of Birth</label>
+                      {ef(editForm.dateOfBirth, (v) => setEditForm((f) => ({ ...f, dateOfBirth: v })), { type: 'date' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Gender</label>
+                      {esel(editForm.gender, (v) => setEditForm((f) => ({ ...f, gender: v })), ['Male', 'Female'])}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Race</label>
+                      {ef(editForm.race, (v) => setEditForm((f) => ({ ...f, race: v })), { placeholder: 'e.g. African' })}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Form / Class</label>
+                      {esel(editForm.form, (v) => setEditForm((f) => ({ ...f, form: v })), formOptions)}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Curriculum</label>
+                      {esel(editForm.curriculum, (v) => setEditForm((f) => ({ ...f, curriculum: v })), curriculumOptions)}
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Student Email</label>
+                      {ef(editForm.email, (v) => setEditForm((f) => ({ ...f, email: v })), { type: 'email', placeholder: 'student@example.com' })}
+                    </div>
+                  </div>
+                </div>
+
+                {editError && (
+                  <div style={{ color: '#dc2626', fontSize: '13px', fontWeight: '600', padding: '10px 14px', background: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                    {editError}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: '8px', position: 'sticky', bottom: 0, background: 'white' }}>
+                <button onClick={() => setIsEditModalOpen(false)} className="btn btn-secondary" disabled={editSubmitting}>Cancel</button>
+                <button
+                  onClick={handleEditSubmit}
+                  disabled={editSubmitting}
+                  style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: '#1a237e', color: 'white', fontSize: '14px', fontWeight: '600', cursor: editSubmitting ? 'not-allowed' : 'pointer', opacity: editSubmitting ? 0.6 : 1 }}
+                >
+                  {editSubmitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
         );
       })()}
 

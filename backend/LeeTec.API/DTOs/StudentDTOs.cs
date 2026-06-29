@@ -24,6 +24,18 @@ namespace LeeTec.API.DTOs
         public string? Email { get; set; }
     }
 
+    public class UpdateStudentDTO
+    {
+        public string FirstName { get; set; } = string.Empty;
+        public string Surname { get; set; } = string.Empty;
+        public string DateOfBirth { get; set; } = string.Empty;
+        public string Gender { get; set; } = string.Empty;
+        public string Race { get; set; } = string.Empty;
+        public string Form { get; set; } = string.Empty;
+        public string Curriculum { get; set; } = string.Empty;
+        public string? Email { get; set; }
+    }
+
     public class ActivateDTO
     {
         public string Token { get; set; } = string.Empty;

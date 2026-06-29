@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
@@ -91,6 +92,26 @@ namespace LeeTec.API.Controllers
                     error = ex.Message
                 });
             }
+        }
+
+        // UPDATE STUDENT
+        [Authorize]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateStudent(int id, [FromBody] UpdateStudentDTO dto)
+        {
+            var student = await _context.Students.FindAsync(id);
+            if (student == null) return NotFound(new { message = "Student not found" });
+
+            student.FirstName = dto.FirstName.Trim();
+            student.Surname = dto.Surname.Trim();
+            student.DateOfBirth = dto.DateOfBirth;
+            student.Gender = dto.Gender;
+            student.Race = dto.Race;
+            student.Form = dto.Form;
+            student.Curriculum = dto.Curriculum;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Student updated successfully" });
         }
 
         // GET SINGLE STUDENT
