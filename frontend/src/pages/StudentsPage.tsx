@@ -36,6 +36,7 @@ const defaultCurriculum = (campus: string) =>
 const blankStep1 = () => ({
   firstName: '', surname: '', dateOfBirth: '', gender: 'Male',
   race: '', birthCertificateNo: '', campus: 'AHA', curriculum: defaultCurriculum('AHA'),
+  studentEmail: '',
 });
 
 const blankStep2 = () => ({
@@ -148,6 +149,7 @@ export default function StudentsPage() {
         medicalAidNo: step2.medicalAidNo.trim(),
         allergies: step2.allergies.trim(),
         denomination: step2.denomination.trim(),
+        email: step1.studentEmail.trim() || undefined,
       };
 
       console.log('Enrol payload:', JSON.stringify(payload, null, 2));
@@ -756,6 +758,11 @@ export default function StudentsPage() {
                     <div>
                       <label style={labelStyle}>Birth Certificate No.</label>
                       {inp(step1.birthCertificateNo, (v) => setStep1({ ...step1, birthCertificateNo: v }), { placeholder: 'Birth certificate number' })}
+                    </div>
+                    <div style={{ gridColumn: '1/-1' }}>
+                      <label style={labelStyle}>Student Email Address (for portal activation)</label>
+                      {inp(step1.studentEmail, (v) => setStep1({ ...step1, studentEmail: v }), { type: 'email', placeholder: 'student@example.com' })}
+                      <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0' }}>Optional — student will receive their student number at this email</p>
                     </div>
                   </div>
                 </>
