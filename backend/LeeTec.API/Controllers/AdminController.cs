@@ -181,59 +181,6 @@ namespace LeeTec.API.Controllers
             return Ok(new { message = "Portal account deleted" });
         }
 
-        // GET /api/admin/portal-registrations?schoolId=1
-        [HttpGet("portal-registrations")]
-        public async Task<IActionResult> GetPortalRegistrations([FromQuery] int schoolId = 1)
-        {
-            var accounts = await _context.StudentPortalAccounts
-                .Where(a => a.Status == "Pending" && a.Student.SchoolId == schoolId)
-                .OrderBy(a => a.CreatedAt)
-                .Select(a => new
-                {
-                    id = a.Id,
-                    studentId = a.StudentId,
-                    studentNumber = a.Student.StudentNumber,
-                    firstName = a.Student.FirstName,
-                    surname = a.Student.Surname,
-                    form = a.Student.Form,
-                    campus = a.Student.StudentNumber.StartsWith("AHJ") ? "AHJ"
-                           : a.Student.StudentNumber.StartsWith("AHS") ? "AHS"
-                           : "AHA",
-                    email = a.Email,
-                    createdAt = a.CreatedAt,
-                })
-                .ToListAsync();
-
-            return Ok(accounts);
-        }
-
-        // PUT /api/admin/portal-registrations/{id}/approve
-        [HttpPut("portal-registrations/{id}/approve")]
-        public async Task<IActionResult> ApprovePortalRegistration(int id)
-        {
-            var account = await _context.StudentPortalAccounts.FindAsync(id);
-            if (account == null) return NotFound(new { message = "Registration not found" });
-
-            account.Status = "Active";
-            account.ApprovedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Account approved" });
-        }
-
-        // PUT /api/admin/portal-registrations/{id}/reject
-        [HttpPut("portal-registrations/{id}/reject")]
-        public async Task<IActionResult> RejectPortalRegistration(int id)
-        {
-            var account = await _context.StudentPortalAccounts.FindAsync(id);
-            if (account == null) return NotFound(new { message = "Registration not found" });
-
-            _context.StudentPortalAccounts.Remove(account);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Account rejected" });
-        }
-
         // GET /api/admin/teachers?schoolId=1
         [HttpGet("teachers")]
         public async Task<IActionResult> GetTeachers([FromQuery] int schoolId = 1)

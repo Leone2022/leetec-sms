@@ -19,7 +19,6 @@ import TeacherLoginPage from './pages/TeacherLoginPage.tsx';
 import TeacherDashboardPage from './pages/TeacherDashboardPage.tsx';
 import StudentDashboardPage from './pages/StudentDashboardPage.tsx';
 import ActivatePage from './pages/ActivatePage.tsx';
-import PortalApprovalsPage from './pages/PortalApprovalsPage.tsx';
 import PortalAccountsPage from './pages/PortalAccountsPage.tsx';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -51,9 +50,6 @@ function App() {
 
       {/* Student Activation */}
       <Route path="/activate" element={<ActivatePage />} />
-
-      {/* Portal Registrations */}
-      <Route path="/portal-approvals" element={<ProtectedRoute><PortalApprovalsPage /></ProtectedRoute>} />
 
       {/* Portal Accounts */}
       <Route path="/portal-accounts" element={<ProtectedRoute><PortalAccountsPage /></ProtectedRoute>} />

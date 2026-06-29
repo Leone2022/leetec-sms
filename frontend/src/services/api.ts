@@ -205,12 +205,6 @@ export const adminAPI = {
   getTeachers: (schoolId = 1) => api.get(`/admin/teachers?schoolId=${schoolId}`),
   getStudentCredentials: (termId: number, schoolId = 1) =>
     api.get(`/admin/student-credentials?termId=${termId}&schoolId=${schoolId}`),
-  getPortalRegistrations: (schoolId = 1) =>
-    api.get(`/admin/portal-registrations?schoolId=${schoolId}`),
-  approvePortalRegistration: (id: number) =>
-    api.put(`/admin/portal-registrations/${id}/approve`),
-  rejectPortalRegistration: (id: number) =>
-    api.put(`/admin/portal-registrations/${id}/reject`),
 };
 
 export const teacherAuthAPI = {

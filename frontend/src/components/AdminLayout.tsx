@@ -18,7 +18,6 @@ import {
   ClipboardList,
   FileStack,
   Bell,
-  UserCheck,
   Globe,
 } from 'lucide-react';
 
@@ -35,7 +34,6 @@ const NAV: NavItem[] = [
   { label: 'Fees & Billing', Icon: Receipt, path: '/fees' },
   { label: 'Fee Setup', Icon: Settings, path: '/fee-setup' },
   { label: 'Portal Approvals', Icon: ClipboardCheck, path: '/approvals' },
-  { label: 'Portal Registrations', Icon: UserCheck, path: '/portal-approvals' },
   { label: 'Portal Accounts', Icon: Globe, path: '/portal-accounts' },
   { label: 'Terms & Periods', Icon: Calendar, path: '/terms' },
   { label: 'Subjects', Icon: BookOpen, path: '/subjects' },
