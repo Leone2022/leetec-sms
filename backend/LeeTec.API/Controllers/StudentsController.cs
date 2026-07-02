@@ -73,8 +73,20 @@ namespace LeeTec.API.Controllers
                 // Send welcome email with student number if address provided (non-blocking)
                 if (!string.IsNullOrEmpty(dto.Email))
                 {
-                    try { await _emailService.SendActivationEmailAsync(dto.Email, dto.FirstName, student.StudentNumber, "https://www.adventhopeacademy.com/student-login"); }
-                    catch { /* don't fail enrolment if email fails */ }
+                    var capturedEmail = dto.Email;
+                    var capturedName = dto.FirstName;
+                    var capturedStudentNo = student.StudentNumber;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _emailService.SendActivationEmailAsync(capturedEmail, capturedName, capturedStudentNo, "https://www.adventhopeacademy.com/student-login");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Email send failed: {ex.Message}");
+                        }
+                    });
                 }
 
                 return Ok(new {
