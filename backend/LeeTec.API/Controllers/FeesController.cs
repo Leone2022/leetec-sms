@@ -156,6 +156,37 @@ namespace LeeTec.API.Controllers
                           ?? User.FindFirstValue(ClaimTypes.Email)
                           ?? "Admin";
 
+            // Upsert: if a package with the same name exists for this term and school, update it
+            var existing = await _context.FeePackages
+                .Include(p => p.Items)
+                .FirstOrDefaultAsync(p =>
+                    p.Name == request.Name &&
+                    p.TermId == request.TermId &&
+                    p.SchoolId == request.SchoolId &&
+                    p.IsActive);
+
+            if (existing != null)
+            {
+                existing.StudentType = request.StudentType;
+                existing.LockedAt = DateTime.UtcNow;
+                existing.LockedBy = savedBy;
+
+                _context.FeePackageItems.RemoveRange(existing.Items);
+                decimal updatedTotal = 0;
+                foreach (var item in request.Items)
+                {
+                    _context.FeePackageItems.Add(new FeePackageItem
+                    {
+                        FeePackageId = existing.Id,
+                        FeeCategoryId = item.ResolvedFeeCategoryId,
+                        Amount = item.Amount
+                    });
+                    updatedTotal += item.Amount;
+                }
+                await _context.SaveChangesAsync();
+                return Ok(new { message = "Fee package updated successfully", package = existing, total = updatedTotal });
+            }
+
             var package = new FeePackage
             {
                 SchoolId = request.SchoolId,

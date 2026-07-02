@@ -58,6 +58,7 @@ export const feesAPI = {
   createCategory: (data: any) => api.post('/fees/categories', data),
   deleteCategory: (id: number) => api.delete(`/fees/categories/${id}`),
   getPackages: (termId: number) => api.get(`/fees/packages/term/${termId}`),
+  getPackage: (id: number) => api.get(`/fees/packages/${id}`),
   createPackage: (data: any) => api.post('/fees/packages', data),
   updatePackage: (id: number, data: any) => api.put(`/fees/packages/${id}`, data),
   getStudentBalances: (termId: number, schoolId?: number) =>

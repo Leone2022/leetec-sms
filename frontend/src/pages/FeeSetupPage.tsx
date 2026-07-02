@@ -136,6 +136,14 @@ export default function FeeSetupPage() {
   const [indivAmount, setIndivAmount] = useState('');
   const [indivApplying, setIndivApplying] = useState(false);
 
+  // ── Charge Package Modal ─────────────────────────────────────────────────────
+  const [isPkgOpen, setIsPkgOpen] = useState(false);
+  const [pkgStudent, setPkgStudent] = useState<any>(null);
+  const [pkgPackages, setPkgPackages] = useState<any[]>([]);
+  const [pkgSelectedId, setPkgSelectedId] = useState<number | ''>('');
+  const [pkgLoading, setPkgLoading] = useState(false);
+  const [pkgApplying, setPkgApplying] = useState(false);
+
   // ── Invoice PDF & Email ─────────────────────────────────────────────────────
   const [emailModal, setEmailModal] = useState<{ studentId: number; invoiceId: number | null; studentName: string } | null>(null);
   const [emailAddr, setEmailAddr] = useState('');
@@ -281,6 +289,51 @@ export default function FeeSetupPage() {
       showMsg(err.response?.data?.message || 'Failed to apply charge', 'error');
     } finally {
       setIndivApplying(false);
+    }
+  };
+
+  // ── Charge Package ──────────────────────────────────────────────────────────
+  const openPkgModal = async (b: any) => {
+    if (!activeTerm) return;
+    const student = allStudents.find((s: any) => s.id === b.studentId)
+      ?? { id: b.studentId, firstName: (b.studentName || '').split(' ')[0], surname: (b.studentName || '').split(' ').slice(1).join(' ') };
+    setPkgStudent({ ...student, studentName: b.studentName });
+    setPkgSelectedId('');
+    setPkgPackages([]);
+    setIsPkgOpen(true);
+    setPkgLoading(true);
+    try {
+      const res = await feesAPI.getPackages(activeTerm.id);
+      setPkgPackages(res.data || []);
+    } catch {
+      showMsg('Failed to load packages', 'error');
+    } finally {
+      setPkgLoading(false);
+    }
+  };
+
+  const handleChargePackage = async () => {
+    if (!pkgStudent || !pkgSelectedId) return;
+    const pkg = pkgPackages.find((p: any) => p.id === pkgSelectedId);
+    if (!pkg || !pkg.items?.length) { showMsg('Selected package has no items', 'error'); return; }
+    setPkgApplying(true);
+    try {
+      for (const item of pkg.items) {
+        await feesAPI.chargeIndividual({
+          studentId: pkgStudent.id,
+          schoolId: 1,
+          description: item.feeCategory?.name || 'Fee',
+          amount: Number(item.amount),
+          feeCategoryId: item.feeCategoryId,
+        });
+      }
+      showMsg('Package charged successfully', 'success');
+      setIsPkgOpen(false);
+      if (activeTerm) loadBalances(activeTerm.id);
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to charge package', 'error');
+    } finally {
+      setPkgApplying(false);
     }
   };
 
@@ -881,6 +934,10 @@ export default function FeeSetupPage() {
                                       onClick={() => handleOpenEmailModal(b)}>
                                       📧 Email
                                     </button>
+                                    <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: '#fdf4ff', color: '#7e22ce', border: '1px solid #e9d5ff' }}
+                                      onClick={() => openPkgModal(b)} disabled={!activeTerm}>
+                                      📦 Charge Package
+                                    </button>
                                   </div>
                                 </td>
                               </tr>
@@ -1357,6 +1414,72 @@ export default function FeeSetupPage() {
           </div>
         </div>
       )}
+
+      {/* ════ CHARGE PACKAGE MODAL ════ */}
+      {isPkgOpen && pkgStudent && (() => {
+        const selectedPkg = pkgPackages.find((p: any) => p.id === pkgSelectedId);
+        const pkgTotal = (selectedPkg?.items ?? []).reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+            onClick={() => setIsPkgOpen(false)}>
+            <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '480px' }}
+              onClick={(e) => e.stopPropagation()}>
+              <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Charge Package</h2>
+                  <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{pkgStudent.studentName || `${pkgStudent.firstName} ${pkgStudent.surname}`}</p>
+                </div>
+                <button onClick={() => setIsPkgOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={18} /></button>
+              </div>
+              <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: '600', color: '#0f172a', display: 'block', marginBottom: '5px' }}>Select Package</label>
+                  {pkgLoading ? (
+                    <p style={{ fontSize: 13, color: '#64748b' }}>Loading packages...</p>
+                  ) : pkgPackages.length === 0 ? (
+                    <p style={{ fontSize: 13, color: '#64748b' }}>No packages found for this term.</p>
+                  ) : (
+                    <select value={pkgSelectedId} onChange={(e) => setPkgSelectedId(Number(e.target.value) || '')}
+                      className="text-field" style={{ appearance: 'auto', cursor: 'pointer' }}>
+                      <option value="">— Select a package —</option>
+                      {pkgPackages.map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.name}{p.studentType ? ` · ${p.studentType}` : ''}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {selectedPkg && (
+                  <div style={{ background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                    <div style={{ padding: '8px 14px', borderBottom: '1px solid #e2e8f0', fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Line Items
+                    </div>
+                    {(selectedPkg.items ?? []).map((item: any, idx: number) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>
+                        <span style={{ color: '#0f172a' }}>{item.feeCategory?.name || 'Fee'}</span>
+                        <span style={{ fontFamily: 'ui-monospace, monospace', color: '#0f172a', fontWeight: 600 }}>${Number(item.amount).toLocaleString()}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', fontSize: 13, fontWeight: 700, background: '#eef2ff' }}>
+                      <span style={{ color: '#1a237e' }}>Total</span>
+                      <span style={{ fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>${pkgTotal.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+                  <button className="btn btn-secondary" onClick={() => setIsPkgOpen(false)} disabled={pkgApplying}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleChargePackage}
+                    disabled={pkgApplying || !pkgSelectedId || pkgLoading}
+                    style={{ opacity: (pkgApplying || !pkgSelectedId) ? 0.6 : 1 }}>
+                    {pkgApplying ? 'Charging...' : '📦 Charge Now'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </AdminLayout>
