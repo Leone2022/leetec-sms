@@ -545,80 +545,144 @@ export default function FeeSetupPage() {
     const studentNum = payStudent.studentNumber || '—';
     const form = payStudent.form || '—';
     const campus = payStudent.campus || (studentNum.split('/')[0]) || '—';
+    const studentType = payStudent.studentType === 'Boarding' ? 'Boarder' : 'Day Scholar';
+    const termName = activeTerm?.name ?? '—';
     const finalBal = statementRows[statementRows.length - 1].balance;
     const stmtBank = getBankDetails(payStudent.studentNumber);
+    const stmtRef = `STM/${studentNum.replace(/\//g, '')}/${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
 
-    // Navy banner
-    doc.setFillColor(26, 35, 126);
-    doc.rect(0, 0, 210, 42, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20); doc.setFont('helvetica', 'bold');
-    doc.text('Advent Hope Academy', 14, 17);
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    doc.text('64 Jason Moyo Ave, Harare  |  Tel: +263 773 102 003  |  adventhope01@gmail.com', 14, 26);
-    doc.text(`Bank: ZB Bank, ${stmtBank.branch}  |  NOSTRO: ${stmtBank.nostro}`, 14, 34);
+    // Separate charges and payments from raw invoice data
+    const chargeRows: { date: string; desc: string; amount: number }[] = [];
+    const paymentRows: { date: string; ref: string; method: string; amount: number }[] = [];
+    for (const inv of payInvoices) {
+      for (const item of (inv.items || []))
+        chargeRows.push({ date: inv.issuedDate || inv.createdAt || '', desc: item.description || '—', amount: Number(item.amount || 0) });
+      for (const pmt of (inv.payments || [])) {
+        if (Number(pmt.amount) > 0)
+          paymentRows.push({ date: pmt.paymentDate || pmt.postedAt || '', ref: pmt.receiptNumber || '—', method: pmt.paymentMethod || 'Cash', amount: Number(pmt.amount) });
+      }
+    }
+
+    // ── HEADER (white background, text only) ──────────────────────────────────
+    doc.setTextColor(15, 23, 42);
     doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-    doc.text('ACCOUNT STATEMENT', 196, 22, { align: 'right' });
+    doc.text('Advent Hope Academy', 14, 18);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${today}`, 196, 32, { align: 'right' });
+    doc.setTextColor(120, 120, 120);
+    doc.text('64 Jason Moyo Ave, Harare  |  Tel: +263 773 102 003  |  adventhope01@gmail.com', 14, 26);
 
-    doc.setTextColor(0); doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+    doc.text('FEE STATEMENT', 196, 18, { align: 'right' });
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Ref: ${stmtRef}`, 196, 26, { align: 'right' });
+    doc.text(`Date: ${today}`, 196, 32, { align: 'right' });
 
-    // Student info
+    doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.5);
+    doc.line(14, 36, 196, 36);
+
+    // ── STUDENT INFO BOX (light gray background) ──────────────────────────────
     autoTable(doc, {
-      startY: 50,
-      head: [['Student Name', 'Student Number', 'Form', 'Campus']],
-      body: [[studentName, studentNum, form, campus]],
+      startY: 40,
+      body: [
+        ['Student Name', studentName, 'Form / Class', form],
+        ['Student Number', studentNum, 'Campus', campus],
+        ['Term', termName, 'Student Type', studentType],
+      ],
       theme: 'plain',
-      headStyles: { fillColor: [26, 35, 126], textColor: 255, fontStyle: 'bold' },
-      styles: { fontSize: 10, cellPadding: 4 },
+      styles: { fontSize: 10, cellPadding: 4, fillColor: [248, 249, 250] },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 40, textColor: [100, 100, 100] as [number, number, number] },
+        1: { cellWidth: 54 },
+        2: { fontStyle: 'bold', cellWidth: 40, textColor: [100, 100, 100] as [number, number, number] },
+        3: { cellWidth: 54 },
+      },
+      margin: { left: 14, right: 14 },
     });
 
-    // Statement table
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 6,
-      head: [['Date', 'Description', 'Charge', 'Payment', 'Balance']],
-      body: statementRows.map(r => [
-        r.date ? new Date(r.date).toLocaleDateString('en-GB') : '—',
-        r.desc,
-        r.charge > 0 ? `$${r.charge.toLocaleString()}` : '—',
-        r.payment > 0 ? `$${r.payment.toLocaleString()}` : '—',
-        `$${r.balance.toLocaleString()}`,
-      ]),
-      theme: 'striped',
-      headStyles: { fillColor: [26, 35, 126], textColor: 255 },
-      styles: { fontSize: 10 },
-      columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
-    });
+    let curY: number = (doc as any).lastAutoTable.finalY + 10;
 
-    // Summary
+    // ── CHARGES TABLE ─────────────────────────────────────────────────────────
+    if (chargeRows.length > 0) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+      doc.text('Charges', 14, curY);
+      autoTable(doc, {
+        startY: curY + 4,
+        head: [['Date', 'Description', 'Amount']],
+        body: chargeRows.map(r => [
+          r.date ? new Date(r.date).toLocaleDateString('en-GB') : '—',
+          r.desc,
+          `$${r.amount.toLocaleString()}`,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [51, 51, 51] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: 'bold', lineColor: [51, 51, 51] as [number, number, number] },
+        bodyStyles: { fillColor: [255, 255, 255] as [number, number, number], lineColor: [221, 221, 221] as [number, number, number] },
+        alternateRowStyles: { fillColor: [249, 249, 249] as [number, number, number] },
+        styles: { fontSize: 10, cellPadding: 4 },
+        columnStyles: { 2: { halign: 'right', cellWidth: 36 } },
+        margin: { left: 14, right: 14 },
+      });
+      curY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // ── PAYMENTS TABLE ────────────────────────────────────────────────────────
+    if (paymentRows.length > 0) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+      doc.text('Payments Received', 14, curY);
+      autoTable(doc, {
+        startY: curY + 4,
+        head: [['Date', 'Reference', 'Method', 'Amount']],
+        body: paymentRows.map(r => [
+          r.date ? new Date(r.date).toLocaleDateString('en-GB') : '—',
+          r.ref,
+          r.method,
+          `$${r.amount.toLocaleString()}`,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [51, 51, 51] as [number, number, number], textColor: [255, 255, 255] as [number, number, number], fontStyle: 'bold', lineColor: [51, 51, 51] as [number, number, number] },
+        bodyStyles: { fillColor: [255, 255, 255] as [number, number, number], lineColor: [221, 221, 221] as [number, number, number] },
+        alternateRowStyles: { fillColor: [249, 249, 249] as [number, number, number] },
+        styles: { fontSize: 10, cellPadding: 4 },
+        columnStyles: { 3: { halign: 'right', cellWidth: 36 } },
+        margin: { left: 14, right: 14 },
+      });
+      curY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // ── SUMMARY BOX (bottom right, bordered) ──────────────────────────────────
     const balColor: [number, number, number] = finalBal > 0 ? [220, 38, 38] : [21, 128, 61];
     autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 8,
+      startY: curY,
       body: [
         ['Total Charged', `$${totalCharged.toLocaleString()}`],
-        ['Total Paid', `-$${totalPaid.toLocaleString()}`],
         [
-          { content: 'Balance Due', styles: { fontStyle: 'bold', textColor: balColor } },
-          { content: `$${finalBal.toLocaleString()}`, styles: { fontStyle: 'bold', textColor: balColor } },
+          { content: 'Total Paid', styles: { textColor: [21, 128, 61] as [number, number, number] } },
+          { content: `$${totalPaid.toLocaleString()}`, styles: { textColor: [21, 128, 61] as [number, number, number], halign: 'right' as const } },
+        ],
+        [
+          { content: 'Balance Due', styles: { fontStyle: 'bold' as const, textColor: balColor } },
+          { content: `$${finalBal.toLocaleString()}`, styles: { fontStyle: 'bold' as const, textColor: balColor, halign: 'right' as const } },
         ],
       ],
       theme: 'plain',
-      styles: { fontSize: 11, cellPadding: 4 },
+      styles: { fontSize: 11, cellPadding: 5 },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 }, 1: { halign: 'right' } },
-      margin: { left: 120 },
+      tableWidth: 90,
+      margin: { left: 106 },
+      tableLineColor: [200, 200, 200] as [number, number, number],
+      tableLineWidth: 0.5,
     });
 
-    // Footer
-    const footY = (doc as any).lastAutoTable.finalY + 12;
-    doc.setDrawColor(200, 200, 200);
+    // ── FOOTER ────────────────────────────────────────────────────────────────
+    const footY: number = (doc as any).lastAutoTable.finalY + 14;
+    doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.5);
     doc.line(14, footY, 196, footY);
-    doc.setFontSize(9); doc.setTextColor(71, 85, 105);
-    doc.text('Banking Details:', 14, footY + 8);
-    doc.text(`Bank: ZB Bank  |  Branch: ${stmtBank.branch}  |  Name: ${stmtBank.name}`, 14, footY + 15);
-    doc.text(`NOSTRO: ${stmtBank.nostro}  |  ZWL: ${stmtBank.zwl}`, 14, footY + 22);
-    doc.setFontSize(8); doc.setTextColor(150);
-    doc.text('This is a computer generated statement.', 105, footY + 30, { align: 'center' });
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 120);
+    doc.text(`Banking Details: ZB Bank  |  Branch: ${stmtBank.branch}  |  Account Name: ${stmtBank.name}  |  NOSTRO: ${stmtBank.nostro}`, 14, footY + 8);
+    doc.text(`ZWL Account: ${stmtBank.zwl}`, 14, footY + 15);
+    doc.setFontSize(8); doc.setTextColor(160, 160, 160);
+    doc.text('This is a computer generated statement.  LeeTec School Management System', 105, footY + 23, { align: 'center' });
 
     doc.save(`Statement_${studentNum}_${new Date().toISOString().split('T')[0]}.pdf`);
   };
@@ -943,28 +1007,39 @@ export default function FeeSetupPage() {
                                   </strong>
                                 </td>
                                 <td>
-                                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                    <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}
-                                      onClick={() => student && jumpToPayment(student)}>
-                                      Post Payment
-                                    </button>
-                                    <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}
-                                      onClick={() => student && jumpToPayment(student)}>
-                                      Statement
-                                    </button>
-                                    <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: '#fff7ed', color: '#ea580c', border: '1px solid #fed7aa' }}
-                                      onClick={() => handleDownloadInvoicePDF(b)}>
-                                      📄 Invoice
-                                    </button>
-                                    <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd' }}
-                                      onClick={() => handleOpenEmailModal(b)}>
-                                      📧 Email
-                                    </button>
-                                    <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: '#fdf4ff', color: '#7e22ce', border: '1px solid #e9d5ff' }}
-                                      onClick={() => openPkgModal(b)} disabled={!activeTerm}>
-                                      📦 Charge Package
-                                    </button>
-                                  </div>
+                                  {(() => {
+                                    const charged = Number(b.totalAmount ?? 0);
+                                    const paid = Number(b.amountPaid ?? 0);
+                                    const icoStyle: React.CSSProperties = { width: 28, height: 28, padding: 0, fontSize: 14, cursor: 'pointer', background: 'white', border: '1px solid #e2e8f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
+                                    if (charged === 0) {
+                                      return (
+                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                          <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', whiteSpace: 'nowrap' }}>💡 Click 📦 to charge fees</span>
+                                          <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: '#fdf4ff', color: '#7e22ce', border: '1px solid #e9d5ff', flexShrink: 0 }}
+                                            onClick={() => openPkgModal(b)} disabled={!activeTerm}>
+                                            📦 Charge Package
+                                          </button>
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <button className="btn btn-primary" style={{ fontSize: 11, padding: '4px 12px', flexShrink: 0 }}
+                                          onClick={() => student && jumpToPayment(student)}>
+                                          💳 Post Payment
+                                        </button>
+                                        {paid === 0 && (
+                                          <span style={{ fontSize: 11, color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>💳 Payment pending</span>
+                                        )}
+                                        <div style={{ display: 'flex', gap: 3, marginLeft: 2 }}>
+                                          <button title="View Statement" style={icoStyle} onClick={() => student && jumpToPayment(student)}>📋</button>
+                                          <button title="Download Invoice PDF" style={icoStyle} onClick={() => handleDownloadInvoicePDF(b)}>📄</button>
+                                          <button title="Email Invoice" style={icoStyle} onClick={() => handleOpenEmailModal(b)}>📧</button>
+                                          <button title="Charge Package" style={{ ...icoStyle, cursor: activeTerm ? 'pointer' : 'not-allowed', opacity: activeTerm ? 1 : 0.5 }} onClick={() => openPkgModal(b)} disabled={!activeTerm}>📦</button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </td>
                               </tr>
                             );
