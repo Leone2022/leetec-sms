@@ -22,7 +22,6 @@ export default function StudentPortalLoginPage() {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [loginPending, setLoginPending] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
 
   // Register state
@@ -44,7 +43,6 @@ export default function StudentPortalLoginPage() {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError('');
-    setLoginPending(false);
     try {
       const res = await portalAPI.login(loginEmail, loginPassword);
       const { token, student } = res.data;
@@ -53,14 +51,7 @@ export default function StudentPortalLoginPage() {
       navigate('/student-dashboard');
     } catch (err: any) {
       const msg: string = err.response?.data?.message || err.response?.data || 'Invalid email or password';
-      const isPending = msg.toLowerCase().includes('pending') ||
-        err.response?.data?.status?.toLowerCase?.() === 'pending' ||
-        err.response?.status === 403;
-      if (isPending) {
-        setLoginPending(true);
-      } else {
-        setLoginError(msg);
-      }
+      setLoginError(msg);
     } finally {
       setLoginLoading(false);
     }
@@ -162,11 +153,6 @@ export default function StudentPortalLoginPage() {
                 <>
                   <h2 className="auth-login-title">Welcome back</h2>
                   <p className="auth-login-sub">Sign in to open your student dashboard.</p>
-                  {loginPending && (
-                    <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '12px 14px', fontSize: '13px', color: '#92400e', lineHeight: 1.5 }}>
-                      Your account is pending admin approval. You will receive an email once approved.
-                    </div>
-                  )}
                   {loginError && <div className="auth-error">{loginError}</div>}
                   <form onSubmit={handleLogin} className="auth-form">
                     <div>
