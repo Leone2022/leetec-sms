@@ -139,6 +139,7 @@ export default function FeeSetupPage() {
   // ── Charge Package Modal ─────────────────────────────────────────────────────
   const [isPkgOpen, setIsPkgOpen] = useState(false);
   const [pkgStudent, setPkgStudent] = useState<any>(null);
+  const [pkgStudentType, setPkgStudentType] = useState<string>('Day');
   const [pkgPackages, setPkgPackages] = useState<any[]>([]);
   const [pkgSelectedId, setPkgSelectedId] = useState<number | ''>('');
   const [pkgLoading, setPkgLoading] = useState(false);
@@ -299,13 +300,20 @@ export default function FeeSetupPage() {
     const student = allStudents.find((s: any) => s.id === b.studentId)
       ?? { id: b.studentId, firstName: (b.studentName || '').split(' ')[0], surname: (b.studentName || '').split(' ').slice(1).join(' ') };
     setPkgStudent({ ...student, studentName: b.studentName });
+    const sType: string = student.studentType ?? 'Day';
+    setPkgStudentType(sType);
     setPkgSelectedId('');
     setPkgPackages([]);
     setIsPkgOpen(true);
     setPkgLoading(true);
     try {
       const res = await feesAPI.getPackages(activeTerm.id);
-      setPkgPackages(res.data || []);
+      const pkgs: any[] = res.data || [];
+      setPkgPackages(pkgs);
+      const firstMatch = pkgs.find((p: any) =>
+        (p.studentType ?? '').toLowerCase() === sType.toLowerCase()
+      );
+      if (firstMatch) setPkgSelectedId(firstMatch.id);
     } catch {
       showMsg('Failed to load packages', 'error');
     } finally {
@@ -1457,7 +1465,7 @@ export default function FeeSetupPage() {
               <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Charge Package</h2>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{pkgStudent.studentName || `${pkgStudent.firstName} ${pkgStudent.surname}`}</p>
+                  <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{pkgStudent.studentName || `${pkgStudent.firstName} ${pkgStudent.surname}`} · {pkgStudentType === 'Boarding' ? 'Boarder' : 'Day Scholar'}</p>
                 </div>
                 <button onClick={() => setIsPkgOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={18} /></button>
               </div>
@@ -1472,9 +1480,33 @@ export default function FeeSetupPage() {
                     <select value={pkgSelectedId} onChange={(e) => setPkgSelectedId(Number(e.target.value) || '')}
                       className="text-field" style={{ appearance: 'auto', cursor: 'pointer' }}>
                       <option value="">— Select a package —</option>
-                      {pkgPackages.map((p: any) => (
-                        <option key={p.id} value={p.id}>{p.name}{p.studentType ? ` · ${p.studentType}` : ''}</option>
-                      ))}
+                      {(() => {
+                        const recommended = pkgPackages.filter((p: any) =>
+                          (p.studentType ?? '').toLowerCase() === pkgStudentType.toLowerCase()
+                        );
+                        const others = pkgPackages.filter((p: any) =>
+                          (p.studentType ?? '').toLowerCase() !== pkgStudentType.toLowerCase()
+                        );
+                        const typeLabel = pkgStudentType === 'Boarding' ? 'Boarder' : 'Day Scholar';
+                        return (
+                          <>
+                            {recommended.length > 0 && (
+                              <optgroup label={`⭐ Recommended for ${typeLabel}`}>
+                                {recommended.map((p: any) => (
+                                  <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {others.length > 0 && (
+                              <optgroup label="Other Packages">
+                                {others.map((p: any) => (
+                                  <option key={p.id} value={p.id}>{p.name}{p.studentType ? ` · ${p.studentType}` : ''}</option>
+                                ))}
+                              </optgroup>
+                            )}
+                          </>
+                        );
+                      })()}
                     </select>
                   )}
                 </div>
