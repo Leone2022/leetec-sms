@@ -36,7 +36,7 @@ const defaultCurriculum = (campus: string) =>
 const blankStep1 = () => ({
   firstName: '', surname: '', dateOfBirth: '', gender: 'Male',
   race: '', birthCertificateNo: '', campus: 'AHA', curriculum: defaultCurriculum('AHA'),
-  studentEmail: '',
+  studentType: 'Day', studentEmail: '',
 });
 
 const blankStep2 = () => ({
@@ -89,8 +89,8 @@ export default function StudentsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState<{
     firstName: string; surname: string; dateOfBirth: string; gender: string;
-    race: string; form: string; curriculum: string; email: string;
-  }>({ firstName: '', surname: '', dateOfBirth: '', gender: 'Male', race: '', form: '', curriculum: '', email: '' });
+    race: string; form: string; curriculum: string; email: string; studentType: string;
+  }>({ firstName: '', surname: '', dateOfBirth: '', gender: 'Male', race: '', form: '', curriculum: '', email: '', studentType: 'Day' });
   const [editError, setEditError] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
@@ -147,6 +147,7 @@ export default function StudentsPage() {
         form: step2.form,
         dateOfEntry: step2.dateOfEntry,
         campus: step1.campus,
+        studentType: step1.studentType,
         curriculum: step1.curriculum,
         race: step1.race.trim(),
         previousSchool: step2.previousSchool.trim(),
@@ -452,6 +453,7 @@ export default function StudentsPage() {
       form: s.form ?? '',
       curriculum: s.curriculum ?? '',
       email: '',
+      studentType: s.studentType ?? 'Day',
     });
     setEditError('');
     setIsEditModalOpen(true);
@@ -473,6 +475,7 @@ export default function StudentsPage() {
         gender: editForm.gender,
         race: editForm.race.trim(),
         form: editForm.form,
+        studentType: editForm.studentType,
         curriculum: editForm.curriculum,
         email: editForm.email.trim() || undefined,
       });
@@ -794,6 +797,26 @@ export default function StudentsPage() {
                     ) : (
                       sel(step1.curriculum, (v) => setStep1({ ...step1, curriculum: v }), CURRICULUM_OPTIONS[step1.campus] ?? [])
                     )}
+                  </div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={labelStyle}>Student Type</label>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      {(['Day', 'Boarding'] as const).map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setStep1({ ...step1, studentType: type })}
+                          style={{
+                            flex: 1, padding: '10px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                            border: step1.studentType === type ? '2px solid #1a237e' : '2px solid #e2e8f0',
+                            background: step1.studentType === type ? '#1a237e' : 'white',
+                            color: step1.studentType === type ? 'white' : '#475569',
+                          }}
+                        >
+                          {type === 'Day' ? 'Day Scholar' : 'Boarder'}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <h3 style={sectionHeadStyle}>Personal Details</h3>
                   <div style={gridTwo}>
@@ -1524,6 +1547,26 @@ export default function StudentsPage() {
                     <div>
                       <label style={labelStyle}>Student Email</label>
                       {ef(editForm.email, (v) => setEditForm((f) => ({ ...f, email: v })), { type: 'email', placeholder: 'student@example.com' })}
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <label style={labelStyle}>Student Type</label>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        {(['Day', 'Boarding'] as const).map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setEditForm((f) => ({ ...f, studentType: type }))}
+                            style={{
+                              flex: 1, padding: '10px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                              border: editForm.studentType === type ? '2px solid #1a237e' : '2px solid #e2e8f0',
+                              background: editForm.studentType === type ? '#1a237e' : 'white',
+                              color: editForm.studentType === type ? 'white' : '#475569',
+                            }}
+                          >
+                            {type === 'Day' ? 'Day Scholar' : 'Boarder'}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>

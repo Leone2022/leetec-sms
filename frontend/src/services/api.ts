@@ -75,6 +75,7 @@ export const feesAPI = {
   deleteInvoiceItem: (id: number) => api.delete(`/fees/invoice-items/${id}`),
   deleteInvoice: (id: number) => api.delete(`/fees/invoices/${id}`),
   refundInvoice: (data: any) => api.post('/fees/refunds', data),
+  refundPayment: (paymentId: number, reason: string) => api.post('/fees/refunds', { paymentId, reason }),
 };
 
 export const portalAPI = {

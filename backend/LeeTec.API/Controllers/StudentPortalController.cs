@@ -62,6 +62,20 @@ namespace LeeTec.API.Controllers
             _context.StudentPortalAccounts.Add(account);
             await _context.SaveChangesAsync();
 
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _emailService.SendAccountApprovedAsync(
+                        account.Email,
+                        student.FirstName + " " + student.Surname);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Welcome email failed: {ex.Message}");
+                }
+            });
+
             return Ok(new
             {
                 message = "Registration successful! You can now log in.",

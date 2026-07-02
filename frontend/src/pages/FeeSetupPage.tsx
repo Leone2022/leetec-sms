@@ -155,6 +155,7 @@ export default function FeeSetupPage() {
   const [payInvoices, setPayInvoices] = useState<any[]>([]);
   const [payLoading, setPayLoading] = useState(false);
   const [selectedInvId, setSelectedInvId] = useState<number | null>(null);
+  const [unpostingId, setUnpostingId] = useState<number | null>(null);
   const [payForm, setPayForm] = useState({ amount: '', method: 'Cash', reference: '', date: todayISO() });
   const [paySubmitting, setPaySubmitting] = useState(false);
   const [paySuccess, setPaySuccess] = useState<any>(null);
@@ -616,17 +617,34 @@ export default function FeeSetupPage() {
 
   // ── Statement running balance ─────────────────────────────────────────────────
   const statementRows = useMemo(() => {
-    const rows: { date: string; desc: string; charge: number; payment: number }[] = [];
+    const rows: { date: string; desc: string; charge: number; payment: number; paymentId?: number }[] = [];
     for (const inv of payInvoices) {
       for (const item of (inv.items || []))
         rows.push({ date: inv.issuedDate || inv.createdAt || '', desc: item.description || '—', charge: Number(item.amount || 0), payment: 0 });
       for (const pmt of (inv.payments || []))
-        rows.push({ date: pmt.paymentDate || pmt.postedAt || '', desc: `Payment — ${pmt.paymentMethod || 'Cash'}${pmt.receiptNumber ? ` (${pmt.receiptNumber})` : ''}`, charge: 0, payment: Number(pmt.amount || 0) });
+        rows.push({ date: pmt.paymentDate || pmt.postedAt || '', desc: `Payment — ${pmt.paymentMethod || 'Cash'}${pmt.receiptNumber ? ` (${pmt.receiptNumber})` : ''}`, charge: 0, payment: Number(pmt.amount || 0), paymentId: pmt.id });
     }
     rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let bal = 0;
     return rows.map((r) => { bal += r.charge - r.payment; return { ...r, balance: bal }; });
   }, [payInvoices]);
+
+  const handleUnpost = async (paymentId: number, amount: number) => {
+    if (!payStudent) return;
+    if (!window.confirm(`Are you sure you want to reverse this payment of $${amount.toLocaleString()}?`)) return;
+    setUnpostingId(paymentId);
+    try {
+      await feesAPI.refundPayment(paymentId, 'Reversed by admin');
+      showMsg('Payment reversed successfully', 'success');
+      const res = await feesAPI.getStudentInvoices(payStudent.id);
+      setPayInvoices(res.data || []);
+      if (activeTerm) loadBalances(activeTerm.id);
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to reverse payment', 'error');
+    } finally {
+      setUnpostingId(null);
+    }
+  };
 
   // ── Receipt PDF ───────────────────────────────────────────────────────────────
   const printReceipt = () => {
@@ -1037,6 +1055,7 @@ export default function FeeSetupPage() {
                                   <th style={{ textAlign: 'right' }}>Charge</th>
                                   <th style={{ textAlign: 'right' }}>Payment</th>
                                   <th style={{ textAlign: 'right' }}>Balance</th>
+                                  <th></th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1056,6 +1075,17 @@ export default function FeeSetupPage() {
                                       <strong style={{ fontSize: 12, color: row.balance > 0 ? '#dc2626' : '#15803d' }}>
                                         ${row.balance.toLocaleString()}
                                       </strong>
+                                    </td>
+                                    <td style={{ textAlign: 'center', width: 80 }}>
+                                      {row.payment > 0 && row.paymentId && (
+                                        <button
+                                          disabled={unpostingId === row.paymentId}
+                                          onClick={() => handleUnpost(row.paymentId!, row.payment)}
+                                          style={{ padding: '3px 10px', fontSize: 11, fontWeight: 600, borderRadius: 5, cursor: 'pointer', background: 'white', color: '#dc2626', border: '1.5px solid #dc2626', opacity: unpostingId === row.paymentId ? 0.5 : 1 }}
+                                        >
+                                          Unpost
+                                        </button>
+                                      )}
                                     </td>
                                   </tr>
                                 ))}

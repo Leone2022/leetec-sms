@@ -645,16 +645,28 @@ namespace LeeTec.API.Controllers
         [HttpPost("refunds")]
         public async Task<IActionResult> RefundPayment([FromBody] DTOs.RefundRequest request)
         {
-            var invoice = await _context.Invoices.FindAsync(request.InvoiceId);
+            int resolvedInvoiceId = request.InvoiceId;
+            decimal resolvedAmount = request.Amount;
+
+            if (request.PaymentId.HasValue)
+            {
+                var pmt = await _context.Payments.FindAsync(request.PaymentId.Value);
+                if (pmt == null) return NotFound(new { message = "Payment not found" });
+                if (pmt.Amount <= 0) return BadRequest(new { message = "Cannot reverse a refund" });
+                resolvedInvoiceId = pmt.InvoiceId;
+                resolvedAmount = pmt.Amount;
+            }
+
+            var invoice = await _context.Invoices.FindAsync(resolvedInvoiceId);
             if (invoice == null) return NotFound(new { message = "Invoice not found" });
 
-            if (request.Amount <= 0)
+            if (resolvedAmount <= 0)
                 return BadRequest(new { message = "Refund amount must be greater than zero" });
 
             if (invoice.AmountPaid <= 0)
                 return BadRequest(new { message = "No payments recorded for this invoice" });
 
-            if (request.Amount > invoice.AmountPaid)
+            if (resolvedAmount > invoice.AmountPaid)
                 return BadRequest(new { message = "Refund amount exceeds amount paid" });
 
             var postingUserId = request.PostedByUserId > 0 ? request.PostedByUserId : GetCurrentUserId();
@@ -670,7 +682,7 @@ namespace LeeTec.API.Controllers
                 InvoiceId = invoice.Id,
                 StudentId = invoice.StudentId,
                 PostedByUserId = postingUserId.Value,
-                Amount = -Math.Abs(request.Amount),
+                Amount = -Math.Abs(resolvedAmount),
                 PaymentMethod = request.PaymentMethod ?? "Refund",
                 ReceiptNumber = request.ReceiptNumber ?? $"REF-{System.Guid.NewGuid().ToString().Substring(0,8)}",
                 Notes = request.Reason,

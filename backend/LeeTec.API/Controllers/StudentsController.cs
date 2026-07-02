@@ -50,6 +50,7 @@ namespace LeeTec.API.Controllers
                     BirthCertificateNo = dto.BirthCertificateNo,
                     Gender = dto.Gender,
                     Form = dto.Form,
+                    StudentType = dto.StudentType ?? "Day",
                     Curriculum = dto.Curriculum,
                     DateOfEntry = dto.DateOfEntry,
                     Race = dto.Race,
@@ -120,6 +121,7 @@ namespace LeeTec.API.Controllers
             student.Gender = dto.Gender;
             student.Race = dto.Race;
             student.Form = dto.Form;
+            student.StudentType = dto.StudentType;
             student.Curriculum = dto.Curriculum;
 
             await _context.SaveChangesAsync();

@@ -9,6 +9,7 @@ namespace LeeTec.API.DTOs
         public string BirthCertificateNo { get; set; } = string.Empty;
         public string Gender { get; set; } = string.Empty;
         public string Form { get; set; } = string.Empty;
+        public string StudentType { get; set; } = "Day";
         public string Curriculum { get; set; } = string.Empty;
         public string DateOfEntry { get; set; } = string.Empty;
         public string Race { get; set; } = string.Empty;
@@ -32,6 +33,7 @@ namespace LeeTec.API.DTOs
         public string Gender { get; set; } = string.Empty;
         public string Race { get; set; } = string.Empty;
         public string Form { get; set; } = string.Empty;
+        public string StudentType { get; set; } = "Day";
         public string Curriculum { get; set; } = string.Empty;
         public string? Email { get; set; }
     }
