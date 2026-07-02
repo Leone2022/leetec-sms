@@ -207,9 +207,9 @@ export default function StudentPortalLoginPage() {
                   {regSuccess ? (
                     <div style={{ textAlign: 'center', padding: '20px 0' }}>
                       <CheckCircle size={40} style={{ color: '#15803d', margin: '0 auto 12px' }} />
-                      <h3 style={{ fontWeight: '700', fontSize: '16px', marginBottom: 8 }}>Registration submitted!</h3>
+                      <h3 style={{ fontWeight: '700', fontSize: '16px', marginBottom: 8 }}>Registration successful!</h3>
                       <p style={{ fontSize: '13px', color: '#475569', marginBottom: 16 }}>
-                        Your account is pending approval by the school admin. You'll be able to log in once approved.
+                        You can now log in with your email and password.
                       </p>
                       <button className="btn btn-primary" onClick={() => { setRegSuccess(false); setTab('login'); }}>
                         Back to Sign In
