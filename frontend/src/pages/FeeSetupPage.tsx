@@ -177,9 +177,11 @@ export default function FeeSetupPage() {
       const active = (termsRes.data as any[]).find((t) => t.isActive) ?? null;
       setActiveTerm(active);
       if (active) {
-        const regRes = await termRegistrationsAPI.getDashboard(active.id);
+        const [regRes] = await Promise.all([
+          termRegistrationsAPI.getDashboard(active.id),
+          loadBalances(active.id),
+        ]);
         setRegistrations(regRes.data?.registrations || []);
-        loadBalances(active.id);
       }
     } catch (err) {
       console.error(err);
@@ -817,7 +819,9 @@ export default function FeeSetupPage() {
       )}
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: '#475569' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: '60px' }}>
+          <div style={{ fontSize: '14px', color: '#666' }}>Loading fee data...</div>
+        </div>
       ) : (
         <>
           {/* ══════════════ TAB 1: CHARGE STUDENTS ══════════════ */}
