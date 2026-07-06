@@ -720,6 +720,12 @@ namespace LeeTec.API.Controllers
             invoice.AmountPaid += refund.Amount; // refund.Amount is negative
             invoice.Balance = invoice.TotalAmount - invoice.AmountPaid;
 
+            if (invoice.AmountPaid <= 0)
+            {
+                invoice.AmountPaid = 0;
+                invoice.Status = "Unpaid";
+            }
+
             if (invoice.Balance <= 0)
                 invoice.Status = "Paid";
             else if (invoice.AmountPaid > 0)
