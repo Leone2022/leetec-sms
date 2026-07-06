@@ -228,7 +228,19 @@ namespace LeeTec.API.Controllers
                     .ThenInclude(i => i.FeeCategory)
                 .ToListAsync();
 
-            return Ok(packages);
+            return Ok(packages.Select(p => new {
+                p.Id,
+                p.Name,
+                p.StudentType,
+                p.TermId,
+                p.IsActive,
+                items = p.Items.Select(i => new {
+                    i.Id,
+                    i.Amount,
+                    i.FeeCategoryId,
+                    feeCategoryName = i.FeeCategory != null ? i.FeeCategory.Name : "Fee"
+                })
+            }));
         }
 
         [HttpGet("packages/{id}")]
@@ -242,7 +254,19 @@ namespace LeeTec.API.Controllers
 
             if (package == null) return NotFound(new { message = "Package not found" });
 
-            return Ok(package);
+            return Ok(new {
+                package.Id,
+                package.Name,
+                package.StudentType,
+                package.TermId,
+                package.IsActive,
+                items = package.Items.Select(i => new {
+                    i.Id,
+                    i.Amount,
+                    i.FeeCategoryId,
+                    feeCategoryName = i.FeeCategory != null ? i.FeeCategory.Name : "Fee"
+                })
+            });
         }
 [HttpPut("packages/{id}")]
         public async Task<IActionResult> UpdateFeePackage(int id, [FromBody] CreateFeePackageRequest request)
