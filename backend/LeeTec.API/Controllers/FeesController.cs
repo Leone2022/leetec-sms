@@ -748,40 +748,8 @@ namespace LeeTec.API.Controllers
         // DELETION / REVERSALS
         // =====================
 
-        [HttpDelete("invoice-items/{id}")]
-        public async Task<IActionResult> DeleteInvoiceItem(int id)
-        {
-            var item = await _context.InvoiceItems
-                .Include(i => i.Invoice)
-                .FirstOrDefaultAsync(i => i.Id == id);
-            if (item == null) return NotFound(new { message = "Invoice item not found" });
-
-            var invoice = item.Invoice;
-
-            // Do not allow removing items if invoice has payments recorded
-            if (invoice.AmountPaid > 0)
-                return BadRequest(new { message = "Cannot remove invoice item after payments have been posted. Please refund or adjust payments first." });
-
-            // Adjust invoice totals
-            invoice.TotalAmount -= item.Amount;
-            invoice.Balance -= item.Amount;
-
-            _context.InvoiceItems.Remove(item);
-
-            // If invoice has no more items and no payments, delete the invoice too
-            var remainingItems = await _context.InvoiceItems.CountAsync(ii => ii.InvoiceId == invoice.Id);
-            if (remainingItems == 0 && invoice.AmountPaid == 0)
-            {
-                _context.Invoices.Remove(invoice);
-            }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "Invoice item removed", invoiceId = invoice.Id });
-        }
-
         [HttpDelete("invoices/{invoiceId}/items/{itemId}")]
-        public async Task<IActionResult> RemoveInvoiceItem(int invoiceId, int itemId)
+        public async Task<IActionResult> DeleteInvoiceItem(int invoiceId, int itemId)
         {
             var item = await _context.InvoiceItems
                 .FirstOrDefaultAsync(i => i.Id == itemId && i.InvoiceId == invoiceId);
