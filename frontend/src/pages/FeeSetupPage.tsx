@@ -157,6 +157,7 @@ export default function FeeSetupPage() {
   const [payLoading, setPayLoading] = useState(false);
   const [selectedInvId, setSelectedInvId] = useState<number | null>(null);
   const [unpostingId, setUnpostingId] = useState<number | null>(null);
+  const [removingItemId, setRemovingItemId] = useState<number | null>(null);
   const [payForm, setPayForm] = useState({ amount: '', method: 'Cash', reference: '', date: todayISO() });
   const [paySubmitting, setPaySubmitting] = useState(false);
   const [paySuccess, setPaySuccess] = useState<any>(null);
@@ -691,10 +692,10 @@ export default function FeeSetupPage() {
 
   // ── Statement running balance ─────────────────────────────────────────────────
   const statementRows = useMemo(() => {
-    const rows: { date: string; desc: string; charge: number; payment: number; paymentId?: number }[] = [];
+    const rows: { date: string; desc: string; charge: number; payment: number; paymentId?: number; itemId?: number; invoiceId?: number }[] = [];
     for (const inv of payInvoices) {
       for (const item of (inv.items || []))
-        rows.push({ date: inv.issuedDate || inv.createdAt || '', desc: item.description || '—', charge: Number(item.amount || 0), payment: 0 });
+        rows.push({ date: inv.issuedDate || inv.createdAt || '', desc: item.description || '—', charge: Number(item.amount || 0), payment: 0, itemId: item.id, invoiceId: inv.id });
       for (const pmt of (inv.payments || []))
         rows.push({ date: pmt.paymentDate || pmt.postedAt || '', desc: `Payment — ${pmt.paymentMethod || 'Cash'}${pmt.receiptNumber ? ` (${pmt.receiptNumber})` : ''}`, charge: 0, payment: Number(pmt.amount || 0), paymentId: pmt.id });
     }
@@ -717,6 +718,23 @@ export default function FeeSetupPage() {
       showMsg(err.response?.data?.message || 'Failed to reverse payment', 'error');
     } finally {
       setUnpostingId(null);
+    }
+  };
+
+  const handleRemoveItem = async (itemId: number, invoiceId: number, amount: number, desc: string) => {
+    if (!payStudent) return;
+    if (!window.confirm(`Remove charge of $${amount.toLocaleString()} for "${desc}"?`)) return;
+    setRemovingItemId(itemId);
+    try {
+      await feesAPI.removeInvoiceItem(invoiceId, itemId);
+      showMsg('Charge removed successfully', 'success');
+      const res = await feesAPI.getStudentInvoices(payStudent.id);
+      setPayInvoices(res.data || []);
+      if (activeTerm) loadBalances(activeTerm.id);
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to remove charge', 'error');
+    } finally {
+      setRemovingItemId(null);
     }
   };
 
@@ -1173,6 +1191,22 @@ export default function FeeSetupPage() {
                                           Unpost
                                         </button>
                                       )}
+                                      {row.charge > 0 && row.itemId && row.invoiceId && (() => {
+                                        const inv = payInvoices.find((i: any) => i.id === row.invoiceId);
+                                        const hasPaid = (inv?.payments || []).some((p: any) => Number(p.amount) > 0);
+                                        return hasPaid ? (
+                                          <span title="Cannot remove — payments have been made" style={{ fontSize: 14, cursor: 'not-allowed', opacity: 0.45 }}>🔒</span>
+                                        ) : (
+                                          <button
+                                            title="Remove this charge"
+                                            disabled={removingItemId === row.itemId}
+                                            onClick={() => handleRemoveItem(row.itemId!, row.invoiceId!, row.charge, row.desc)}
+                                            style={{ padding: '2px 7px', fontSize: 13, cursor: 'pointer', background: 'white', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 5, opacity: removingItemId === row.itemId ? 0.5 : 1 }}
+                                          >
+                                            🗑
+                                          </button>
+                                        );
+                                      })()}
                                     </td>
                                   </tr>
                                 ))}

@@ -74,6 +74,7 @@ export const feesAPI = {
     api.get(`/fees/invoices/student/${studentId}`),
   postPayment: (data: any) => api.post('/fees/payments', data),
   deleteInvoiceItem: (id: number) => api.delete(`/fees/invoice-items/${id}`),
+  removeInvoiceItem: (invoiceId: number, itemId: number) => api.delete(`/fees/invoices/${invoiceId}/items/${itemId}`),
   deleteInvoice: (id: number) => api.delete(`/fees/invoices/${id}`),
   refundInvoice: (data: any) => api.post('/fees/refunds', data),
   refundPayment: (paymentId: number, reason: string) => api.post('/fees/refunds', { paymentId, reason }),
