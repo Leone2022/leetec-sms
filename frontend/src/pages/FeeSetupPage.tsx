@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { feesAPI, studentsAPI, termRegistrationsAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import {
   Search, X, Plus, Zap, CreditCard, FileDown,
   FileSpreadsheet, FileText, Printer, AlertTriangle,
@@ -102,6 +103,7 @@ const FEE_PRESETS = [
 ];
 
 export default function FeeSetupPage() {
+  const { user } = useAuth();
   // ── Shared ──────────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<Tab>('charge');
   const [loading, setLoading] = useState(true);
@@ -144,6 +146,17 @@ export default function FeeSetupPage() {
   const [pkgSelectedId, setPkgSelectedId] = useState<number | ''>('');
   const [pkgLoading, setPkgLoading] = useState(false);
   const [pkgApplying, setPkgApplying] = useState(false);
+
+  // ── Bursary / Scholarship Modal ─────────────────────────────────────────────
+  const [isBursaryOpen, setIsBursaryOpen] = useState(false);
+  const [bursaryStudent, setBursaryStudent] = useState<any>(null);
+  const [bursaryType, setBursaryType] = useState('Scholarship');
+  const [bursaryDesc, setBursaryDesc] = useState('');
+  const [bursaryAmountMode, setBursaryAmountMode] = useState<'fixed' | 'percentage'>('fixed');
+  const [bursaryAmount, setBursaryAmount] = useState('');
+  const [bursaryApplying, setBursaryApplying] = useState(false);
+  const [payBursaries, setPayBursaries] = useState<any[]>([]);
+  const [revokingBursaryId, setRevokingBursaryId] = useState<number | null>(null);
 
   // ── Invoice PDF & Email ─────────────────────────────────────────────────────
   const [emailModal, setEmailModal] = useState<{ studentId: number; invoiceId: number | null; studentName: string } | null>(null);
@@ -349,6 +362,83 @@ export default function FeeSetupPage() {
     }
   };
 
+  // ── Bursaries / Scholarships ──────────────────────────────────────────────────
+  const loadStudentBursaries = async (studentId: number) => {
+    try {
+      const res = await feesAPI.getStudentBursaries(studentId);
+      setPayBursaries(res.data || []);
+    } catch {
+      setPayBursaries([]);
+    }
+  };
+
+  const openBursaryModal = (b: any) => {
+    setBursaryStudent({ id: b.studentId, studentName: b.studentName, totalCharged: Number(b.totalAmount ?? 0) });
+    setBursaryType('Scholarship');
+    setBursaryDesc('');
+    setBursaryAmountMode('fixed');
+    setBursaryAmount('');
+    setIsBursaryOpen(true);
+  };
+
+  const bursaryPreviewAmount = useMemo(() => {
+    const amt = Number(bursaryAmount || 0);
+    if (amt <= 0) return 0;
+    if (bursaryAmountMode === 'percentage') {
+      return Math.round((amt / 100) * (bursaryStudent?.totalCharged ?? 0) * 100) / 100;
+    }
+    return amt;
+  }, [bursaryAmount, bursaryAmountMode, bursaryStudent]);
+
+  const handleAwardBursary = async () => {
+    if (!bursaryStudent || !activeTerm) return;
+    if (!bursaryDesc.trim()) { showMsg('Enter a description', 'error'); return; }
+    if (bursaryPreviewAmount <= 0) { showMsg('Enter a valid amount', 'error'); return; }
+    setBursaryApplying(true);
+    try {
+      const amt = Number(bursaryAmount);
+      await feesAPI.awardBursary({
+        studentId: bursaryStudent.id,
+        schoolId: 1,
+        termId: activeTerm.id,
+        type: bursaryType,
+        description: bursaryDesc.trim(),
+        amount: bursaryAmountMode === 'fixed' ? amt : undefined,
+        percentage: bursaryAmountMode === 'percentage' ? amt : undefined,
+        awardedBy: user ? `${user.firstName} ${user.lastName}`.trim() : 'Admin',
+      });
+      showMsg('Bursary awarded successfully', 'success');
+      setIsBursaryOpen(false);
+      if (activeTerm) loadBalances(activeTerm.id);
+      if (payStudent && payStudent.id === bursaryStudent.id) {
+        const res = await feesAPI.getStudentInvoices(payStudent.id);
+        setPayInvoices(res.data || []);
+        loadStudentBursaries(payStudent.id);
+      }
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to award bursary', 'error');
+    } finally {
+      setBursaryApplying(false);
+    }
+  };
+
+  const handleRevokeBursary = async (id: number) => {
+    if (!payStudent) return;
+    setRevokingBursaryId(id);
+    try {
+      await feesAPI.revokeBursary(id);
+      showMsg('Bursary revoked', 'success');
+      const res = await feesAPI.getStudentInvoices(payStudent.id);
+      setPayInvoices(res.data || []);
+      loadStudentBursaries(payStudent.id);
+      if (activeTerm) loadBalances(activeTerm.id);
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to revoke bursary', 'error');
+    } finally {
+      setRevokingBursaryId(null);
+    }
+  };
+
   // ── Jump to payment tab ───────────────────────────────────────────────────────
   const jumpToPayment = async (student: any) => {
     setTab('payments');
@@ -361,6 +451,7 @@ export default function FeeSetupPage() {
       setPayInvoices(invs);
       const first = invs.find((i: any) => i.status !== 'Paid') ?? invs[0] ?? null;
       setSelectedInvId(first?.id ?? null);
+      loadStudentBursaries(student.id);
     } catch { showMsg('Failed to load invoices', 'error'); }
     finally { setPayLoading(false); }
   };
@@ -515,6 +606,7 @@ export default function FeeSetupPage() {
       setPayInvoices(invs);
       const first = invs.find((i: any) => i.status !== 'Paid') ?? invs[0] ?? null;
       setSelectedInvId(first?.id ?? null);
+      loadStudentBursaries(student.id);
     } catch { showMsg('Failed to load invoices', 'error'); }
     finally { setPayLoading(false); }
   };
@@ -1041,6 +1133,10 @@ export default function FeeSetupPage() {
                                             onClick={() => openPkgModal(b)} disabled={!activeTerm}>
                                             📦 Charge Package
                                           </button>
+                                          <button className="btn" style={{ fontSize: 11, padding: '4px 10px', background: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', flexShrink: 0 }}
+                                            onClick={() => openBursaryModal(b)} disabled={!activeTerm}>
+                                            🎓 Bursary
+                                          </button>
                                         </div>
                                       );
                                     }
@@ -1058,6 +1154,7 @@ export default function FeeSetupPage() {
                                           <button title="Download Invoice PDF" style={icoStyle} onClick={() => handleDownloadInvoicePDF(b)}>📄</button>
                                           <button title="Email Invoice" style={icoStyle} onClick={() => handleOpenEmailModal(b)}>📧</button>
                                           <button title="Charge Package" style={{ ...icoStyle, cursor: activeTerm ? 'pointer' : 'not-allowed', opacity: activeTerm ? 1 : 0.5 }} onClick={() => openPkgModal(b)} disabled={!activeTerm}>📦</button>
+                                          <button title="Award Bursary" style={{ ...icoStyle, cursor: activeTerm ? 'pointer' : 'not-allowed', opacity: activeTerm ? 1 : 0.5 }} onClick={() => openBursaryModal(b)} disabled={!activeTerm}>🎓</button>
                                         </div>
                                       </div>
                                     );
@@ -1258,6 +1355,55 @@ export default function FeeSetupPage() {
                           </div>
                         </div>
                       )}
+
+                      {/* Bursaries & Scholarships */}
+                      <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                        <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0' }}>
+                          <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>🎓 Bursaries & Scholarships</h3>
+                        </div>
+                        {payBursaries.length === 0 ? (
+                          <div style={{ padding: '16px 18px', fontSize: 12, color: '#64748b' }}>No bursaries awarded to this student.</div>
+                        ) : (
+                          <div style={{ overflowX: 'auto' }}>
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th>Type</th>
+                                  <th>Description</th>
+                                  <th style={{ textAlign: 'right' }}>Amount</th>
+                                  <th>Awarded By</th>
+                                  <th>Date</th>
+                                  <th></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {payBursaries.map((bu: any) => (
+                                  <tr key={bu.id}>
+                                    <td style={{ fontSize: 12 }}>{bu.type}</td>
+                                    <td style={{ fontSize: 12 }}>{bu.description}</td>
+                                    <td style={{ textAlign: 'right', fontSize: 12, color: '#15803d', fontWeight: 600 }}>
+                                      ${Number(bu.amount).toLocaleString()}{bu.percentage ? ` (${bu.percentage}%)` : ''}
+                                    </td>
+                                    <td style={{ fontSize: 12 }}>{bu.awardedBy || '—'}</td>
+                                    <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
+                                      {bu.awardedAt ? new Date(bu.awardedAt).toLocaleDateString('en-GB') : '—'}
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      <button
+                                        disabled={revokingBursaryId === bu.id}
+                                        onClick={() => handleRevokeBursary(bu.id)}
+                                        style={{ padding: '3px 10px', fontSize: 11, fontWeight: 600, borderRadius: 5, cursor: 'pointer', background: 'white', color: '#dc2626', border: '1.5px solid #dc2626', opacity: revokingBursaryId === bu.id ? 0.5 : 1 }}
+                                      >
+                                        Revoke
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Payment form */}
                       <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '20px 24px' }}>
@@ -1655,6 +1801,75 @@ export default function FeeSetupPage() {
           </div>
         );
       })()}
+
+      {/* ════ AWARD BURSARY MODAL ════ */}
+      {isBursaryOpen && bursaryStudent && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+          onClick={() => setIsBursaryOpen(false)}>
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '480px' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Award Bursary / Scholarship</h2>
+                <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{bursaryStudent.studentName}</p>
+              </div>
+              <button onClick={() => setIsBursaryOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={18} /></button>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={lbl}>Type</label>
+                <select value={bursaryType} onChange={(e) => setBursaryType(e.target.value)}
+                  className="text-field" style={{ ...fld, appearance: 'auto', cursor: 'pointer' }}>
+                  {['Scholarship', 'Bursary', 'Discount', 'BEAM'].map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label style={lbl}>Description</label>
+                <input type="text" value={bursaryDesc} onChange={(e) => setBursaryDesc(e.target.value)}
+                  placeholder="e.g. Academic excellence award" className="text-field" style={fld} />
+              </div>
+
+              <div>
+                <label style={lbl}>Amount Type</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={() => setBursaryAmountMode('fixed')}
+                    className="btn" style={{ flex: 1, fontSize: 12, background: bursaryAmountMode === 'fixed' ? '#eef2ff' : 'white', color: bursaryAmountMode === 'fixed' ? '#1a237e' : '#475569', border: `1px solid ${bursaryAmountMode === 'fixed' ? '#c7d2fe' : '#e2e8f0'}` }}>
+                    Fixed Amount ($)
+                  </button>
+                  <button type="button" onClick={() => setBursaryAmountMode('percentage')}
+                    className="btn" style={{ flex: 1, fontSize: 12, background: bursaryAmountMode === 'percentage' ? '#eef2ff' : 'white', color: bursaryAmountMode === 'percentage' ? '#1a237e' : '#475569', border: `1px solid ${bursaryAmountMode === 'percentage' ? '#c7d2fe' : '#e2e8f0'}` }}>
+                    Percentage (%)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={lbl}>{bursaryAmountMode === 'fixed' ? 'Amount ($)' : 'Percentage (%)'}</label>
+                <input type="number" value={bursaryAmount} onChange={(e) => setBursaryAmount(e.target.value)}
+                  placeholder={bursaryAmountMode === 'fixed' ? '0.00' : '0'} min="0" className="text-field" style={fld} />
+              </div>
+
+              <div style={{ padding: '12px 14px', background: bursaryPreviewAmount > 0 ? '#f0fdf4' : '#f8fafc', borderRadius: '8px', border: `1px solid ${bursaryPreviewAmount > 0 ? '#bbf7d0' : '#e2e8f0'}` }}>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: bursaryPreviewAmount > 0 ? '#166534' : '#64748b' }}>
+                  {bursaryPreviewAmount > 0
+                    ? `This will credit $${bursaryPreviewAmount.toLocaleString()} to ${bursaryStudent.studentName}'s account`
+                    : 'Enter an amount to see the credit preview'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+                <button className="btn btn-secondary" onClick={() => setIsBursaryOpen(false)} disabled={bursaryApplying}>Cancel</button>
+                <button className="btn btn-primary" onClick={handleAwardBursary}
+                  disabled={bursaryApplying || !bursaryDesc.trim() || bursaryPreviewAmount <= 0}
+                  style={{ opacity: (bursaryApplying || !bursaryDesc.trim() || bursaryPreviewAmount <= 0) ? 0.6 : 1 }}>
+                  {bursaryApplying ? 'Awarding...' : '🎓 Award'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </AdminLayout>

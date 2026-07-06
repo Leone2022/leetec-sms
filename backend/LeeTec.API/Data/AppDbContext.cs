@@ -32,6 +32,7 @@ namespace LeeTec.API.Data
         public DbSet<Invoice> Invoices { get; set; }
         public DbSet<InvoiceItem> InvoiceItems { get; set; }
         public DbSet<Payment> Payments { get; set; }
+        public DbSet<Bursary> Bursaries { get; set; }
 
         // Student Portal
         public DbSet<StudentPortalAccount> StudentPortalAccounts { get; set; }
@@ -126,6 +127,20 @@ namespace LeeTec.API.Data
             modelBuilder.Entity<InvoiceItem>()
                 .Property(i => i.Amount)
                 .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Bursary>()
+                .Property(b => b.Amount)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Bursary>()
+                .Property(b => b.Percentage)
+                .HasColumnType("decimal(5,2)");
+
+            modelBuilder.Entity<Bursary>()
+                .HasOne(b => b.Student)
+                .WithMany()
+                .HasForeignKey(b => b.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // TermRegistration relationships
             modelBuilder.Entity<TermRegistration>()

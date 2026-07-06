@@ -118,4 +118,19 @@ namespace LeeTec.API.DTOs
         public string? ReceiptNumber { get; set; }
         public string? ReceiptReference { get; set; }
     }
+
+    // =====================
+    // BURSARIES / SCHOLARSHIPS
+    // =====================
+    public class AwardBursaryRequest
+    {
+        public int StudentId { get; set; }
+        public int SchoolId { get; set; }
+        public int TermId { get; set; }
+        public string Type { get; set; } = "Discount";
+        public string Description { get; set; } = "";
+        public decimal? Amount { get; set; }
+        public decimal? Percentage { get; set; }
+        public string AwardedBy { get; set; } = "";
+    }
 }

@@ -1020,5 +1020,142 @@ namespace LeeTec.API.Controllers
                 });
             }
         }
+
+        // =====================
+        // BURSARIES / SCHOLARSHIPS
+        // =====================
+
+        [HttpPost("bursaries")]
+        public async Task<IActionResult> AwardBursary([FromBody] AwardBursaryRequest request)
+        {
+            var student = await _context.Students.FindAsync(request.StudentId);
+            if (student == null)
+                return NotFound(new { message = "Student not found" });
+
+            var invoice = await _context.Invoices
+                .FirstOrDefaultAsync(i => i.StudentId == request.StudentId && i.TermId == request.TermId);
+            if (invoice == null)
+                return BadRequest(new { message = "No invoice found for this student for this term" });
+
+            decimal amount;
+            if (request.Percentage.HasValue && request.Percentage.Value > 0)
+                amount = Math.Round(request.Percentage.Value / 100m * invoice.TotalAmount, 2);
+            else
+                amount = request.Amount ?? 0;
+
+            if (amount <= 0)
+                return BadRequest(new { message = "Bursary amount must be greater than zero" });
+
+            var invoiceItem = new InvoiceItem
+            {
+                InvoiceId = invoice.Id,
+                FeeCategoryId = 1,
+                Description = $"{request.Type}: {request.Description}",
+                Amount = -amount
+            };
+            _context.InvoiceItems.Add(invoiceItem);
+
+            invoice.TotalAmount -= amount;
+            invoice.Balance -= amount;
+            if (invoice.Balance <= 0)
+                invoice.Status = "Paid";
+            else if (invoice.AmountPaid > 0)
+                invoice.Status = "PartiallyPaid";
+            else
+                invoice.Status = "Unpaid";
+
+            await _context.SaveChangesAsync();
+
+            var bursary = new Bursary
+            {
+                StudentId = request.StudentId,
+                SchoolId = request.SchoolId,
+                TermId = request.TermId,
+                Type = request.Type,
+                Description = request.Description,
+                Amount = amount,
+                Percentage = request.Percentage,
+                AwardedBy = request.AwardedBy,
+                AwardedAt = DateTime.UtcNow,
+                InvoiceItemId = invoiceItem.Id
+            };
+            _context.Bursaries.Add(bursary);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Bursary awarded successfully", bursary });
+        }
+
+        [HttpGet("bursaries/student/{studentId}")]
+        public async Task<IActionResult> GetStudentBursaries(int studentId)
+        {
+            var bursaries = await _context.Bursaries
+                .Where(b => b.StudentId == studentId)
+                .OrderByDescending(b => b.AwardedAt)
+                .ToListAsync();
+
+            return Ok(bursaries);
+        }
+
+        [HttpGet("bursaries/term/{termId}")]
+        public async Task<IActionResult> GetTermBursaries(int termId)
+        {
+            var bursaries = await _context.Bursaries
+                .Where(b => b.TermId == termId)
+                .Include(b => b.Student)
+                .OrderByDescending(b => b.AwardedAt)
+                .Select(b => new
+                {
+                    b.Id,
+                    b.StudentId,
+                    b.SchoolId,
+                    b.TermId,
+                    b.Type,
+                    b.Description,
+                    b.Amount,
+                    b.Percentage,
+                    b.AwardedAt,
+                    b.AwardedBy,
+                    studentName = b.Student != null ? (b.Student.FirstName + " " + b.Student.Surname) : "",
+                    studentNumber = b.Student != null ? b.Student.StudentNumber : ""
+                })
+                .ToListAsync();
+
+            return Ok(bursaries);
+        }
+
+        [HttpDelete("bursaries/{id}")]
+        public async Task<IActionResult> RevokeBursary(int id)
+        {
+            var bursary = await _context.Bursaries.FirstOrDefaultAsync(b => b.Id == id);
+            if (bursary == null)
+                return NotFound(new { message = "Bursary not found" });
+
+            if (bursary.InvoiceItemId.HasValue)
+            {
+                var item = await _context.InvoiceItems
+                    .Include(i => i.Invoice)
+                    .FirstOrDefaultAsync(i => i.Id == bursary.InvoiceItemId.Value);
+
+                if (item != null)
+                {
+                    var invoice = item.Invoice;
+                    invoice.TotalAmount -= item.Amount;
+                    invoice.Balance -= item.Amount;
+                    if (invoice.Balance <= 0)
+                        invoice.Status = "Paid";
+                    else if (invoice.AmountPaid > 0)
+                        invoice.Status = "PartiallyPaid";
+                    else
+                        invoice.Status = "Unpaid";
+
+                    _context.InvoiceItems.Remove(item);
+                }
+            }
+
+            _context.Bursaries.Remove(bursary);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Bursary revoked" });
+        }
     }
 }
