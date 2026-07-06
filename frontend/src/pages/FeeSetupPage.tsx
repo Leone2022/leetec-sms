@@ -1192,8 +1192,7 @@ export default function FeeSetupPage() {
                                         </button>
                                       )}
                                       {row.charge > 0 && row.itemId && row.invoiceId && (() => {
-                                        const inv = payInvoices.find((i: any) => i.id === row.invoiceId);
-                                        const hasPaid = (inv?.payments || []).some((p: any) => Number(p.amount) > 0);
+                                        const hasPaid = Number(payInvoices[0]?.amountPaid) > 0;
                                         return hasPaid ? (
                                           <span title="Cannot remove — payments have been made" style={{ fontSize: 14, cursor: 'not-allowed', opacity: 0.45 }}>🔒</span>
                                         ) : (
