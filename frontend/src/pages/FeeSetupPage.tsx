@@ -10,7 +10,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { exportTableToPdf, exportTableToExcel, exportTableToWord } from '../utils/exportTable';
 
-type Tab = 'charge' | 'payments';
+type Tab = 'charge' | 'payments' | 'bursaries';
+const GraduationCapIcon = ({ size }: { size?: number }) => <span style={{ fontSize: size, lineHeight: 1 }}>🎓</span>;
 const todayISO = () => new Date().toISOString().split('T')[0];
 const CATEGORY_TYPES = ['Core Fees', 'Levies', 'Incidentals'];
 const PAY_METHODS = ['Cash', 'Bank Transfer', 'EcoCash', 'OneMoney', 'Swipe', 'Other'];
@@ -157,6 +158,11 @@ export default function FeeSetupPage() {
   const [bursaryApplying, setBursaryApplying] = useState(false);
   const [payBursaries, setPayBursaries] = useState<any[]>([]);
   const [revokingBursaryId, setRevokingBursaryId] = useState<number | null>(null);
+
+  // ── Tab 3: Bursaries Report ──────────────────────────────────────────────────
+  const [termBursaries, setTermBursaries] = useState<any[]>([]);
+  const [termBursariesLoading, setTermBursariesLoading] = useState(false);
+  const [revokingTermBursaryId, setRevokingTermBursaryId] = useState<number | null>(null);
 
   // ── Invoice PDF & Email ─────────────────────────────────────────────────────
   const [emailModal, setEmailModal] = useState<{ studentId: number; invoiceId: number | null; studentName: string } | null>(null);
@@ -436,6 +442,40 @@ export default function FeeSetupPage() {
       showMsg(err.response?.data?.message || 'Failed to revoke bursary', 'error');
     } finally {
       setRevokingBursaryId(null);
+    }
+  };
+
+  const loadTermBursaries = async (termId: number) => {
+    setTermBursariesLoading(true);
+    try {
+      const res = await feesAPI.getBursariesByTerm(termId);
+      setTermBursaries(res.data || []);
+    } catch {
+      showMsg('Failed to load bursaries', 'error');
+    } finally {
+      setTermBursariesLoading(false);
+    }
+  };
+
+  const openBursariesTab = () => {
+    setTab('bursaries');
+    if (activeTerm) loadTermBursaries(activeTerm.id);
+  };
+
+  const handleRevokeTermBursary = async (id: number) => {
+    if (!window.confirm('Revoke this bursary? This will reverse the credit on the student\'s invoice.')) return;
+    setRevokingTermBursaryId(id);
+    try {
+      await feesAPI.revokeBursary(id);
+      showMsg('Bursary revoked', 'success');
+      if (activeTerm) {
+        loadTermBursaries(activeTerm.id);
+        loadBalances(activeTerm.id);
+      }
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to revoke bursary', 'error');
+    } finally {
+      setRevokingTermBursaryId(null);
     }
   };
 
@@ -909,8 +949,9 @@ export default function FeeSetupPage() {
         {([
           { id: 'charge' as Tab, label: 'Charge Students', Icon: Zap },
           { id: 'payments' as Tab, label: 'Payments & Receipts', Icon: CreditCard },
+          { id: 'bursaries' as Tab, label: 'Bursaries', Icon: GraduationCapIcon },
         ]).map(({ id, label, Icon }) => (
-          <button key={id} onClick={() => setTab(id)} style={{
+          <button key={id} onClick={() => (id === 'bursaries' ? openBursariesTab() : setTab(id))} style={{
             display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px',
             borderRadius: '7px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
             background: tab === id ? '#1a237e' : 'transparent',
@@ -1469,6 +1510,121 @@ export default function FeeSetupPage() {
                   <p style={{ fontSize: 12, margin: 0, color: '#94a3b8' }}>Type a name or student number in the search bar above.</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ══════════════ TAB 3: BURSARIES REPORT ══════════════ */}
+          {tab === 'bursaries' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                <div style={{ background: '#eef2ff', borderRadius: '10px', padding: '14px 20px', minWidth: 200 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#1a237e', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                    Bursaries Awarded This Term
+                  </p>
+                  <p style={{ fontSize: 22, fontWeight: 700, color: '#1a237e', margin: 0 }}>{termBursaries.length}</p>
+                </div>
+                <div style={{ background: '#f0fdf4', borderRadius: '10px', padding: '14px 20px', minWidth: 200 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px' }}>
+                    Total Amount Credited
+                  </p>
+                  <p style={{ fontSize: 22, fontWeight: 700, color: '#15803d', margin: 0 }}>
+                    ${termBursaries.reduce((s, b) => s + Number(b.amount || 0), 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>🎓 Bursaries & Scholarships — {activeTerm?.name}</h3>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-secondary" style={{ fontSize: 11 }} disabled={!termBursaries.length}
+                      onClick={() => exportTableToPdf({
+                        title: `Bursaries — ${activeTerm?.name || ''}`,
+                        filename: `Bursaries_${activeTerm?.name || 'term'}.pdf`,
+                        columns: [
+                          { header: 'Student', value: (b: any) => b.studentName },
+                          { header: 'Student No.', value: (b: any) => b.studentNumber },
+                          { header: 'Campus', value: (b: any) => (b.studentNumber || '').split('/')[0] },
+                          { header: 'Type', value: (b: any) => b.type },
+                          { header: 'Description', value: (b: any) => b.description },
+                          { header: 'Amount', value: (b: any) => `$${Number(b.amount).toLocaleString()}` },
+                          { header: 'Awarded Date', value: (b: any) => b.awardedAt ? new Date(b.awardedAt).toLocaleDateString('en-GB') : '—' },
+                        ],
+                        rows: termBursaries,
+                      })}>
+                      <FileDown size={12} /> PDF
+                    </button>
+                    <button className="btn btn-secondary" style={{ fontSize: 11 }} disabled={!termBursaries.length}
+                      onClick={() => exportTableToExcel({
+                        sheetName: 'Bursaries',
+                        filename: `Bursaries_${activeTerm?.name || 'term'}.xlsx`,
+                        columns: [
+                          { header: 'Student', value: (b: any) => b.studentName },
+                          { header: 'Student No.', value: (b: any) => b.studentNumber },
+                          { header: 'Campus', value: (b: any) => (b.studentNumber || '').split('/')[0] },
+                          { header: 'Type', value: (b: any) => b.type },
+                          { header: 'Description', value: (b: any) => b.description },
+                          { header: 'Amount', value: (b: any) => `$${Number(b.amount).toLocaleString()}` },
+                          { header: 'Awarded Date', value: (b: any) => b.awardedAt ? new Date(b.awardedAt).toLocaleDateString('en-GB') : '—' },
+                        ],
+                        rows: termBursaries,
+                      })}>
+                      <FileSpreadsheet size={12} /> Excel
+                    </button>
+                  </div>
+                </div>
+
+                {termBursariesLoading ? (
+                  <div style={{ padding: '32px', textAlign: 'center', color: '#475569', fontSize: 13 }}>Loading...</div>
+                ) : !activeTerm ? (
+                  <div style={{ padding: '32px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>No active term.</div>
+                ) : termBursaries.length === 0 ? (
+                  <div style={{ padding: '32px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>No bursaries awarded this term.</div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Student</th>
+                          <th>Student No.</th>
+                          <th>Campus</th>
+                          <th>Type</th>
+                          <th>Description</th>
+                          <th style={{ textAlign: 'right' }}>Amount</th>
+                          <th>Awarded Date</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {termBursaries.map((bu: any) => (
+                          <tr key={bu.id}>
+                            <td style={{ fontSize: 12 }}><strong>{bu.studentName}</strong></td>
+                            <td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{bu.studentNumber}</td>
+                            <td><span className="pill" style={{ background: '#eef2ff', color: '#4338ca', fontSize: 10 }}>{(bu.studentNumber || '').split('/')[0] || '—'}</span></td>
+                            <td style={{ fontSize: 12 }}>{bu.type}</td>
+                            <td style={{ fontSize: 12 }}>{bu.description}</td>
+                            <td style={{ textAlign: 'right', fontSize: 12, color: '#15803d', fontWeight: 600 }}>
+                              ${Number(bu.amount).toLocaleString()}{bu.percentage ? ` (${bu.percentage}%)` : ''}
+                            </td>
+                            <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
+                              {bu.awardedAt ? new Date(bu.awardedAt).toLocaleDateString('en-GB') : '—'}
+                            </td>
+                            <td>
+                              <button
+                                disabled={revokingTermBursaryId === bu.id}
+                                onClick={() => handleRevokeTermBursary(bu.id)}
+                                style={{ padding: '4px 12px', fontSize: 11, fontWeight: 600, borderRadius: 5, cursor: 'pointer', background: 'white', color: '#dc2626', border: '1.5px solid #dc2626', opacity: revokingTermBursaryId === bu.id ? 0.5 : 1 }}
+                              >
+                                Revoke
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </>

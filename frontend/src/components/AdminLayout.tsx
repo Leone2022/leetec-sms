@@ -8,35 +8,46 @@ import {
   LogOut,
   Menu,
   ChevronRight,
+  ChevronDown,
   X,
   GraduationCap,
   Calendar,
-  Settings,
   Shield,
   BookOpen,
   ClipboardList,
-  FileStack,
   Bell,
   Globe,
 } from 'lucide-react';
 
+interface NavChild {
+  label: string;
+  path: string;
+}
+
 interface NavItem {
   label: string;
   Icon: React.ComponentType<{ size?: number; className?: string }>;
-  path: string;
+  path?: string;
   superAdminOnly?: boolean;
+  children?: NavChild[];
 }
 
 const NAV: NavItem[] = [
   { label: 'Dashboard', Icon: LayoutDashboard, path: '/dashboard' },
   { label: 'Students', Icon: Users, path: '/students' },
-  { label: 'Fees & Billing', Icon: Receipt, path: '/fees' },
-  { label: 'Fee Setup', Icon: Settings, path: '/fee-setup' },
-{ label: 'Portal Accounts', Icon: Globe, path: '/portal-accounts' },
+  {
+    label: 'Finances',
+    Icon: Receipt,
+    children: [
+      { label: '💰 Fees & Billing', path: '/fees' },
+      { label: '⚙️ Fee Setup', path: '/fee-setup' },
+      { label: '📊 Reports', path: '/bulk-reports' },
+    ],
+  },
+  { label: 'Portal Accounts', Icon: Globe, path: '/portal-accounts' },
   { label: 'Terms & Periods', Icon: Calendar, path: '/terms' },
   { label: 'Subjects', Icon: BookOpen, path: '/subjects' },
   { label: 'Marks Entry', Icon: ClipboardList, path: '/marks-entry' },
-  { label: 'Bulk Reports', Icon: FileStack, path: '/bulk-reports' },
   { label: 'Announcements', Icon: Bell, path: '/announcements' },
   { label: 'Staff Assignments', Icon: Users, path: '/teacher-assignments' },
   { label: 'Super Admin', Icon: Shield, path: '/super-admin', superAdminOnly: true },
@@ -53,10 +64,16 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = `LeeTec SMS — ${title}`;
   }, [title]);
+
+  useEffect(() => {
+    const activeParent = NAV.find((item) => item.children?.some((c) => c.path === location.pathname));
+    if (activeParent) setExpandedGroup(activeParent.label);
+  }, [location.pathname]);
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}` || 'A';
   const isSuperAdmin = user?.role === 'SuperAdmin';
@@ -82,16 +99,55 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
 
         <nav className="admin-nav">
           <p className="admin-nav-label">Menu</p>
-          {visibleNav.map(({ label, Icon, path }) => {
-            const active = location.pathname === path;
+          {visibleNav.map((item) => {
+            if (item.children) {
+              const childActive = item.children.some((c) => c.path === location.pathname);
+              const isExpanded = expandedGroup === item.label;
+              return (
+                <div key={item.label}>
+                  <button
+                    className={`admin-nav-btn${childActive ? ' active' : ''}`}
+                    onClick={() => setExpandedGroup(isExpanded ? null : item.label)}
+                  >
+                    <item.Icon size={15} />
+                    <span>{item.label}</span>
+                    <ChevronDown
+                      size={13}
+                      className="chevron"
+                      style={{ marginLeft: 'auto', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+                    />
+                  </button>
+                  {isExpanded && (
+                    <div style={{ borderLeft: '2px solid #e2e8f0', marginLeft: 18, paddingLeft: 4 }}>
+                      {item.children.map((child) => {
+                        const active = location.pathname === child.path;
+                        return (
+                          <button
+                            key={child.path}
+                            className={`admin-nav-btn${active ? ' active' : ''}`}
+                            onClick={() => { navigate(child.path); close(); }}
+                            style={{ paddingLeft: 24, fontSize: 13 }}
+                          >
+                            <span>{child.label}</span>
+                            {active && <ChevronRight size={13} className="chevron" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            const active = location.pathname === item.path;
             return (
               <button
-                key={path}
+                key={item.path}
                 className={`admin-nav-btn${active ? ' active' : ''}`}
-                onClick={() => { navigate(path); close(); }}
+                onClick={() => { navigate(item.path!); close(); }}
               >
-                <Icon size={15} />
-                <span>{label}</span>
+                <item.Icon size={15} />
+                <span>{item.label}</span>
                 {active && <ChevronRight size={13} className="chevron" />}
               </button>
             );

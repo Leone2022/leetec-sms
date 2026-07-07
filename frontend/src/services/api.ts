@@ -80,7 +80,7 @@ export const feesAPI = {
   refundPayment: (paymentId: number, reason: string) => api.post('/fees/refunds', { paymentId, reason }),
   awardBursary: (data: any) => api.post('/fees/bursaries', data),
   getStudentBursaries: (studentId: number) => api.get(`/fees/bursaries/student/${studentId}`),
-  getTermBursaries: (termId: number) => api.get(`/fees/bursaries/term/${termId}`),
+  getBursariesByTerm: (termId: number) => api.get(`/fees/bursaries/term/${termId}`),
   revokeBursary: (id: number) => api.delete(`/fees/bursaries/${id}`),
 };
 
