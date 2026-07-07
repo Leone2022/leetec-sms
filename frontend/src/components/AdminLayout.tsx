@@ -42,7 +42,7 @@ const NAV: NavItem[] = [
     children: [
       { label: 'Fees & Billing', path: '/fees' },
       { label: 'Fee Setup', path: '/fee-setup' },
-      { label: 'Bursaries', path: '/bursaries' },
+      // { label: 'Bursaries', path: '/bursaries' },
     ],
   },
   { label: 'Portal Accounts', Icon: Globe, path: '/portal-accounts' },
