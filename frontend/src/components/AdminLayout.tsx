@@ -42,6 +42,7 @@ const NAV: NavItem[] = [
       { label: '💰 Fees & Billing', path: '/fees' },
       { label: '⚙️ Fee Setup', path: '/fee-setup' },
       { label: '📊 Reports', path: '/bulk-reports' },
+      { label: '🎓 Bursaries', path: '/bursaries' },
     ],
   },
   { label: 'Portal Accounts', Icon: Globe, path: '/portal-accounts' },
