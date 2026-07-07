@@ -3343,19 +3343,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\LEONE CHIRODZA\\.nuget\\packages\\": {}
+    "/root/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\leetec-sms\\backend\\LeeTec.API\\LeeTec.API.csproj",
+      "projectUniqueName": "/var/www/leetec-sms/backend/LeeTec.API/LeeTec.API.csproj",
       "projectName": "LeeTec.API",
-      "projectPath": "C:\\leetec-sms\\backend\\LeeTec.API\\LeeTec.API.csproj",
-      "packagesPath": "C:\\Users\\LEONE CHIRODZA\\.nuget\\packages\\",
-      "outputPath": "C:\\leetec-sms\\backend\\LeeTec.API\\obj\\",
+      "projectPath": "/var/www/leetec-sms/backend/LeeTec.API/LeeTec.API.csproj",
+      "packagesPath": "/root/.nuget/packages/",
+      "outputPath": "/var/www/leetec-sms/backend/LeeTec.API/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\LEONE CHIRODZA\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "/root/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -3373,11 +3373,6 @@
         "warnAsError": [
           "NU1605"
         ]
-      },
-      "restoreAuditProperties": {
-        "enableAudit": "true",
-        "auditLevel": "low",
-        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -3434,7 +3429,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.420/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/8.0.128/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

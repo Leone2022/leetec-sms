@@ -1049,7 +1049,7 @@ namespace LeeTec.API.Controllers
             var invoiceItem = new InvoiceItem
             {
                 InvoiceId = invoice.Id,
-                FeeCategoryId = 1,
+                FeeCategoryId = null,
                 Description = $"{request.Type}: {request.Description}",
                 Amount = -amount
             };
