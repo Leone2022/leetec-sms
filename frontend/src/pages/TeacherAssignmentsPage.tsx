@@ -57,6 +57,12 @@ export default function TeacherAssignmentsPage() {
   const [newPhone, setNewPhone] = useState('');
   const [submittingTeacher, setSubmittingTeacher] = useState(false);
 
+  // Reset Password modal
+  const [resetPasswordTeacher, setResetPasswordTeacher] = useState<Teacher | null>(null);
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [submittingReset, setSubmittingReset] = useState(false);
+
   const showMsg = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 4000);
@@ -98,6 +104,43 @@ export default function TeacherAssignmentsPage() {
       showMsg('Assignment removed', 'success');
     } catch {
       showMsg('Failed to remove assignment', 'error');
+    }
+  };
+
+  const openResetPasswordModal = (teacher: Teacher) => {
+    setResetPasswordTeacher(teacher);
+    setResetNewPassword('');
+    setResetConfirmPassword('');
+  };
+
+  const handleResetPassword = async (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    if (!resetPasswordTeacher) return;
+    if (resetNewPassword.length < 8) { showMsg('Password must be at least 8 characters', 'error'); return; }
+    if (resetNewPassword !== resetConfirmPassword) { showMsg('Passwords do not match', 'error'); return; }
+    setSubmittingReset(true);
+    try {
+      await adminAPI.resetTeacherPassword(resetPasswordTeacher.id, resetNewPassword);
+      showMsg('Password reset successfully', 'success');
+      setResetPasswordTeacher(null);
+      setResetNewPassword(''); setResetConfirmPassword('');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showMsg(msg || 'Failed to reset password', 'error');
+    } finally {
+      setSubmittingReset(false);
+    }
+  };
+
+  const handleRemoveTeacher = async (teacher: Teacher) => {
+    if (!window.confirm(`Remove ${teacher.firstName} ${teacher.surname} from the system? This cannot be undone.`)) return;
+    try {
+      await adminAPI.deleteTeacher(teacher.id);
+      showMsg('Teacher removed', 'success');
+      await loadData();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showMsg(msg || 'Failed to remove teacher', 'error');
     }
   };
 
@@ -229,6 +272,43 @@ export default function TeacherAssignmentsPage() {
         </div>
       )}
 
+      {/* Reset Password Modal */}
+      {resetPasswordTeacher && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: '28px', width: 380, maxWidth: '95vw', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Reset Password</h2>
+                <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{resetPasswordTeacher.firstName} {resetPasswordTeacher.surname}</p>
+              </div>
+              <button onClick={() => setResetPasswordTeacher(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4 }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleResetPassword}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={lbl}>New Password</label>
+                  <input className="text-field" style={{ width: '100%' }} type="password" placeholder="Min 8 characters"
+                    value={resetNewPassword} onChange={e => setResetNewPassword(e.target.value)} required minLength={8} />
+                </div>
+                <div>
+                  <label style={lbl}>Confirm Password</label>
+                  <input className="text-field" style={{ width: '100%' }} type="password" placeholder="Re-enter password"
+                    value={resetConfirmPassword} onChange={e => setResetConfirmPassword(e.target.value)} required minLength={8} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+                <button type="button" className="btn btn-secondary" style={{ fontSize: 13 }} onClick={() => setResetPasswordTeacher(null)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" style={{ fontSize: 13 }} disabled={submittingReset}>
+                  {submittingReset ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Assign Subject Modal */}
       {showAssignModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
@@ -312,7 +392,7 @@ export default function TeacherAssignmentsPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    {['Name', 'Email', 'Phone', 'Status', 'Assignments'].map(h => (
+                    {['Name', 'Email', 'Phone', 'Status', 'Assignments', 'Actions'].map(h => (
                       <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: 12 }}>{h}</th>
                     ))}
                   </tr>
@@ -339,6 +419,22 @@ export default function TeacherAssignmentsPage() {
                         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 20, background: '#eef2ff', color: '#1a237e', fontWeight: 600 }}>
                           {assignmentCountByTeacher[t.id] ?? 0} class{(assignmentCountByTeacher[t.id] ?? 0) !== 1 ? 'es' : ''}
                         </span>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => openResetPasswordModal(t)}
+                            style={{ background: 'white', border: '1px solid #cbd5e1', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#475569', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
+                          >
+                            🔑 Reset Password
+                          </button>
+                          <button
+                            onClick={() => handleRemoveTeacher(t)}
+                            style={{ background: 'white', border: '1px solid #fca5a5', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', color: '#dc2626', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}
+                          >
+                            🗑 Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

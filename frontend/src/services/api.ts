@@ -215,6 +215,9 @@ export const adminAPI = {
   getTeachers: (schoolId = 1) => api.get(`/admin/teachers?schoolId=${schoolId}`),
   getStudentCredentials: (termId: number, schoolId = 1) =>
     api.get(`/admin/student-credentials?termId=${termId}&schoolId=${schoolId}`),
+  resetTeacherPassword: (id: number, newPassword: string) =>
+    api.put(`/admin/teachers/${id}/reset-password`, { newPassword }),
+  deleteTeacher: (id: number) => api.delete(`/admin/teachers/${id}`),
 };
 
 export const teacherAuthAPI = {
