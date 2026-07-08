@@ -198,6 +198,29 @@ namespace LeeTec.API.Controllers
             return Ok(new { message = "Password reset successfully" });
         }
 
+
+        [HttpPut("teachers/{id}/reset-password")]
+        public async Task<IActionResult> ResetTeacherPassword(int id, [FromBody] AdminResetPasswordRequest dto)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound(new { message = "Teacher not found" });
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Password reset successfully" });
+        }
+
+        [HttpDelete("teachers/{id}")]
+        public async Task<IActionResult> DeleteTeacher(int id)
+        {
+            var user = await _context.Users.Include(u => u.UserRoles).FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null) return NotFound(new { message = "Teacher not found" });
+            var assignments = _context.TeacherSubjectAssignments.Where(a => a.TeacherId == id);
+            _context.TeacherSubjectAssignments.RemoveRange(assignments);
+            _context.UserRoles.RemoveRange(user.UserRoles);
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Teacher removed successfully" });
+        }
         // GET /api/admin/teachers?schoolId=1
         [HttpGet("teachers")]
         public async Task<IActionResult> GetTeachers([FromQuery] int schoolId = 1)
