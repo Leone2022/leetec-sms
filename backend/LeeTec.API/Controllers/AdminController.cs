@@ -246,6 +246,114 @@ namespace LeeTec.API.Controllers
 
             return Ok(teachers);
         }
+
+        // POST /api/admin/seed-test-data
+        [HttpPost("seed-test-data")]
+        public async Task<IActionResult> SeedTestData()
+        {
+            // ── STEP 1 — Create test students ───────────────────────────────────
+            var campusConfigs = new (string Campus, string[] Forms, string Curriculum)[]
+            {
+                ("AHJ", new[] { "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6" }, "Cambridge Primary"),
+                ("AHA", new[] { "Form 1", "Form 2", "Form 3", "Form 4", "Form 5", "Form 6" }, "ZIMSEC O-Level"),
+                ("AHS", new[] { "Form 5", "Lower 6", "Upper 6" }, "ZIMSEC A-Level"),
+            };
+
+            var existingNumbers = (await _context.Students.Select(s => s.StudentNumber).ToListAsync()).ToHashSet();
+
+            int studentsCreated = 0;
+
+            foreach (var (campus, forms, curriculum) in campusConfigs)
+            {
+                int counter = 1;
+                foreach (var form in forms)
+                {
+                    var formCode = form.Replace(" ", "");
+                    foreach (var suffix in new[] { "A", "B" })
+                    {
+                        var studentNumber = $"{campus}/2026/T{counter:D3}";
+                        counter++;
+
+                        if (existingNumbers.Contains(studentNumber))
+                            continue;
+
+                        _context.Students.Add(new Student
+                        {
+                            SchoolId = 1,
+                            StudentNumber = studentNumber,
+                            FirstName = "Test",
+                            Surname = $"{campus}{formCode}{suffix}",
+                            DateOfBirth = "2008-01-01",
+                            Gender = "Male",
+                            Form = form,
+                            StudentType = "Day",
+                            Curriculum = curriculum,
+                            Status = "Active",
+                            CreatedAt = DateTime.UtcNow,
+                        });
+                        existingNumbers.Add(studentNumber);
+                        studentsCreated++;
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // ── STEP 2 — Assign all subjects to teacher 11 ──────────────────────
+            var formOptionsByCampus = new Dictionary<string, string[]>
+            {
+                ["AHJ"] = new[] { "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7" },
+                ["AHA"] = new[] { "Form 1", "Form 2", "Form 3", "Form 4", "Form 5", "Form 6" },
+                ["AHS"] = new[] { "Form 5", "Lower 6", "Upper 6" },
+            };
+
+            var subjects = await _context.Subjects.ToListAsync();
+
+            var existingKeys = (await _context.TeacherSubjectAssignments
+                .Where(a => a.TeacherId == 11)
+                .Select(a => new { a.SubjectId, a.Campus, a.Form })
+                .ToListAsync())
+                .Select(a => $"{a.SubjectId}|{a.Campus}|{a.Form}")
+                .ToHashSet();
+
+            int assignmentsCreated = 0;
+
+            foreach (var subject in subjects)
+            {
+                if (!formOptionsByCampus.TryGetValue(subject.Campus, out var forms))
+                    continue;
+
+                foreach (var form in forms)
+                {
+                    var key = $"{subject.Id}|{subject.Campus}|{form}";
+                    if (existingKeys.Contains(key))
+                        continue;
+
+                    _context.TeacherSubjectAssignments.Add(new TeacherSubjectAssignment
+                    {
+                        SchoolId = 1,
+                        TeacherId = 11,
+                        SubjectId = subject.Id,
+                        Campus = subject.Campus,
+                        Form = form,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                    });
+                    existingKeys.Add(key);
+                    assignmentsCreated++;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // ── STEP 3 — Summary ─────────────────────────────────────────────────
+            return Ok(new
+            {
+                studentsCreated,
+                assignmentsCreated,
+                message = "Test data seeded successfully"
+            });
+        }
     }
 
     public class AdminResetPasswordRequest
