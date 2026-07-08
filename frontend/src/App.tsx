@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
 
 import LoginPage from './pages/LoginPage.tsx';
 import DashboardPage from './pages/DashboardPage.tsx';
@@ -22,9 +21,22 @@ import ActivatePage from './pages/ActivatePage.tsx';
 import PortalAccountsPage from './pages/PortalAccountsPage.tsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.tsx';
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+// Roles that should not reach the admin console (they have their own portals)
+const NON_ADMIN_ROLES = ['Student', 'ClassTeacher', 'SubjectTeacher', 'Teacher'];
+
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = localStorage.getItem('leetec_token');
+  const user = JSON.parse(localStorage.getItem('leetec_user') || 'null');
+  if (!token || !user) return <Navigate to="/login" />;
+  if (NON_ADMIN_ROLES.includes(user.role)) return <Navigate to="/login" />;
+  return <>{children}</>;
+};
+
+const TeacherRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = localStorage.getItem('teacher_token');
+  const teacher = JSON.parse(localStorage.getItem('teacher_info') || 'null');
+  if (!token || !teacher) return <Navigate to="/teacher-login" />;
+  return <>{children}</>;
 };
 
 function App() {
@@ -36,29 +48,29 @@ function App() {
       <Route path="/student-dashboard" element={<StudentDashboardPage />} />
 
       {/* Protected Admin Routes */}
-      <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-      <Route path="/students" element={<ProtectedRoute><StudentsPage /></ProtectedRoute>} />
-      <Route path="/fees" element={<ProtectedRoute><FeesPage /></ProtectedRoute>} />
-      <Route path="/terms" element={<ProtectedRoute><TermsPage /></ProtectedRoute>} />
-      <Route path="/fee-setup" element={<ProtectedRoute><FeeSetupPage /></ProtectedRoute>} />
-      {/* <Route path="/bursaries" element={<ProtectedRoute><BursariesPage /></ProtectedRoute>} /> */}
-      <Route path="/super-admin" element={<ProtectedRoute><SuperAdminPage /></ProtectedRoute>} />
-      <Route path="/subjects" element={<ProtectedRoute><SubjectsPage /></ProtectedRoute>} />
-      <Route path="/marks-entry" element={<ProtectedRoute><MarksEntryPage /></ProtectedRoute>} />
-      <Route path="/bulk-reports" element={<ProtectedRoute><BulkReportsPage /></ProtectedRoute>} />
-      <Route path="/announcements" element={<ProtectedRoute><AnnouncementsPage /></ProtectedRoute>} />
-      <Route path="/teacher-assignments" element={<ProtectedRoute><TeacherAssignmentsPage /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<AdminRoute><DashboardPage /></AdminRoute>} />
+      <Route path="/students" element={<AdminRoute><StudentsPage /></AdminRoute>} />
+      <Route path="/fees" element={<AdminRoute><FeesPage /></AdminRoute>} />
+      <Route path="/terms" element={<AdminRoute><TermsPage /></AdminRoute>} />
+      <Route path="/fee-setup" element={<AdminRoute><FeeSetupPage /></AdminRoute>} />
+      {/* <Route path="/bursaries" element={<AdminRoute><BursariesPage /></AdminRoute>} /> */}
+      <Route path="/super-admin" element={<AdminRoute><SuperAdminPage /></AdminRoute>} />
+      <Route path="/subjects" element={<AdminRoute><SubjectsPage /></AdminRoute>} />
+      <Route path="/marks-entry" element={<AdminRoute><MarksEntryPage /></AdminRoute>} />
+      <Route path="/bulk-reports" element={<AdminRoute><BulkReportsPage /></AdminRoute>} />
+      <Route path="/announcements" element={<AdminRoute><AnnouncementsPage /></AdminRoute>} />
+      <Route path="/teacher-assignments" element={<AdminRoute><TeacherAssignmentsPage /></AdminRoute>} />
 
       {/* Student Activation */}
       <Route path="/activate" element={<ActivatePage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Portal Accounts */}
-      <Route path="/portal-accounts" element={<ProtectedRoute><PortalAccountsPage /></ProtectedRoute>} />
+      <Route path="/portal-accounts" element={<AdminRoute><PortalAccountsPage /></AdminRoute>} />
 
       {/* Teacher Portal */}
       <Route path="/teacher-login" element={<TeacherLoginPage />} />
-      <Route path="/teacher-dashboard" element={<TeacherDashboardPage />} />
+      <Route path="/teacher-dashboard" element={<TeacherRoute><TeacherDashboardPage /></TeacherRoute>} />
 
       {/* Default redirect */}
       <Route path="/" element={<Navigate to="/login" />} />
