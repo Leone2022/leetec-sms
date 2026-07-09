@@ -157,6 +157,10 @@ export const marksAPI = {
   bulkSave: (data: any) => api.post('/marks/bulk-save', data),
   getStudentMarks: (studentId: number, termId: number) =>
     api.get(`/marks/student/${studentId}?termId=${termId}`),
+  publishReportCards: (data: any) =>
+    api.post('/marks/publish-report-cards', data),
+  getStudentReportCard: (studentId: number, termId: number) =>
+    api.get(`/marks/report-card/${studentId}/${termId}`),
 };
 
 export const reportsAPI = {

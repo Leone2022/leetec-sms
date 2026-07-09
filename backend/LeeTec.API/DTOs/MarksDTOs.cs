@@ -28,7 +28,25 @@ namespace LeeTec.API.DTOs
         public int SubjectId { get; set; }
         public string AssessmentType { get; set; } = string.Empty;
         public List<StudentMarkEntry> Entries { get; set; } = new();
+        public List<BulkSaveMarkEntry>? Marks { get; set; }
         public int? TeacherId { get; set; }
+        public string? Campus { get; set; }
+        public string? Form { get; set; }
+    }
+
+    // Combined midterm + end-of-term entry used by the unified marks entry table
+    public class BulkSaveMarkEntry
+    {
+        public int StudentId { get; set; }
+        public decimal? MidtermScore { get; set; }
+        public decimal? EndOfTermScore { get; set; }
+        public string? Comments { get; set; }
+    }
+
+    public class PublishReportCardsRequest
+    {
+        public int TermId { get; set; }
+        public int SchoolId { get; set; } = 1;
         public string? Campus { get; set; }
         public string? Form { get; set; }
     }

@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
-import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI } from '../services/api';
+import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI, marksAPI } from '../services/api';
 import { generateReportCard } from '../utils/reportCard';
 import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } from '../utils/credentials';
 import AdminLayout from '../components/AdminLayout';
 import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
+
+const PUBLISH_FORM_OPTIONS = [
+  'All',
+  'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7',
+  'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6',
+  'Lower 6', 'Upper 6',
+];
 
 interface CompletionRow {
   studentId: number;
@@ -32,6 +39,12 @@ export default function BulkReportsPage() {
   const [progress, setProgress] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Publish Report Cards section
+  const [publishTermId, setPublishTermId] = useState<number | ''>('');
+  const [publishCampus, setPublishCampus] = useState('All');
+  const [publishForm, setPublishForm] = useState('All');
+  const [publishingReportCards, setPublishingReportCards] = useState(false);
+
   const showMsg = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
@@ -42,9 +55,28 @@ export default function BulkReportsPage() {
       const data: any[] = res.data || [];
       setTerms(data);
       const active = data.find(t => t.isActive) ?? data[0];
-      if (active) setTermId(active.id);
+      if (active) { setTermId(active.id); setPublishTermId(active.id); }
     }).catch(() => showMsg('Failed to load terms', 'error'));
   }, []);
+
+  const handlePublishReportCards = async () => {
+    if (!publishTermId) return;
+    setPublishingReportCards(true);
+    try {
+      const res = await marksAPI.publishReportCards({
+        termId: publishTermId,
+        schoolId: 1,
+        campus: publishCampus,
+        form: publishForm,
+      });
+      const count = res.data?.published ?? 0;
+      showMsg(`${count} report card${count !== 1 ? 's' : ''} published successfully`, 'success');
+    } catch {
+      showMsg('Failed to publish report cards', 'error');
+    } finally {
+      setPublishingReportCards(false);
+    }
+  };
 
   useEffect(() => {
     if (!termId) { setRows([]); return; }
@@ -201,6 +233,42 @@ export default function BulkReportsPage() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Publish Report Cards */}
+        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 18px' }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: '#0f172a' }}>Publish Report Cards</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: 12, alignItems: 'end', maxWidth: 800 }}>
+            <div>
+              <label style={lbl}>Term</label>
+              <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
+                value={publishTermId} onChange={e => setPublishTermId(Number(e.target.value))}>
+                <option value="">Select term</option>
+                {terms.map(t => <option key={t.id} value={t.id}>{t.name} {t.year}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Campus</label>
+              <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
+                value={publishCampus} onChange={e => setPublishCampus(e.target.value)}>
+                {['All', 'AHJ', 'AHA', 'AHS'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Form</label>
+              <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
+                value={publishForm} onChange={e => setPublishForm(e.target.value)}>
+                {PUBLISH_FORM_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <button
+              style={{ padding: '10px 22px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 700, cursor: publishingReportCards || !publishTermId ? 'not-allowed' : 'pointer', opacity: publishingReportCards || !publishTermId ? 0.6 : 1, whiteSpace: 'nowrap' }}
+              onClick={handlePublishReportCards}
+              disabled={!publishTermId || publishingReportCards}
+            >
+              📋 {publishingReportCards ? 'Publishing...' : 'Publish Report Cards'}
+            </button>
+          </div>
+        </div>
 
         {/* Filter bar */}
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 18px' }}>

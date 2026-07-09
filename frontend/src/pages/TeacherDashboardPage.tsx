@@ -4,21 +4,27 @@ import { marksAPI, feesAPI } from '../services/api';
 import { teacherAssignmentsAPI } from '../services/api';
 import {
   GraduationCap, LogOut, BookOpen, User, Menu, X,
-  ClipboardList, Save, ChevronLeft,
+  ClipboardList, ChevronLeft,
 } from 'lucide-react';
 
-const ASSESSMENT_TYPES = ['Mid-term Test', 'End of Term Exam'];
-
 interface MarkRow {
-  markId: number | null;
   studentId: number;
   studentName: string;
   studentNumber: string;
-  paper1Score: string;
-  paper2Score: string;
-  score: string;
+  midtermScore: string;
+  endOfTermScore: string;
   comments: string;
 }
+
+const calculateGrade = (total: number) => {
+  if (total >= 90) return 'A*';
+  if (total >= 80) return 'A';
+  if (total >= 70) return 'B';
+  if (total >= 60) return 'C';
+  if (total >= 50) return 'D';
+  if (total >= 40) return 'E';
+  return 'U';
+};
 
 type View = 'classes' | 'profile';
 
@@ -46,7 +52,6 @@ export default function TeacherDashboardPage() {
   // Marks entry state
   const [terms, setTerms] = useState<any[]>([]);
   const [termId, setTermId] = useState<number | ''>('');
-  const [assessmentType, setAssessmentType] = useState(ASSESSMENT_TYPES[0]);
   const [rows, setRows] = useState<MarkRow[]>([]);
   const [entryLoading, setEntryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -77,31 +82,44 @@ export default function TeacherDashboardPage() {
     if (!selectedAssignment || !termId) { setRows([]); return; }
     loadEntrySheet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAssignment, termId, assessmentType]);
+  }, [selectedAssignment, termId]);
 
   const loadEntrySheet = async () => {
     if (!selectedAssignment || !termId || !teacherInfo?.id) return;
     setEntryLoading(true);
     try {
-      const res = await marksAPI.getEntrySheet({
-        termId: termId as number,
-        campus: selectedAssignment.campus,
-        form: selectedAssignment.form,
-        subjectId: selectedAssignment.subjectId,
-        assessmentType,
-        teacherId: teacherInfo.id,
-      });
-      const data: any[] = res.data || [];
-      setRows(data.map(d => ({
-        markId: d.markId,
-        studentId: d.studentId,
-        studentName: d.studentName,
-        studentNumber: d.studentNumber,
-        paper1Score: d.paper1Score != null ? String(d.paper1Score) : '',
-        paper2Score: d.paper2Score != null ? String(d.paper2Score) : '',
-        score: d.score != null ? String(d.score) : '',
-        comments: d.comments ?? '',
-      })));
+      const [midRes, endRes] = await Promise.all([
+        marksAPI.getEntrySheet({
+          termId: termId as number,
+          campus: selectedAssignment.campus,
+          form: selectedAssignment.form,
+          subjectId: selectedAssignment.subjectId,
+          assessmentType: 'Mid-term Test',
+          teacherId: teacherInfo.id,
+        }),
+        marksAPI.getEntrySheet({
+          termId: termId as number,
+          campus: selectedAssignment.campus,
+          form: selectedAssignment.form,
+          subjectId: selectedAssignment.subjectId,
+          assessmentType: 'End of Term Exam',
+          teacherId: teacherInfo.id,
+        }),
+      ]);
+      const midData: any[] = midRes.data || [];
+      const endData: any[] = endRes.data || [];
+      const endByStudent = new Map(endData.map(d => [d.studentId, d]));
+      setRows(midData.map(d => {
+        const endD = endByStudent.get(d.studentId);
+        return {
+          studentId: d.studentId,
+          studentName: d.studentName,
+          studentNumber: d.studentNumber,
+          midtermScore: d.score != null ? String(d.score) : '',
+          endOfTermScore: endD?.score != null ? String(endD.score) : '',
+          comments: d.comments || endD?.comments || '',
+        };
+      }));
     } catch (err: any) {
       if (err?.response?.status === 403) showMsg('You are not assigned to this class', 'error');
       else showMsg('Failed to load entry sheet', 'error');
@@ -124,33 +142,37 @@ export default function TeacherDashboardPage() {
   };
 
   const total = (row: MarkRow) => {
-    const p1 = Number(row.paper1Score) || 0;
-    const p2 = Number(row.paper2Score) || 0;
-    if (row.paper1Score === '' && row.paper2Score === '') return '';
-    return String(p1 + p2);
+    if (row.midtermScore === '' && row.endOfTermScore === '') return '';
+    if (row.midtermScore !== '' && row.endOfTermScore !== '') {
+      return String((Number(row.midtermScore) + Number(row.endOfTermScore)) / 2);
+    }
+    return row.midtermScore !== '' ? row.midtermScore : row.endOfTermScore;
+  };
+
+  const grade = (row: MarkRow) => {
+    const t = total(row);
+    return t === '' ? '' : calculateGrade(Number(t));
   };
 
   const handleSaveAll = async () => {
     if (!termId || !selectedAssignment || !teacherInfo?.id) return;
     setSaving(true);
-    const isPaperBased = selectedAssignment.campus === 'AHJ';
     try {
-      const entries = rows.map(r => ({
+      const marks = rows.map(r => ({
         studentId: r.studentId,
-        paper1Score: isPaperBased && r.paper1Score !== '' ? Number(r.paper1Score) : null,
-        paper2Score: isPaperBased && r.paper2Score !== '' ? Number(r.paper2Score) : null,
-        score: !isPaperBased && r.score !== '' ? Number(r.score) : null,
+        midtermScore: r.midtermScore !== '' ? Number(r.midtermScore) : null,
+        endOfTermScore: r.endOfTermScore !== '' ? Number(r.endOfTermScore) : null,
         comments: r.comments || null,
       }));
       const res = await marksAPI.bulkSave({
         schoolId: 1,
         termId,
         subjectId: selectedAssignment.subjectId,
-        assessmentType,
+        assessmentType: 'Combined',
         campus: selectedAssignment.campus,
         form: selectedAssignment.form,
         teacherId: teacherInfo.id,
-        entries,
+        marks,
       });
       showMsg(res.data?.message || `Marks saved for ${rows.length} students`, 'success');
       await loadEntrySheet();
@@ -183,8 +205,6 @@ export default function TeacherDashboardPage() {
   const lbl: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
   const scoreInput: React.CSSProperties = { width: 70, textAlign: 'center', padding: '0 6px', color: '#0f172a' };
   const fld: React.CSSProperties = { width: '100%', boxSizing: 'border-box' };
-
-  const isPaperBased = selectedAssignment?.campus === 'AHJ';
 
   // ── Sidebar ──────────────────────────────────────────────────
   const Sidebar = (
@@ -247,26 +267,13 @@ export default function TeacherDashboardPage() {
 
       {/* Controls */}
       <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 18px', marginBottom: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={lbl}>Term</label>
-            <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
-              value={termId} onChange={e => setTermId(Number(e.target.value))}>
-              <option value="">Select term</option>
-              {terms.map(t => <option key={t.id} value={t.id}>{t.name} {t.year}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={lbl}>Assessment Type</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {ASSESSMENT_TYPES.map(a => (
-                <button key={a} type="button" onClick={() => setAssessmentType(a)}
-                  style={{ flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: assessmentType === a ? '#1a237e' : '#f1f5f9', color: assessmentType === a ? 'white' : '#475569' }}>
-                  {a === 'Mid-term Test' ? 'Mid-term' : 'End of Term'}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div style={{ maxWidth: 280 }}>
+          <label style={lbl}>Term</label>
+          <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
+            value={termId} onChange={e => setTermId(Number(e.target.value))}>
+            <option value="">Select term</option>
+            {terms.map(t => <option key={t.id} value={t.id}>{t.name} {t.year}</option>)}
+          </select>
         </div>
       </div>
 
@@ -280,7 +287,7 @@ export default function TeacherDashboardPage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <ClipboardList size={17} style={{ color: '#94a3b8' }} />
             <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleSaveAll} disabled={saving || rows.length === 0}>
-              <Save size={13} /> {saving ? 'Saving...' : 'Save All'}
+              💾 {saving ? 'Saving...' : 'Save All'}
             </button>
           </div>
         </div>
@@ -297,16 +304,11 @@ export default function TeacherDashboardPage() {
               <thead>
                 <tr>
                   <th>Student Name</th>
-                  <th>Student No</th>
-                  {isPaperBased ? (
-                    <>
-                      <th style={{ textAlign: 'center' }}>Paper 1</th>
-                      <th style={{ textAlign: 'center' }}>Paper 2</th>
-                      <th style={{ textAlign: 'center' }}>Total</th>
-                    </>
-                  ) : (
-                    <th style={{ textAlign: 'center' }}>Score (%)</th>
-                  )}
+                  <th>Student No.</th>
+                  <th style={{ textAlign: 'center' }}>Midterm (%)</th>
+                  <th style={{ textAlign: 'center' }}>End of Term (%)</th>
+                  <th style={{ textAlign: 'center' }}>Total</th>
+                  <th style={{ textAlign: 'center' }}>Grade</th>
                   <th>Comments</th>
                 </tr>
               </thead>
@@ -315,27 +317,24 @@ export default function TeacherDashboardPage() {
                   <tr key={row.studentId}>
                     <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{row.studentName}</td>
                     <td style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>{row.studentNumber}</td>
-                    {isPaperBased ? (
-                      <>
-                        <td style={{ textAlign: 'center' }}>
-                          <input className="text-field" style={scoreInput} type="number" min={0} max={50}
-                            value={row.paper1Score}
-                            onChange={e => updateRow(row.studentId, 'paper1Score', clamp(e.target.value, 50))} />
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <input className="text-field" style={scoreInput} type="number" min={0} max={50}
-                            value={row.paper2Score}
-                            onChange={e => updateRow(row.studentId, 'paper2Score', clamp(e.target.value, 50))} />
-                        </td>
-                        <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{total(row)}</td>
-                      </>
-                    ) : (
-                      <td style={{ textAlign: 'center' }}>
-                        <input className="text-field" style={scoreInput} type="number" min={0} max={100}
-                          value={row.score}
-                          onChange={e => updateRow(row.studentId, 'score', clamp(e.target.value, 100))} />
-                      </td>
-                    )}
+                    <td style={{ textAlign: 'center' }}>
+                      <input className="text-field" style={scoreInput} type="number" min={0} max={100}
+                        value={row.midtermScore}
+                        onChange={e => updateRow(row.studentId, 'midtermScore', clamp(e.target.value, 100))} />
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <input className="text-field" style={scoreInput} type="number" min={0} max={100}
+                        value={row.endOfTermScore}
+                        onChange={e => updateRow(row.studentId, 'endOfTermScore', clamp(e.target.value, 100))} />
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{total(row)}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      {grade(row) && (
+                        <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
+                          {grade(row)}
+                        </span>
+                      )}
+                    </td>
                     <td>
                       <input className="text-field" style={fld}
                         value={row.comments}

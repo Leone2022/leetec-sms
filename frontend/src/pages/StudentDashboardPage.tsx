@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { portalAPI, feesAPI, studentsAPI, announcementsAPI, reportsAPI } from '../services/api';
-import { generateReportCard, type ReportCardData } from '../utils/reportCard';
+import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI } from '../services/api';
 import { generateStatementPdf, buildStatementRows } from '../utils/statement';
 import {
   LogOut, GraduationCap, LayoutDashboard, DollarSign,
   FileText, Bell, User, Menu, X, FileDown,
 } from 'lucide-react';
+
+interface MarksReportCard {
+  isPublished: boolean;
+  student: { name: string; studentNumber: string; form: string; campus: string };
+  term: { name: string };
+  subjects: { subjectName: string; midtermScore: number | null; endOfTermScore: number | null; total: number | null; grade: string }[];
+}
 
 type View = 'dashboard' | 'reportCard' | 'fees' | 'announcements' | 'profile';
 
@@ -33,10 +39,9 @@ export default function StudentDashboardPage() {
   // Report card tab state
   const [terms, setTerms] = useState<any[]>([]);
   const [reportTermId, setReportTermId] = useState<number | ''>('');
-  const [reportCard, setReportCard] = useState<ReportCardData | null>(null);
+  const [reportCard, setReportCard] = useState<MarksReportCard | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
-  const [reportNotFound, setReportNotFound] = useState(false);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [reportError, setReportError] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
 
@@ -101,24 +106,14 @@ export default function StudentDashboardPage() {
     if (!studentId || !reportTermId) return;
     setReportLoading(true);
     setReportCard(null);
-    setReportNotFound(false);
+    setReportError(false);
     try {
-      const res = await reportsAPI.getStudentView(studentId, reportTermId as number);
-      setReportCard(res.data as ReportCardData);
-    } catch (err: any) {
-      if (err?.response?.status === 404) setReportNotFound(true);
+      const res = await marksAPI.getStudentReportCard(studentId, reportTermId as number);
+      setReportCard(res.data as MarksReportCard);
+    } catch {
+      setReportError(true);
     } finally {
       setReportLoading(false);
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    if (!reportCard) return;
-    setDownloadingPdf(true);
-    try {
-      await generateReportCard(reportCard);
-    } finally {
-      setDownloadingPdf(false);
     }
   };
 
@@ -313,16 +308,6 @@ export default function StudentDashboardPage() {
             <option value="">Select term</option>
             {terms.map(t => <option key={t.id} value={t.id}>{t.name} {t.year}</option>)}
           </select>
-          {reportCard && (
-            <button
-              onClick={handleDownloadPdf}
-              disabled={downloadingPdf}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-            >
-              <FileDown size={14} />
-              {downloadingPdf ? 'Generating...' : 'Download PDF'}
-            </button>
-          )}
         </div>
       </div>
 
@@ -332,12 +317,28 @@ export default function StudentDashboardPage() {
         </div>
       ) : reportLoading ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center', color: '#475569', fontSize: 13 }}>Loading report card...</div>
-      ) : reportNotFound || !reportCard ? (
+      ) : reportError || !reportCard ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center' }}>
           <FileText size={36} style={{ color: '#94a3b8', marginBottom: 12 }} />
-          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Not Yet Published</h3>
+          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Report Card Unavailable</h3>
           <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-            Your {selectedReportTerm ? `${selectedReportTerm.name} ${selectedReportTerm.year}` : 'selected term'} report card is being processed. Please check back soon.
+            We couldn't load your {selectedReportTerm ? `${selectedReportTerm.name} ${selectedReportTerm.year}` : 'selected term'} report card. Please try again later.
+          </p>
+        </div>
+      ) : !reportCard.isPublished ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center' }}>
+          <FileText size={36} style={{ color: '#94a3b8', marginBottom: 12 }} />
+          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Not Yet Available</h3>
+          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+            Report card not yet available. Please check back later.
+          </p>
+        </div>
+      ) : reportCard.subjects.length === 0 ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center' }}>
+          <FileText size={36} style={{ color: '#94a3b8', marginBottom: 12 }} />
+          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>No Marks Recorded</h3>
+          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+            No marks recorded for this term.
           </p>
         </div>
       ) : (
@@ -348,13 +349,12 @@ export default function StudentDashboardPage() {
               {reportCard.student.campus === 'AHJ' ? 'ADVENT HOPE JUNIOR SCHOOL' : 'ADVENT HOPE ACADEMY'}
             </p>
             <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>
-              {reportCard.student.firstName} {reportCard.student.surname}
+              {reportCard.student.name}
             </h2>
             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, opacity: 0.85 }}>
               <span><strong>Form:</strong> {reportCard.student.form || '—'}</span>
-              <span><strong>Term:</strong> {reportCard.term.name} {reportCard.term.year}</span>
+              <span><strong>Term:</strong> {reportCard.term.name}</span>
               <span><strong>Student No:</strong> {reportCard.student.studentNumber}</span>
-              <span><strong>Curriculum:</strong> {reportCard.gradingCurriculum}</span>
             </div>
           </div>
 
@@ -367,32 +367,25 @@ export default function StudentDashboardPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#1a237e' }}>
-                    {['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Band / Grade', 'Comments'].map(h => (
+                    {['Subject', 'Midterm', 'End of Term', 'Total', 'Grade'].map(h => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Subject' ? 'left' : 'center', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {reportCard.subjects.map((s, i) => {
-                    const block = s.noTerminalExam ? s.midterm : s.endTerm;
-                    const comments = (s.noTerminalExam ? s.midterm?.comments : s.endTerm?.comments) || '—';
                     const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
                     return (
-                      <tr key={s.subjectId} style={{ background: rowBg }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>
-                          {s.name}
-                          {s.noTerminalExam && <span style={{ fontSize: 10, color: '#64748b', fontWeight: 400, marginLeft: 6 }}>(No Terminal Exam)</span>}
-                        </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.paper1)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.paper2)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.total)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{fmt(s.cm)}</td>
+                      <tr key={s.subjectName} style={{ background: rowBg }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{s.subjectName}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.midtermScore)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.endOfTermScore)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.total)}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
                             {s.grade || '—'}
                           </span>
                         </td>
-                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{comments}</td>
                       </tr>
                     );
                   })}
@@ -400,47 +393,6 @@ export default function StudentDashboardPage() {
               </table>
             </div>
           </div>
-
-          {/* Grade reference */}
-          <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-                {reportCard.gradingCurriculum} — Grading Reference
-              </h3>
-            </div>
-            <div style={{ padding: '0 18px 12px' }}>
-              <table style={{ borderCollapse: 'collapse', fontSize: 12, marginTop: 12 }}>
-                <thead>
-                  <tr style={{ background: '#1a237e' }}>
-                    {['Score Range', 'Performance Band'].map(h => (
-                      <th key={h} style={{ padding: '7px 24px', color: 'white', fontWeight: 600, fontSize: 11 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportCard.gradingCurriculum === 'Cambridge Checkpoint' ? (
-                    [['0', 'Unclassified'], ['1–10', 'Basic'], ['11–20', 'Aspiring'], ['21–30', 'Good'], ['31–40', 'High'], ['41–50', 'Outstanding']].map(([range, band], i) => (
-                      <tr key={range} style={{ background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                        <td style={{ padding: '6px 24px', textAlign: 'center', color: '#475569' }}>{range}</td>
-                        <td style={{ padding: '6px 24px', textAlign: 'center', fontWeight: 600, color: '#0f172a' }}>{band}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    [['75–100', 'A'], ['60–74', 'B'], ['50–59', 'C'], ['45–49', 'D'], ['35–44', 'E'], ['0–34', 'U']].map(([range, grade], i) => (
-                      <tr key={range} style={{ background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                        <td style={{ padding: '6px 24px', textAlign: 'center', color: '#475569' }}>{range}%</td>
-                        <td style={{ padding: '6px 24px', textAlign: 'center', fontWeight: 600, color: '#0f172a' }}>{grade}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <p style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', margin: 0 }}>
-            This is a computer generated report card. Download the PDF for the official formatted version.
-          </p>
         </div>
       )}
     </div>
