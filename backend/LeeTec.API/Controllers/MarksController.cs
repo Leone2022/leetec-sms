@@ -262,64 +262,55 @@ namespace LeeTec.API.Controllers
 
         // REPORT CARD — combined midterm/end-of-term view for the student portal
         [HttpGet("report-card/{studentId}/{termId}")]
-        public async Task<IActionResult> GetMarksReportCard(int studentId, int termId)
+        public async Task<IActionResult> GetReportCard(int studentId, int termId)
         {
-            var student = await _context.Students.FindAsync(studentId);
+            // Check if published
+            var record = await _context.ReportCardRecords
+                .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == termId);
+
+            var student = await _context.Students
+                .FirstOrDefaultAsync(s => s.Id == studentId);
+
+            var term = await _context.Terms
+                .FirstOrDefaultAsync(t => t.Id == termId);
+
             if (student == null) return NotFound(new { message = "Student not found" });
 
-            var term = await _context.Terms.FindAsync(termId);
-            if (term == null) return NotFound(new { message = "Term not found" });
-
-            var registration = await _context.TermRegistrations
-                .FirstOrDefaultAsync(tr => tr.StudentId == studentId && tr.TermId == termId);
-            var campus = registration?.Campus ?? student.StudentNumber.Split('/').FirstOrDefault() ?? "";
-
-            var isPublished = await _context.ReportCardRecords
-                .AnyAsync(r => r.StudentId == studentId && r.TermId == termId && r.Status == "Published");
-
-            var studentSubjects = await _context.StudentSubjects
-                .Where(ss => ss.StudentId == studentId && ss.TermId == termId && ss.IsActive)
-                .Include(ss => ss.Subject)
-                .ToListAsync();
+            var campus = student.StudentNumber.Split('/').FirstOrDefault() ?? "";
 
             var marks = await _context.Marks
                 .Where(m => m.StudentId == studentId && m.TermId == termId)
+                .Include(m => m.Subject)
                 .ToListAsync();
 
-            var subjects = studentSubjects
-                .Select(ss =>
-                {
-                    var midtermScore = marks.FirstOrDefault(m => m.SubjectId == ss.SubjectId && m.AssessmentType == "Mid-term Test")?.Score;
-                    var endOfTermScore = marks.FirstOrDefault(m => m.SubjectId == ss.SubjectId && m.AssessmentType == "End of Term Exam")?.Score;
-
-                    decimal? total = midtermScore.HasValue && endOfTermScore.HasValue
-                        ? (midtermScore.Value + endOfTermScore.Value) / 2
-                        : midtermScore ?? endOfTermScore;
-
-                    return new
-                    {
-                        subjectName = ss.Subject != null ? ss.Subject.Name : "",
-                        midtermScore,
-                        endOfTermScore,
-                        total,
-                        grade = total.HasValue ? CalculateGrade(total.Value) : "",
+            var grouped = marks
+                .GroupBy(m => new { m.SubjectId, SubjectName = m.Subject?.Name ?? "" })
+                .Select(g => {
+                    var midterm = g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test");
+                    var endOfTerm = g.FirstOrDefault(m => m.AssessmentType == "End of Term Exam");
+                    var midScore = midterm?.Score ?? 0;
+                    var endScore = endOfTerm?.Score ?? 0;
+                    var total = (midScore + endScore) / 2;
+                    return new {
+                        subjectName = g.Key.SubjectName,
+                        midtermScore = midScore,
+                        endOfTermScore = endScore,
+                        total = total,
+                        grade = CalculateGrade(total)
                     };
                 })
-                .OrderBy(s => s.subjectName)
                 .ToList();
 
-            return Ok(new
-            {
-                isPublished,
-                student = new
-                {
+            return Ok(new {
+                isPublished = record?.Status == "Published",
+                student = new {
                     name = $"{student.FirstName} {student.Surname}",
                     studentNumber = student.StudentNumber,
                     form = student.Form,
-                    campus,
+                    campus
                 },
-                term = new { name = $"{term.Name} {term.Year}" },
-                subjects,
+                term = new { name = term?.Name ?? "" },
+                subjects = grouped
             });
         }
     }
