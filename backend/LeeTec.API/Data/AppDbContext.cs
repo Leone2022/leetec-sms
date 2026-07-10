@@ -40,6 +40,7 @@ namespace LeeTec.API.Data
 
         // Subjects
         public DbSet<Subject> Subjects { get; set; }
+        public DbSet<StudentSubject> StudentSubjects { get; set; }
 
         // Term Registrations
         public DbSet<TermRegistration> TermRegistrations { get; set; }
@@ -222,6 +223,25 @@ namespace LeeTec.API.Data
                 .HasOne(t => t.Subject)
                 .WithMany()
                 .HasForeignKey(t => t.SubjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Student Subjects
+            modelBuilder.Entity<StudentSubject>()
+                .HasOne(ss => ss.Student)
+                .WithMany()
+                .HasForeignKey(ss => ss.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<StudentSubject>()
+                .HasOne(ss => ss.Subject)
+                .WithMany()
+                .HasForeignKey(ss => ss.SubjectId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<StudentSubject>()
+                .HasOne(ss => ss.Term)
+                .WithMany()
+                .HasForeignKey(ss => ss.TermId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

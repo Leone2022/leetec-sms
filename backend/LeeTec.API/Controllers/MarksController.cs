@@ -277,17 +277,20 @@ namespace LeeTec.API.Controllers
             var isPublished = await _context.ReportCardRecords
                 .AnyAsync(r => r.StudentId == studentId && r.TermId == termId && r.Status == "Published");
 
-            var marks = await _context.Marks
-                .Where(m => m.StudentId == studentId && m.TermId == termId)
-                .Include(m => m.Subject)
+            var studentSubjects = await _context.StudentSubjects
+                .Where(ss => ss.StudentId == studentId && ss.TermId == termId && ss.IsActive)
+                .Include(ss => ss.Subject)
                 .ToListAsync();
 
-            var subjects = marks
-                .GroupBy(m => new { m.SubjectId, SubjectName = m.Subject != null ? m.Subject.Name : "" })
-                .Select(g =>
+            var marks = await _context.Marks
+                .Where(m => m.StudentId == studentId && m.TermId == termId)
+                .ToListAsync();
+
+            var subjects = studentSubjects
+                .Select(ss =>
                 {
-                    var midtermScore = g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test")?.Score;
-                    var endOfTermScore = g.FirstOrDefault(m => m.AssessmentType == "End of Term Exam")?.Score;
+                    var midtermScore = marks.FirstOrDefault(m => m.SubjectId == ss.SubjectId && m.AssessmentType == "Mid-term Test")?.Score;
+                    var endOfTermScore = marks.FirstOrDefault(m => m.SubjectId == ss.SubjectId && m.AssessmentType == "End of Term Exam")?.Score;
 
                     decimal? total = midtermScore.HasValue && endOfTermScore.HasValue
                         ? (midtermScore.Value + endOfTermScore.Value) / 2
@@ -295,7 +298,7 @@ namespace LeeTec.API.Controllers
 
                     return new
                     {
-                        subjectName = g.Key.SubjectName,
+                        subjectName = ss.Subject != null ? ss.Subject.Name : "",
                         midtermScore,
                         endOfTermScore,
                         total,

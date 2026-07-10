@@ -262,6 +262,7 @@ namespace LeeTec.API.Controllers
             var existingNumbers = (await _context.Students.Select(s => s.StudentNumber).ToListAsync()).ToHashSet();
 
             int studentsCreated = 0;
+            var newStudents = new List<(Student Student, string Campus)>();
 
             foreach (var (campus, forms, curriculum) in campusConfigs)
             {
@@ -277,7 +278,7 @@ namespace LeeTec.API.Controllers
                         if (existingNumbers.Contains(studentNumber))
                             continue;
 
-                        _context.Students.Add(new Student
+                        var newStudent = new Student
                         {
                             SchoolId = 1,
                             StudentNumber = studentNumber,
@@ -290,7 +291,9 @@ namespace LeeTec.API.Controllers
                             Curriculum = curriculum,
                             Status = "Active",
                             CreatedAt = DateTime.UtcNow,
-                        });
+                        };
+                        _context.Students.Add(newStudent);
+                        newStudents.Add((newStudent, campus));
                         existingNumbers.Add(studentNumber);
                         studentsCreated++;
                     }
@@ -298,6 +301,41 @@ namespace LeeTec.API.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // ── STEP 1b — Register each new student for their campus/curriculum subjects ──
+            var activeTerm = await _context.Terms.FirstOrDefaultAsync(t => t.IsActive && t.SchoolId == 1);
+            int studentSubjectsCreated = 0;
+
+            if (activeTerm != null && newStudents.Count > 0)
+            {
+                var allSubjects = await _context.Subjects.Where(s => s.SchoolId == 1 && s.IsActive).ToListAsync();
+
+                foreach (var (student, campus) in newStudents)
+                {
+                    var subjectCurriculumType = student.Curriculum.StartsWith("ZIMSEC", StringComparison.OrdinalIgnoreCase)
+                        ? "ZIMSEC"
+                        : "Cambridge";
+
+                    var matchingSubjects = allSubjects
+                        .Where(s => s.Campus == campus && s.CurriculumType == subjectCurriculumType);
+
+                    foreach (var subject in matchingSubjects)
+                    {
+                        _context.StudentSubjects.Add(new StudentSubject
+                        {
+                            StudentId = student.Id,
+                            SubjectId = subject.Id,
+                            TermId = activeTerm.Id,
+                            SchoolId = 1,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                        });
+                        studentSubjectsCreated++;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+            }
 
             // ── STEP 2 — Assign all subjects to teacher 11 ──────────────────────
             var formOptionsByCampus = new Dictionary<string, string[]>
@@ -350,6 +388,7 @@ namespace LeeTec.API.Controllers
             return Ok(new
             {
                 studentsCreated,
+                studentSubjectsCreated,
                 assignmentsCreated,
                 message = "Test data seeded successfully"
             });

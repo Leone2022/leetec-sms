@@ -69,6 +69,37 @@ namespace LeeTec.API.Controllers
                 _context.Students.Add(student);
                 await _context.SaveChangesAsync();
 
+                // Auto-assign subjects matching this student's campus and curriculum
+                var activeTerm = await _context.Terms
+                    .FirstOrDefaultAsync(t => t.IsActive && t.SchoolId == dto.SchoolId);
+
+                if (activeTerm != null)
+                {
+                    var subjectCurriculumType = dto.Curriculum.StartsWith("ZIMSEC", StringComparison.OrdinalIgnoreCase)
+                        ? "ZIMSEC"
+                        : "Cambridge";
+
+                    var matchingSubjects = await _context.Subjects
+                        .Where(s => s.SchoolId == dto.SchoolId && s.Campus == prefix
+                            && s.CurriculumType == subjectCurriculumType && s.IsActive)
+                        .ToListAsync();
+
+                    foreach (var subject in matchingSubjects)
+                    {
+                        _context.StudentSubjects.Add(new StudentSubject
+                        {
+                            StudentId = student.Id,
+                            SubjectId = subject.Id,
+                            TermId = activeTerm.Id,
+                            SchoolId = dto.SchoolId,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow,
+                        });
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+
                 await transaction.CommitAsync();
 
                 // Send welcome email with student number if address provided (non-blocking)
@@ -279,6 +310,80 @@ namespace LeeTec.API.Controllers
                     error = ex.Message
                 });
             }
+        }
+
+        // GET STUDENT SUBJECTS
+        [HttpGet("{id}/subjects")]
+        public async Task<IActionResult> GetStudentSubjects(int id)
+        {
+            var subjects = await _context.StudentSubjects
+                .Where(ss => ss.StudentId == id && ss.IsActive)
+                .Include(ss => ss.Subject)
+                .Select(ss => new
+                {
+                    ss.Id,
+                    ss.SubjectId,
+                    subjectName = ss.Subject != null ? ss.Subject.Name : "",
+                    subjectCode = ss.Subject != null ? ss.Subject.Code : "",
+                    ss.TermId,
+                })
+                .ToListAsync();
+
+            return Ok(subjects);
+        }
+
+        // ADD SUBJECT TO STUDENT
+        [HttpPost("{id}/subjects")]
+        public async Task<IActionResult> AddStudentSubject(int id, [FromBody] AddStudentSubjectDTO dto)
+        {
+            var student = await _context.Students.FindAsync(id);
+            if (student == null) return NotFound(new { message = "Student not found" });
+
+            var subject = await _context.Subjects.FindAsync(dto.SubjectId);
+            if (subject == null) return NotFound(new { message = "Subject not found" });
+
+            var existing = await _context.StudentSubjects
+                .FirstOrDefaultAsync(ss => ss.StudentId == id && ss.SubjectId == dto.SubjectId && ss.TermId == dto.TermId);
+
+            if (existing != null)
+            {
+                if (existing.IsActive)
+                    return BadRequest(new { message = "Student is already registered for this subject" });
+                existing.IsActive = true;
+            }
+            else
+            {
+                _context.StudentSubjects.Add(new StudentSubject
+                {
+                    StudentId = id,
+                    SubjectId = dto.SubjectId,
+                    TermId = dto.TermId,
+                    SchoolId = student.SchoolId,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Subject added" });
+        }
+
+        // REMOVE SUBJECT FROM STUDENT
+        [HttpDelete("{studentId}/subjects/{subjectId}")]
+        public async Task<IActionResult> RemoveStudentSubject(int studentId, int subjectId)
+        {
+            var records = await _context.StudentSubjects
+                .Where(ss => ss.StudentId == studentId && ss.SubjectId == subjectId && ss.IsActive)
+                .ToListAsync();
+
+            if (records.Count == 0)
+                return NotFound(new { message = "Subject registration not found" });
+
+            foreach (var record in records)
+                record.IsActive = false;
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Subject removed" });
         }
 
         // SEARCH STUDENTS

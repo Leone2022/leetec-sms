@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { studentsAPI, feesAPI } from '../services/api';
+import { studentsAPI, feesAPI, subjectsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Search, Users, X, FileDown, FileSpreadsheet, FileText, Plus, ChevronRight, ChevronLeft, Lock, Unlock } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
@@ -86,6 +86,15 @@ export default function StudentsPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
 
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
+  const [showAddSubject, setShowAddSubject] = useState(false);
+  const [addSubjectId, setAddSubjectId] = useState<number | ''>('');
+  const [addingSubject, setAddingSubject] = useState(false);
+  const [removingSubjectId, setRemovingSubjectId] = useState<number | null>(null);
+  const [activeTermId, setActiveTermId] = useState<number | ''>('');
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState<{
     firstName: string; surname: string; dateOfBirth: string; gender: string;
@@ -95,6 +104,14 @@ export default function StudentsPage() {
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   useEffect(() => { loadStudents(); }, []);
+
+  useEffect(() => {
+    feesAPI.getTerms(1).then(res => {
+      const data: any[] = res.data || [];
+      const active = data.find((t: any) => t.isActive) ?? data[0];
+      if (active) setActiveTermId(active.id);
+    }).catch(() => {});
+  }, []);
 
   const loadStudents = async () => {
     try {
@@ -337,10 +354,69 @@ export default function StudentsPage() {
       } finally {
         setInvoicesLoading(false);
       }
+      await loadStudentSubjects(student.id);
     } catch (err) {
       console.error('Failed to load student details:', err);
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  const loadStudentSubjects = async (studentId: number) => {
+    setSubjectsLoading(true);
+    try {
+      const res = await studentsAPI.getStudentSubjects(studentId);
+      setSubjects(res.data || []);
+    } catch (e) {
+      console.error('Failed to load student subjects', e);
+      setSubjects([]);
+    } finally {
+      setSubjectsLoading(false);
+    }
+  };
+
+  const handleOpenAddSubject = async () => {
+    if (!selectedStudent) return;
+    setShowAddSubject(true);
+    setAddSubjectId('');
+    const campus = (selectedStudent.studentNumber ?? '').split('/')[0];
+    const curriculum = (profileStudent || selectedStudent)?.curriculum || '';
+    const curriculumType = curriculum.startsWith('ZIMSEC') ? 'ZIMSEC' : 'Cambridge';
+    try {
+      const res = await subjectsAPI.getAll(1, campus, curriculumType);
+      setAvailableSubjects(res.data || []);
+    } catch {
+      setAvailableSubjects([]);
+    }
+  };
+
+  const handleAddSubject = async () => {
+    if (!selectedStudent || !addSubjectId || !activeTermId) return;
+    setAddingSubject(true);
+    try {
+      await studentsAPI.addStudentSubject(selectedStudent.id, Number(addSubjectId), Number(activeTermId));
+      showMessage('Subject added', 'success');
+      setShowAddSubject(false);
+      setAddSubjectId('');
+      await loadStudentSubjects(selectedStudent.id);
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to add subject', 'error');
+    } finally {
+      setAddingSubject(false);
+    }
+  };
+
+  const handleRemoveSubject = async (subjectId: number) => {
+    if (!selectedStudent) return;
+    setRemovingSubjectId(subjectId);
+    try {
+      await studentsAPI.removeStudentSubject(selectedStudent.id, subjectId);
+      showMessage('Subject removed', 'success');
+      await loadStudentSubjects(selectedStudent.id);
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to remove subject', 'error');
+    } finally {
+      setRemovingSubjectId(null);
     }
   };
 
@@ -349,6 +425,9 @@ export default function StudentsPage() {
     setSelectedStudent(null);
     setProfileStudent(null);
     setProfileTab('personal');
+    setSubjects([]);
+    setShowAddSubject(false);
+    setAddSubjectId('');
   };
 
   const handleDeleteStudent = async () => {
@@ -1147,7 +1226,7 @@ export default function StudentsPage() {
       {/* ─── PROFILE PANEL ─── */}
       {isProfileOpen && selectedStudent && (() => {
         const s = profileStudent || selectedStudent;
-        const TABS = ['Personal', 'Medical', 'Family', 'Guardians', 'Emergency', 'Fees'];
+        const TABS = ['Personal', 'Medical', 'Family', 'Guardians', 'Emergency', 'Fees', '📚 Subjects'];
         const tabBtn = (label: string) => (
           <button
             key={label}
@@ -1396,6 +1475,82 @@ export default function StudentsPage() {
                                   <button className="btn" onClick={() => handleRefundInvoice(inv.id, inv.amountPaid)} style={{ background: '#f59e0b', color: 'white', border: 'none' }}>Refund</button>
                                 )}
                               </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── Subjects ── */}
+                  {profileTab === '📚 subjects' && (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                        <p style={{ ...sectionHeadStyle, marginBottom: 0 }}>Registered Subjects</p>
+                        <button
+                          className="btn"
+                          onClick={handleOpenAddSubject}
+                          style={{ background: '#0ea5e9', color: 'white', border: 'none', fontSize: '12px' }}
+                        >
+                          + Add Subject
+                        </button>
+                      </div>
+
+                      {showAddSubject && (
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                          <select
+                            className="text-field"
+                            style={{ flex: 1, appearance: 'auto' }}
+                            value={addSubjectId}
+                            onChange={(e) => setAddSubjectId(e.target.value ? Number(e.target.value) : '')}
+                          >
+                            <option value="">Select subject</option>
+                            {availableSubjects
+                              .filter((av: any) => !subjects.some((s: any) => s.subjectId === av.id))
+                              .map((av: any) => (
+                                <option key={av.id} value={av.id}>{av.name} ({av.code})</option>
+                              ))}
+                          </select>
+                          <button
+                            className="btn"
+                            onClick={handleAddSubject}
+                            disabled={!addSubjectId || !activeTermId || addingSubject}
+                            style={{ background: '#1a237e', color: 'white', border: 'none' }}
+                          >
+                            {addingSubject ? 'Adding...' : 'Add'}
+                          </button>
+                          <button
+                            className="btn"
+                            onClick={() => setShowAddSubject(false)}
+                            style={{ background: 'transparent', border: '1px solid #e2e8f0' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+
+                      {subjectsLoading ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: '#475569' }}>Loading subjects...</div>
+                      ) : subjects.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b', fontSize: '13px' }}>
+                          No subjects registered for this student.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {subjects.map((sub: any) => (
+                            <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>{sub.subjectName}</div>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>{sub.subjectCode}</div>
+                              </div>
+                              <button
+                                className="btn"
+                                onClick={() => handleRemoveSubject(sub.subjectId)}
+                                disabled={removingSubjectId === sub.subjectId}
+                                style={{ background: 'transparent', border: '1px solid #fca5a5', color: '#dc2626', fontSize: '12px' }}
+                              >
+                                {removingSubjectId === sub.subjectId ? 'Removing...' : 'Remove'}
+                              </button>
                             </div>
                           ))}
                         </div>

@@ -44,4 +44,10 @@ namespace LeeTec.API.DTOs
         public string Password { get; set; } = string.Empty;
         public string ConfirmPassword { get; set; } = string.Empty;
     }
+
+    public class AddStudentSubjectDTO
+    {
+        public int SubjectId { get; set; }
+        public int TermId { get; set; }
+    }
 }
