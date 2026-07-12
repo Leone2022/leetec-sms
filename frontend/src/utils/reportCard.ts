@@ -300,14 +300,14 @@ function generateAhaAhsReportCard(reportData: ReportCardData) {
       startY: (doc as any).lastAutoTable.finalY + 14,
       head: [['Subject', 'CA', 'Written Exam', 'Total', 'Grade', 'Comments']],
       body: subjects
-        .filter(s => s.midterm.total !== null || s.endTerm?.total !== null)
+        .filter(s => s.midterm?.total !== null || s.endTerm?.total !== null)
         .map(s => {
-          const ca = s.midterm.total;
+          const ca = s.midterm?.total ?? null;
           const written = s.endTerm?.total ?? null;
           const total = ca !== null && written !== null
-            ? Math.round((ca + written) / 2)
+            ? Math.round((Number(ca) + Number(written)) / 2)
             : ca ?? written;
-          const comments = s.endTerm?.comments || s.midterm.comments || '—';
+          const comments = s.endTerm?.comments || s.midterm?.comments || '—';
           return [s.name, fmt(ca), fmt(written), fmt(total), s.grade || '—', comments];
         }),
       theme: 'striped',
