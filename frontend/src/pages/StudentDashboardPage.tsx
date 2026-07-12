@@ -453,15 +453,19 @@ export default function StudentDashboardPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#1a237e' }}>
-                    {['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Band / Grade', 'Comments'].map(h => (
+                    {['Subject', 'Paper 1', 'Paper 2', 'Total', 'Grade', 'Comments'].map(h => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Subject' ? 'left' : 'center', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {reportCard.subjects.map((s, i) => {
-                    const block = s.noTerminalExam ? s.midterm : s.endTerm;
-                    const comments = (s.noTerminalExam ? s.midterm?.comments : s.endTerm?.comments) || '—';
+                    const midtermScore = s.midterm?.total ?? null;
+                    const endOfTermScore = s.endTerm?.total ?? null;
+                    const total = midtermScore !== null && endOfTermScore !== null
+                      ? Math.round((Number(midtermScore) + Number(endOfTermScore)) / 2)
+                      : midtermScore ?? endOfTermScore;
+                    const comments = s.endTerm?.comments || s.midterm?.comments || '—';
                     const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
                     return (
                       <tr key={s.subjectId} style={{ background: rowBg }}>
@@ -469,10 +473,9 @@ export default function StudentDashboardPage() {
                           {s.name}
                           {s.noTerminalExam && <span style={{ fontSize: 10, color: '#64748b', fontWeight: 400, marginLeft: 6 }}>(No Terminal Exam)</span>}
                         </td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.paper1)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.paper2)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.total)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{fmt(s.cm)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(midtermScore)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(endOfTermScore)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{fmt(total)}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                           <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
                             {s.grade || '—'}

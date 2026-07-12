@@ -244,7 +244,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
 // ─── AHA / AHS report card — unchanged ──────────────────────────────────────
 
 function generateAhaAhsReportCard(reportData: ReportCardData) {
-  const { student, term, subjects, attendance, usesPapers, gradingCurriculum } = reportData;
+  const { student, term, subjects, attendance, gradingCurriculum } = reportData;
   const doc = new jsPDF();
   const studentName = `${student.firstName} ${student.surname}`;
   const termLabel = `${term.name} ${term.year}`.trim();
@@ -279,43 +279,25 @@ function generateAhaAhsReportCard(reportData: ReportCardData) {
   doc.setFontSize(11); doc.setFont('helvetica', 'bold');
   doc.text('Subject Results', 14, (doc as any).lastAutoTable.finalY + 10);
 
-  if (usesPapers) {
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 14,
-      head: [['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Band', 'Comments']],
-      body: subjects
-        .filter(s => s.midterm.total !== null || s.endTerm?.total !== null)
-        .map(s => {
-          const block = s.noTerminalExam ? s.midterm : s.endTerm;
-          const comments = (s.noTerminalExam ? s.midterm.comments : s.endTerm?.comments) || '—';
-          return [s.name, fmt(block?.paper1), fmt(block?.paper2), fmt(block?.total), fmt(s.cm), s.grade || '—', comments];
-        }),
-      theme: 'striped',
-      headStyles: { fillColor: [26, 35, 126], textColor: 255 },
-      styles: { fontSize: 9 },
-      columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } },
-    });
-  } else {
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 14,
-      head: [['Subject', 'CA', 'Written Exam', 'Total', 'Grade', 'Comments']],
-      body: subjects
-        .filter(s => s.midterm?.total !== null || s.endTerm?.total !== null)
-        .map(s => {
-          const ca = s.midterm?.total ?? null;
-          const written = s.endTerm?.total ?? null;
-          const total = ca !== null && written !== null
-            ? Math.round((Number(ca) + Number(written)) / 2)
-            : ca ?? written;
-          const comments = s.endTerm?.comments || s.midterm?.comments || '—';
-          return [s.name, fmt(ca), fmt(written), fmt(total), s.grade || '—', comments];
-        }),
-      theme: 'striped',
-      headStyles: { fillColor: [26, 35, 126], textColor: 255 },
-      styles: { fontSize: 9 },
-      columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
-    });
-  }
+  autoTable(doc, {
+    startY: (doc as any).lastAutoTable.finalY + 14,
+    head: [['Subject', 'Paper 1', 'Paper 2', 'Total', 'Grade', 'Comments']],
+    body: subjects
+      .filter(s => s.midterm?.total !== null || s.endTerm?.total !== null)
+      .map(s => {
+        const ca = s.midterm?.total ?? null;
+        const written = s.endTerm?.total ?? null;
+        const total = ca !== null && written !== null
+          ? Math.round((Number(ca) + Number(written)) / 2)
+          : ca ?? written;
+        const comments = s.endTerm?.comments || s.midterm?.comments || '—';
+        return [s.name, fmt(ca), fmt(written), fmt(total), s.grade || '—', comments];
+      }),
+    theme: 'striped',
+    headStyles: { fillColor: [26, 35, 126], textColor: 255 },
+    styles: { fontSize: 9 },
+    columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
+  });
 
   // Grading scale reference
   const reference = GRADE_REFERENCE_TABLES[gradingCurriculum];
