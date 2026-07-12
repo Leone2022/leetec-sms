@@ -102,45 +102,62 @@ namespace LeeTec.API.Controllers
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDTO dto)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
-            if (user == null)
-                return NotFound(new { message = "No account found with that email" });
-
-            var tempPassword = GenerateTempPassword();
-            user.TempPassword = BCrypt.Net.BCrypt.HashPassword(tempPassword);
-            user.TempPasswordExpiry = DateTime.UtcNow.AddHours(24);
-            user.MustChangePassword = true;
-            await _context.SaveChangesAsync();
-
-            var subject = "Your LeeTec SMS Temporary Password";
-            var body = $@"
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                    <div style='background-color: #1a237e; padding: 20px; text-align: center;'>
-                        <h1 style='color: white; margin: 0;'>LeeTec SMS</h1>
-                    </div>
-                    <div style='padding: 30px; background-color: #f9f9f9;'>
-                        <p>Your temporary password is:</p>
-                        <p style='font-size: 22px; font-weight: 700; color: #1a237e; letter-spacing: 1px;'>{tempPassword}</p>
-                        <p>This password expires in <strong>24 hours</strong>.</p>
-                        <p>You will be prompted to change it on first login.</p>
-                        <p style='font-size: 13px; color: #757575;'>If you did not request a password reset, please contact your administrator.</p>
-                    </div>
-                    <div style='background-color: #1a237e; padding: 15px; text-align: center;'>
-                        <p style='color: #c5cae9; margin: 0; font-size: 13px;'>LeeTec School Management System</p>
-                    </div>
-                </div>";
+            const string genericMessage = "If this email exists, a temporary password has been sent.";
 
             try
             {
-                await _emailService.SendAsync(user.Email, subject, body);
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+                if (user == null)
+                    return Ok(new { message = genericMessage });
+
+                var tempPassword = GenerateTempPassword();
+                Console.WriteLine($"[ForgotPassword] Temp password for {dto.Email}: {tempPassword}");
+
+                user.TempPassword = BCrypt.Net.BCrypt.HashPassword(tempPassword);
+                user.TempPasswordExpiry = DateTime.UtcNow.AddHours(24);
+                user.MustChangePassword = true;
+                await _context.SaveChangesAsync();
+
+                var subject = "Your LeeTec SMS Temporary Password";
+                var body = $@"
+                    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
+                        <div style='background-color: #1a237e; padding: 20px; text-align: center;'>
+                            <h1 style='color: white; margin: 0;'>LeeTec SMS</h1>
+                        </div>
+                        <div style='padding: 30px; background-color: #f9f9f9;'>
+                            <p>Your temporary password is:</p>
+                            <p style='font-size: 22px; font-weight: 700; color: #1a237e; letter-spacing: 1px;'>{tempPassword}</p>
+                            <p>This password expires in <strong>24 hours</strong>.</p>
+                            <p>You will be prompted to change it on first login.</p>
+                            <p style='font-size: 13px; color: #757575;'>If you did not request a password reset, please contact your administrator.</p>
+                        </div>
+                        <div style='background-color: #1a237e; padding: 15px; text-align: center;'>
+                            <p style='color: #c5cae9; margin: 0; font-size: 13px;'>LeeTec School Management System</p>
+                        </div>
+                    </div>";
+
+                // Fire-and-forget: don't make the caller wait on SMTP, and don't
+                // let an email failure change the generic response below.
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _emailService.SendAsync(user.Email, subject, body);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Email failed: {ex.Message}");
+                    }
+                });
+
+                return Ok(new { message = genericMessage });
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ForgotPassword] Failed to send email: {ex.Message}");
-                return StatusCode(500, new { message = "Failed to send email. Please try again later." });
+                Console.WriteLine($"[ForgotPassword] Error: {ex.Message}");
+                Console.WriteLine($"[ForgotPassword] Stack: {ex.StackTrace}");
+                return Ok(new { message = genericMessage });
             }
-
-            return Ok(new { message = "Temporary password sent to your email" });
         }
 
         [Authorize]
