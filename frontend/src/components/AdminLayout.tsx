@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { adminAPI } from '../services/api';
 import {
   LayoutDashboard,
   Users,
@@ -18,6 +19,7 @@ import {
   FileStack,
   Bell,
   Globe,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 interface NavChild {
@@ -36,6 +38,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { label: 'Dashboard', Icon: LayoutDashboard, path: '/dashboard' },
   { label: 'Students', Icon: Users, path: '/students' },
+  { label: 'Subject Requests', Icon: ArrowLeftRight, path: '/subject-requests' },
   {
     label: 'Finances',
     Icon: Receipt,
@@ -67,10 +70,17 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [pendingSubjectRequests, setPendingSubjectRequests] = useState(0);
 
   useEffect(() => {
     document.title = `LeeTec SMS — ${title}`;
   }, [title]);
+
+  useEffect(() => {
+    adminAPI.getSubjectChangeRequests()
+      .then((res) => setPendingSubjectRequests((res.data || []).length))
+      .catch(() => {});
+  }, [location.pathname]);
 
   useEffect(() => {
     const activeParent = NAV.find((item) => item.children?.some((c) => c.path === location.pathname));
@@ -150,6 +160,11 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
               >
                 <item.Icon size={15} />
                 <span>{item.label}</span>
+                {item.label === 'Subject Requests' && pendingSubjectRequests > 0 && (
+                  <span style={{ marginLeft: 'auto', background: '#dc2626', color: 'white', fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '1px 7px', lineHeight: '14px' }}>
+                    {pendingSubjectRequests}
+                  </span>
+                )}
                 {active && <ChevronRight size={13} className="chevron" />}
               </button>
             );

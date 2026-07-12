@@ -55,6 +55,8 @@ export const studentsAPI = {
     api.post(`/students/${studentId}/subjects`, { subjectId, termId }),
   removeStudentSubject: (studentId: number, subjectId: number) =>
     api.delete(`/students/${studentId}/subjects/${subjectId}`),
+  requestSubjectChange: (id: number, data: { subjectId: number; action: 'Add' | 'Drop' }) =>
+    api.post(`/students/${id}/subjects/request-change`, data),
 };
 
 export const feesAPI = {
@@ -228,6 +230,11 @@ export const adminAPI = {
   resetTeacherPassword: (id: number, newPassword: string) =>
     api.put(`/admin/teachers/${id}/reset-password`, { newPassword }),
   deleteTeacher: (id: number) => api.delete(`/admin/teachers/${id}`),
+  getSubjectChangeRequests: () => api.get('/admin/subject-change-requests'),
+  approveSubjectRequest: (id: number) =>
+    api.put(`/admin/subject-change-requests/${id}/approve`),
+  rejectSubjectRequest: (id: number) =>
+    api.put(`/admin/subject-change-requests/${id}/reject`),
 };
 
 export const teacherAuthAPI = {

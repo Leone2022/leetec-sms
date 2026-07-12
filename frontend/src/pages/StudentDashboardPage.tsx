@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI } from '../services/api';
+import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI, subjectsAPI } from '../services/api';
 import { generateStatementPdf, buildStatementRows } from '../utils/statement';
 import {
   LogOut, GraduationCap, LayoutDashboard, DollarSign,
-  FileText, Bell, User, Menu, X, FileDown,
+  FileText, Bell, User, Menu, X, FileDown, BookOpen,
 } from 'lucide-react';
 
 interface MarksReportCard {
@@ -14,11 +14,14 @@ interface MarksReportCard {
   subjects: { subjectName: string; midtermScore: number | null; endOfTermScore: number | null; total: number | null; grade: string }[];
 }
 
-type View = 'dashboard' | 'reportCard' | 'fees' | 'announcements' | 'profile';
+const SUBJECT_CHANGE_ELIGIBLE_FORMS = ['Form 5', 'Lower 6', 'Upper 6'];
+
+type View = 'dashboard' | 'reportCard' | 'subjects' | 'fees' | 'announcements' | 'profile';
 
 const NAV: { id: View; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { id: 'reportCard', label: 'Report Card', Icon: FileText },
+  { id: 'subjects', label: 'My Subjects', Icon: BookOpen },
   { id: 'fees', label: 'Financial Statement', Icon: DollarSign },
   { id: 'announcements', label: 'Announcements', Icon: Bell },
   { id: 'profile', label: 'My Profile', Icon: User },
@@ -44,6 +47,17 @@ export default function StudentDashboardPage() {
   const [reportError, setReportError] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+
+  // My Subjects tab state
+  const [mySubjects, setMySubjects] = useState<any[]>([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [changeAction, setChangeAction] = useState<'Add' | 'Drop'>('Add');
+  const [changeSubjectId, setChangeSubjectId] = useState<number | ''>('');
+  const [changeReason, setChangeReason] = useState('');
+  const [submittingChange, setSubmittingChange] = useState(false);
+  const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
+  const [changeMessage, setChangeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [loadError, setLoadError] = useState(false);
 
@@ -84,6 +98,61 @@ export default function StudentDashboardPage() {
       .catch(() => {})
       .finally(() => setAnnouncementsLoading(false));
   }, [view]);
+
+  useEffect(() => {
+    if (view !== 'subjects' || !studentId) return;
+    loadMySubjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, studentId]);
+
+  const loadMySubjects = async () => {
+    if (!studentId) return;
+    setSubjectsLoading(true);
+    try {
+      const res = await studentsAPI.getStudentSubjects(studentId);
+      setMySubjects(res.data || []);
+    } catch {
+      setMySubjects([]);
+    } finally {
+      setSubjectsLoading(false);
+    }
+  };
+
+  const openChangeModal = async (action: 'Add' | 'Drop') => {
+    setChangeAction(action);
+    setChangeSubjectId('');
+    setChangeReason('');
+    setChangeMessage(null);
+    setShowChangeModal(true);
+
+    if (action === 'Add') {
+      const s = dashboard?.student ?? studentInfo;
+      const curriculumType = (s?.curriculum || '').toUpperCase().startsWith('ZIMSEC') ? 'ZIMSEC' : 'Cambridge';
+      try {
+        const res = await subjectsAPI.getAll(1, studentCampus || undefined, curriculumType);
+        const registeredIds = new Set(mySubjects.map((sub: any) => sub.subjectId));
+        setAvailableSubjects((res.data || []).filter((sub: any) => !registeredIds.has(sub.id)));
+      } catch {
+        setAvailableSubjects([]);
+      }
+    }
+  };
+
+  const handleSubmitChange = async () => {
+    if (!studentId || !changeSubjectId) return;
+    setSubmittingChange(true);
+    setChangeMessage(null);
+    try {
+      await studentsAPI.requestSubjectChange(studentId, { subjectId: changeSubjectId as number, action: changeAction });
+      setShowChangeModal(false);
+      setChangeMessage({ type: 'success', text: 'Request submitted for admin approval' });
+      await loadMySubjects();
+    } catch (err: any) {
+      setChangeMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to submit request' });
+    } finally {
+      setSubmittingChange(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -398,6 +467,145 @@ export default function StudentDashboardPage() {
     </div>
   );
 
+  // ── My Subjects view ────────────────────────────────────────────
+  const activeTermForSubjects = terms.find(t => t.isActive) ?? terms[0];
+  const subjectChangeEligible = SUBJECT_CHANGE_ELIGIBLE_FORMS.includes(student?.form);
+
+  const statusBadge = (status: string) => {
+    if (status === 'Confirmed') return { bg: '#dcfce7', color: '#166534', icon: '✅', label: 'Confirmed' };
+    if (status === 'Pending') return { bg: '#ffedd5', color: '#9a3412', icon: '⏳', label: 'Pending Approval' };
+    return { bg: '#fee2e2', color: '#991b1b', icon: '❌', label: 'Dropped' };
+  };
+
+  const SubjectsView = (
+    <div style={{ padding: '28px 32px', maxWidth: 900 }}>
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          My Subjects{activeTermForSubjects ? ` — ${activeTermForSubjects.name} ${activeTermForSubjects.year}` : ''}
+        </h1>
+        <p style={{ color: '#64748b', fontSize: 13, margin: '3px 0 0' }}>Subjects you're registered for this term</p>
+      </div>
+
+      {changeMessage && (
+        <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 13, fontWeight: 500, background: changeMessage.type === 'success' ? '#f0fdf4' : '#fef2f2', color: changeMessage.type === 'success' ? '#166534' : '#991b1b', border: `1px solid ${changeMessage.type === 'success' ? '#bbf7d0' : '#fecaca'}` }}>
+          {changeMessage.text}
+        </div>
+      )}
+
+      {subjectsLoading ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center', color: '#475569', fontSize: 13 }}>Loading subjects...</div>
+      ) : mySubjects.length === 0 ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+          No subjects registered yet.
+        </div>
+      ) : (
+        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          {mySubjects.map((sub: any, i: number) => {
+            const badge = statusBadge(sub.status);
+            return (
+              <div key={sub.id ?? i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: i < mySubjects.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                <div>
+                  <p style={{ fontWeight: 600, fontSize: 14, color: '#0f172a', margin: 0 }}>{sub.subjectName}</p>
+                  {sub.subjectCode && <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>{sub.subjectCode}</p>}
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: badge.bg, color: badge.color }}>
+                  {badge.icon} {badge.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {subjectChangeEligible && (
+        <div style={{ marginTop: 20, textAlign: 'center' }}>
+          <button
+            onClick={() => openChangeModal('Add')}
+            style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            Request Subject Change
+          </button>
+        </div>
+      )}
+
+      {showChangeModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 420, maxWidth: '95vw', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Request Subject Change</h2>
+              <button onClick={() => setShowChangeModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4 }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>Action</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => openChangeModal('Add')}
+                    style={{ flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: changeAction === 'Add' ? '#1a237e' : '#f1f5f9', color: changeAction === 'Add' ? 'white' : '#475569' }}
+                  >
+                    Add Subject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openChangeModal('Drop')}
+                    style={{ flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: changeAction === 'Drop' ? '#1a237e' : '#f1f5f9', color: changeAction === 'Drop' ? 'white' : '#475569' }}
+                  >
+                    Drop Subject
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>Subject</label>
+                <select
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, appearance: 'auto' }}
+                  value={changeSubjectId}
+                  onChange={e => setChangeSubjectId(e.target.value ? Number(e.target.value) : '')}
+                >
+                  <option value="">Select subject</option>
+                  {(changeAction === 'Add' ? availableSubjects : mySubjects.filter((s: any) => s.status === 'Confirmed'))
+                    .map((s: any) => (
+                      <option key={s.id ?? s.subjectId} value={s.id ?? s.subjectId}>{s.name ?? s.subjectName}</option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>Reason</label>
+                <textarea
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, minHeight: 70, resize: 'vertical', fontFamily: 'inherit' }}
+                  value={changeReason}
+                  onChange={e => setChangeReason(e.target.value)}
+                  placeholder="Briefly explain why you're requesting this change"
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button
+                onClick={() => setShowChangeModal(false)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitChange}
+                disabled={!changeSubjectId || submittingChange}
+                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!changeSubjectId || submittingChange) ? 0.6 : 1 }}
+              >
+                {submittingChange ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // ── Financial Statement view ──────────────────────────────────
   const totalCharged = allInvoices.reduce((s, inv) => s + Number(inv.totalAmount ?? 0), 0);
   const totalPaid = allInvoices.reduce((s, inv) => s + Number(inv.amountPaid ?? 0), 0);
@@ -649,6 +857,7 @@ export default function StudentDashboardPage() {
         <div style={{ flex: 1, overflow: 'auto' }}>
           {view === 'dashboard' && DashboardView}
           {view === 'reportCard' && ReportCardView}
+          {view === 'subjects' && SubjectsView}
           {view === 'fees' && FeesView}
           {view === 'announcements' && AnnouncementsView}
           {view === 'profile' && ProfileView}

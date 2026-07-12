@@ -316,20 +316,87 @@ namespace LeeTec.API.Controllers
         [HttpGet("{id}/subjects")]
         public async Task<IActionResult> GetStudentSubjects(int id)
         {
+            var student = await _context.Students.FindAsync(id);
+            if (student == null) return NotFound(new { message = "Student not found" });
+
             var subjects = await _context.StudentSubjects
-                .Where(ss => ss.StudentId == id && ss.IsActive)
+                .Where(ss => ss.StudentId == id)
                 .Include(ss => ss.Subject)
-                .Select(ss => new
-                {
-                    ss.Id,
-                    ss.SubjectId,
-                    subjectName = ss.Subject != null ? ss.Subject.Name : "",
-                    subjectCode = ss.Subject != null ? ss.Subject.Code : "",
-                    ss.TermId,
-                })
                 .ToListAsync();
 
-            return Ok(subjects);
+            var result = subjects.Select(ss => new
+            {
+                ss.Id,
+                ss.SubjectId,
+                subjectName = ss.Subject != null ? ss.Subject.Name : "",
+                subjectCode = ss.Subject != null ? ss.Subject.Code : "",
+                campus = ss.Subject != null ? ss.Subject.Campus : "",
+                form = student.Form,
+                status = string.IsNullOrEmpty(ss.Status) ? "Confirmed" : ss.Status,
+            }).ToList();
+
+            return Ok(result);
+        }
+
+        // REQUEST SUBJECT CHANGE (Form 5/6, Lower 6, Upper 6 only)
+        private static readonly HashSet<string> SubjectChangeEligibleForms = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Form 5", "Lower 6", "Upper 6"
+        };
+
+        [HttpPost("{id}/subjects/request-change")]
+        public async Task<IActionResult> RequestSubjectChange(int id, [FromBody] RequestSubjectChangeDTO dto)
+        {
+            var student = await _context.Students.FindAsync(id);
+            if (student == null) return NotFound(new { message = "Student not found" });
+
+            if (!SubjectChangeEligibleForms.Contains(student.Form))
+                return StatusCode(403, new { message = "Subject changes not allowed for this form" });
+
+            var subject = await _context.Subjects.FindAsync(dto.SubjectId);
+            if (subject == null) return NotFound(new { message = "Subject not found" });
+
+            var activeTerm = await _context.Terms
+                .FirstOrDefaultAsync(t => t.IsActive && t.SchoolId == student.SchoolId);
+            if (activeTerm == null) return BadRequest(new { message = "No active term" });
+
+            var isAdd = string.Equals(dto.Action, "Add", StringComparison.OrdinalIgnoreCase);
+
+            var existing = await _context.StudentSubjects
+                .FirstOrDefaultAsync(ss => ss.StudentId == id && ss.SubjectId == dto.SubjectId && ss.TermId == activeTerm.Id);
+
+            if (isAdd)
+            {
+                if (existing != null)
+                {
+                    existing.Status = "Pending";
+                    existing.IsActive = true;
+                }
+                else
+                {
+                    _context.StudentSubjects.Add(new StudentSubject
+                    {
+                        StudentId = id,
+                        SubjectId = dto.SubjectId,
+                        TermId = activeTerm.Id,
+                        SchoolId = student.SchoolId,
+                        IsActive = true,
+                        Status = "Pending",
+                        CreatedAt = DateTime.UtcNow,
+                    });
+                }
+            }
+            else
+            {
+                if (existing == null)
+                    return NotFound(new { message = "Subject registration not found" });
+
+                existing.Status = "Pending";
+                existing.IsActive = false;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Request submitted for admin approval" });
         }
 
         // ADD SUBJECT TO STUDENT

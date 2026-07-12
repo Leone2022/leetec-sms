@@ -393,6 +393,59 @@ namespace LeeTec.API.Controllers
                 message = "Test data seeded successfully"
             });
         }
+
+        // GET /api/admin/subject-change-requests
+        [HttpGet("subject-change-requests")]
+        public async Task<IActionResult> GetSubjectChangeRequests()
+        {
+            var pending = await _context.StudentSubjects
+                .Where(ss => ss.Status == "Pending")
+                .Include(ss => ss.Student)
+                .Include(ss => ss.Subject)
+                .OrderByDescending(ss => ss.CreatedAt)
+                .ToListAsync();
+
+            var result = pending.Select(ss => new
+            {
+                ss.Id,
+                studentId = ss.StudentId,
+                studentName = ss.Student != null ? $"{ss.Student.FirstName} {ss.Student.Surname}" : "",
+                studentNumber = ss.Student != null ? ss.Student.StudentNumber : "",
+                form = ss.Student != null ? ss.Student.Form : "",
+                subjectId = ss.SubjectId,
+                subjectName = ss.Subject != null ? ss.Subject.Name : "",
+                action = ss.IsActive ? "Add" : "Drop",
+                date = ss.CreatedAt,
+            }).ToList();
+
+            return Ok(result);
+        }
+
+        // PUT /api/admin/subject-change-requests/{id}/approve
+        [HttpPut("subject-change-requests/{id}/approve")]
+        public async Task<IActionResult> ApproveSubjectRequest(int id)
+        {
+            var request = await _context.StudentSubjects.FindAsync(id);
+            if (request == null) return NotFound(new { message = "Request not found" });
+
+            request.Status = "Confirmed";
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Request approved" });
+        }
+
+        // PUT /api/admin/subject-change-requests/{id}/reject
+        [HttpPut("subject-change-requests/{id}/reject")]
+        public async Task<IActionResult> RejectSubjectRequest(int id)
+        {
+            var request = await _context.StudentSubjects.FindAsync(id);
+            if (request == null) return NotFound(new { message = "Request not found" });
+
+            request.Status = "Dropped";
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Request rejected" });
+        }
     }
 
     public class AdminResetPasswordRequest

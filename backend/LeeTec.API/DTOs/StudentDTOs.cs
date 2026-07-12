@@ -50,4 +50,10 @@ namespace LeeTec.API.DTOs
         public int SubjectId { get; set; }
         public int TermId { get; set; }
     }
+
+    public class RequestSubjectChangeDTO
+    {
+        public int SubjectId { get; set; }
+        public string Action { get; set; } = string.Empty; // "Add" | "Drop"
+    }
 }

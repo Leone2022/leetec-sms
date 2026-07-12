@@ -10,6 +10,7 @@ namespace LeeTec.API.Models
         public int TermId { get; set; }
         public int SchoolId { get; set; }
         public bool IsActive { get; set; } = true;
+        public string Status { get; set; } = "Confirmed"; // Confirmed, Pending, Dropped
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation
