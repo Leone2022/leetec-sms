@@ -505,10 +505,11 @@ export default function StudentDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {GRADE_REFERENCE_TABLES[reportCard.gradingCurriculum].rows.map(([range, band], i) => (
-                      <tr key={range} style={{ background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-                        <td style={{ padding: '6px 24px', textAlign: 'center', color: '#475569' }}>{range}</td>
-                        <td style={{ padding: '6px 24px', textAlign: 'center', fontWeight: 600, color: '#0f172a' }}>{band}</td>
+                    {GRADE_REFERENCE_TABLES[reportCard.gradingCurriculum].rows.map((row, i) => (
+                      <tr key={row[0]} style={{ background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                        {row.map((cell, j) => (
+                          <td key={j} style={{ padding: '6px 24px', textAlign: 'center', color: j === 0 ? '#0f172a' : '#475569', fontWeight: j === 0 ? 600 : 400 }}>{cell}</td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>

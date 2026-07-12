@@ -323,6 +323,7 @@ function generateAhaAhsReportCard(reportData: ReportCardData) {
     doc.setFontSize(11); doc.setFont('helvetica', 'bold');
     doc.text(`${gradingCurriculum} Grading Scale`, 14, (doc as any).lastAutoTable.finalY + 10);
 
+    const isWideReference = reference.headers.length > 2;
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 14,
       head: [reference.headers],
@@ -331,7 +332,7 @@ function generateAhaAhsReportCard(reportData: ReportCardData) {
       headStyles: { fillColor: [26, 35, 126], textColor: 255, fontStyle: 'bold' },
       styles: { fontSize: 9, cellPadding: 3 },
       columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' } },
-      margin: { left: 14, right: 120 },
+      margin: { left: 14, right: isWideReference ? 90 : 120 },
     });
   }
 

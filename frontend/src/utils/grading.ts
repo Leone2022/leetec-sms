@@ -78,7 +78,7 @@ export function getGradeForScore(score: number, curriculumType: CurriculumType, 
 
 // Reference tables for report card grading-scale appendices.
 // Keep these ranges in sync with the gradeFor* functions above.
-export const GRADE_REFERENCE_TABLES: Record<CurriculumType, { headers: [string, string]; rows: [string, string][] }> = {
+export const GRADE_REFERENCE_TABLES: Record<CurriculumType, { headers: string[]; rows: string[][] }> = {
   'Cambridge Checkpoint': {
     headers: ['SCORE RANGE', 'PERFORMANCE BAND'],
     rows: [
@@ -91,26 +91,26 @@ export const GRADE_REFERENCE_TABLES: Record<CurriculumType, { headers: [string, 
     ],
   },
   'ZIMSEC O-Level': {
-    headers: ['PERCENTAGE', 'GRADE'],
+    headers: ['GRADE', 'MARK RANGE', 'DESCRIPTION'],
     rows: [
-      ['75–100', 'A'],
-      ['60–74', 'B'],
-      ['50–59', 'C'],
-      ['45–49', 'D'],
-      ['35–44', 'E'],
-      ['0–34', 'U'],
+      ['A', '75–100', 'Distinction'],
+      ['B', '60–74', 'Merit'],
+      ['C', '50–59', 'Credit'],
+      ['D', '45–49', 'Pass'],
+      ['E', '35–44', 'Pass'],
+      ['U', '0–34', 'Ungraded'],
     ],
   },
   'ZIMSEC A-Level': {
-    headers: ['PERCENTAGE', 'GRADE'],
+    headers: ['GRADE', 'MARK RANGE'],
     rows: [
-      ['75–100', 'A'],
-      ['60–74', 'B'],
-      ['50–59', 'C'],
-      ['45–49', 'D'],
-      ['40–44', 'E'],
-      ['35–39', 'O'],
-      ['0–34', 'F'],
+      ['A', '75–100'],
+      ['B', '60–74'],
+      ['C', '50–59'],
+      ['D', '45–49'],
+      ['E', '40–44'],
+      ['O', '35–39'],
+      ['F', '0–34'],
     ],
   },
   'Cambridge IGCSE': {
