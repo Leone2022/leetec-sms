@@ -52,7 +52,7 @@ const fmt = (v: number | null | undefined) => (v === null || v === undefined ? '
 // ─── Image loading ──────────────────────────────────────────────────────────
 
 // Vite resolves these at build time — only PNGs present in the folder are included.
-const logoAssets = import.meta.glob('../assets/*.png', {
+const logoAssets = import.meta.glob('../assets/logos/*.png', {
   eager: true,
   query: '?url',
   import: 'default',
@@ -61,7 +61,7 @@ const logoAssets = import.meta.glob('../assets/*.png', {
 async function loadLogo(filename: string): Promise<string | null> {
   const entry = Object.entries(logoAssets).find(([path]) => path.endsWith(`/${filename}`));
   if (!entry) {
-    console.warn(`[ReportCard] Logo not found (add to src/assets/): ${filename}`);
+    console.warn(`[ReportCard] Logo not found (add to src/assets/logos/): ${filename}`);
     return null;
   }
   try {
@@ -275,56 +275,47 @@ function generateAhaAhsReportCard(reportData: ReportCardData) {
     styles: { fontSize: 9, cellPadding: 4 },
   });
 
-  // Mid-term Test Results
+  // Subject Results — one combined table (Mid-term + End of Term)
   doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-  doc.text('Mid-term Test Results', 14, (doc as any).lastAutoTable.finalY + 10);
+  doc.text('Subject Results', 14, (doc as any).lastAutoTable.finalY + 10);
 
-  const midtermHead = usesPapers
-    ? ['Subject', 'Paper 1', 'Paper 2', 'Total', 'Comments']
-    : ['Subject', 'Score', 'Comments'];
-
-  autoTable(doc, {
-    startY: (doc as any).lastAutoTable.finalY + 14,
-    head: [midtermHead],
-    body: subjects.map(s => usesPapers
-      ? [s.name, fmt(s.midterm.paper1), fmt(s.midterm.paper2), fmt(s.midterm.total), s.midterm.comments || '—']
-      : [s.name, fmt(s.midterm.total), s.midterm.comments || '—']),
-    theme: 'striped',
-    headStyles: { fillColor: [26, 35, 126], textColor: 255 },
-    styles: { fontSize: 9 },
-    columnStyles: usesPapers
-      ? { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } }
-      : { 1: { halign: 'center' } },
-  });
-
-  // End of Term Exam Results
-  doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-  doc.text('End of Term Exam Results', 14, (doc as any).lastAutoTable.finalY + 10);
-
-  const endTermHead = usesPapers
-    ? ['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Grade', 'Comments']
-    : ['Subject', 'Score', 'CM', 'Grade', 'Comments'];
-
-  autoTable(doc, {
-    startY: (doc as any).lastAutoTable.finalY + 14,
-    head: [endTermHead],
-    body: subjects.map(s => {
-      if (s.noTerminalExam) {
-        return usesPapers
-          ? [s.name, '—', '—', '—', fmt(s.cm), s.grade || '—', 'No Terminal Examination']
-          : [s.name, '—', fmt(s.cm), s.grade || '—', 'No Terminal Examination'];
-      }
-      return usesPapers
-        ? [s.name, fmt(s.endTerm?.paper1), fmt(s.endTerm?.paper2), fmt(s.endTerm?.total), fmt(s.cm), s.grade || '—', s.endTerm?.comments || '—']
-        : [s.name, fmt(s.endTerm?.total), fmt(s.cm), s.grade || '—', s.endTerm?.comments || '—'];
-    }),
-    theme: 'striped',
-    headStyles: { fillColor: [26, 35, 126], textColor: 255 },
-    styles: { fontSize: 9 },
-    columnStyles: usesPapers
-      ? { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } }
-      : { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
-  });
+  if (usesPapers) {
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 14,
+      head: [['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Band', 'Comments']],
+      body: subjects
+        .filter(s => s.midterm.total !== null || s.endTerm?.total !== null)
+        .map(s => {
+          const block = s.noTerminalExam ? s.midterm : s.endTerm;
+          const comments = (s.noTerminalExam ? s.midterm.comments : s.endTerm?.comments) || '—';
+          return [s.name, fmt(block?.paper1), fmt(block?.paper2), fmt(block?.total), fmt(s.cm), s.grade || '—', comments];
+        }),
+      theme: 'striped',
+      headStyles: { fillColor: [26, 35, 126], textColor: 255 },
+      styles: { fontSize: 9 },
+      columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } },
+    });
+  } else {
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 14,
+      head: [['Subject', 'CA', 'Written Exam', 'Total', 'Grade', 'Comments']],
+      body: subjects
+        .filter(s => s.midterm.total !== null || s.endTerm?.total !== null)
+        .map(s => {
+          const ca = s.midterm.total;
+          const written = s.endTerm?.total ?? null;
+          const total = ca !== null && written !== null
+            ? Math.round((ca + written) / 2)
+            : ca ?? written;
+          const comments = s.endTerm?.comments || s.midterm.comments || '—';
+          return [s.name, fmt(ca), fmt(written), fmt(total), s.grade || '—', comments];
+        }),
+      theme: 'striped',
+      headStyles: { fillColor: [26, 35, 126], textColor: 255 },
+      styles: { fontSize: 9 },
+      columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
+    });
+  }
 
   // Grading scale reference
   const reference = GRADE_REFERENCE_TABLES[gradingCurriculum];

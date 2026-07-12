@@ -94,29 +94,28 @@ namespace LeeTec.API.Services
             var usesPapers = campus == "AHJ";
             var gradingCurriculum = campus == "AHJ" ? "Cambridge Checkpoint" : student.Curriculum;
 
-            var subjectCurriculumType = student.Curriculum.StartsWith("ZIMSEC", StringComparison.OrdinalIgnoreCase)
-                ? "ZIMSEC"
-                : "Cambridge";
-
             var nextTerm = await _context.Terms
                 .Where(t => t.SchoolId == term.SchoolId && t.StartDate > term.EndDate)
                 .OrderBy(t => t.StartDate)
                 .FirstOrDefaultAsync();
 
-            var subjects = await _context.Subjects
-                .Where(s => s.SchoolId == student.SchoolId && s.Campus == campus
-                            && s.CurriculumType == subjectCurriculumType && s.IsActive)
-                .OrderBy(s => s.Name)
-                .ToListAsync();
-
+            // Only subjects with at least one mark recorded for this student/term —
+            // group the student's marks by subject, then join to Subjects for names.
             var marks = await _context.Marks
                 .Where(m => m.StudentId == studentId && m.TermId == termId)
+                .Include(m => m.Subject)
                 .ToListAsync();
 
-            var subjectResults = subjects.Select(subject =>
+            var subjectGroups = marks
+                .Where(m => m.Subject != null)
+                .GroupBy(m => m.Subject!)
+                .OrderBy(g => g.Key.Name);
+
+            var subjectResults = subjectGroups.Select(g =>
             {
-                var midterm = marks.FirstOrDefault(m => m.SubjectId == subject.Id && m.AssessmentType == "Mid-term Test");
-                var endTerm = marks.FirstOrDefault(m => m.SubjectId == subject.Id && m.AssessmentType == "End of Term Exam");
+                var subject = g.Key;
+                var midterm = g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test");
+                var endTerm = g.FirstOrDefault(m => m.AssessmentType == "End of Term Exam");
 
                 var noTerminalExam = NoTerminalExamSubjects.Contains(subject.Name);
 
