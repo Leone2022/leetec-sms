@@ -1,11 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI, subjectsAPI } from '../services/api';
 import { generateStatementPdf, buildStatementRows } from '../utils/statement';
 import {
   LogOut, GraduationCap, LayoutDashboard, DollarSign,
   FileText, Bell, User, Menu, X, FileDown, BookOpen,
 } from 'lucide-react';
+import ahjCrestImage from '../assets/logos/ahj-crest.png';
+import cambridgeLogoImage from '../assets/logos/cambridge-assessment-logo.png';
+import watermarkImage from '../assets/logos/watermark.png';
 
 interface MarksReportCard {
   isPublished: boolean;
@@ -22,6 +27,12 @@ interface MarksReportCard {
 }
 
 const SUBJECT_CHANGE_ELIGIBLE_FORMS = ['Form 5', 'Lower 6', 'Upper 6'];
+
+const CAMPUS_FULL_NAMES: Record<string, string> = {
+  AHJ: 'ADVENT HOPE JUNIOR SCHOOL',
+  AHA: 'ADVENT HOPE ACADEMY',
+  AHS: 'ADVENT HOPE HIGH SCHOOL',
+};
 
 type View = 'dashboard' | 'reportCard' | 'subjects' | 'fees' | 'announcements' | 'profile';
 
@@ -54,6 +65,9 @@ export default function StudentDashboardPage() {
   const [reportError, setReportError] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+  const [showPrintCard, setShowPrintCard] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const printCardRef = useRef<HTMLDivElement>(null);
 
   // My Subjects tab state
   const [mySubjects, setMySubjects] = useState<any[]>([]);
@@ -216,13 +230,58 @@ export default function StudentDashboardPage() {
   const selectedReportTerm = terms.find(t => t.id === reportTermId);
 
   const reportCardCurriculum = (reportCard?.student?.curriculum || '').toUpperCase();
-  const reportCardColumns = reportCardCurriculum.includes('CAMBRIDGE')
+  const isCambridgeCurriculum = reportCardCurriculum.includes('CAMBRIDGE');
+  const reportCardColumns = isCambridgeCurriculum
     ? { col1: 'Paper 1', col2: 'Paper 2', gradeLabel: 'Band' }
     : reportCardCurriculum.includes('ZIMSEC')
     ? { col1: 'CA', col2: 'Written Exam', gradeLabel: 'Grade' }
     : { col1: 'Mid-term', col2: 'End of Term', gradeLabel: 'Grade' };
 
-  const handleDownloadReportCardPdf = () => window.print();
+  const printColumns = isCambridgeCurriculum
+    ? ['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Band', 'Comments']
+    : ['Subject', 'CA', 'Written Exam', 'Total', 'Grade', 'Comments'];
+
+  const printCampusFullName = CAMPUS_FULL_NAMES[reportCard?.student?.campus ?? ''] || 'ADVENT HOPE SCHOOLS';
+  const printTermLabel = reportCard
+    ? `${reportCard.term.name}${selectedReportTerm?.year ? ' ' + selectedReportTerm.year : ''}`
+    : '';
+
+  const handleDownloadReportCardPdf = async () => {
+    if (!reportCard) return;
+    setDownloadingPdf(true);
+    setShowPrintCard(true);
+    // Wait two frames so the (just-mounted) hidden div is fully laid out before capture.
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    try {
+      const node = printCardRef.current;
+      if (!node) return;
+      const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const nameSlug = (reportCard.student.name || 'Student').trim().replace(/\s+/g, '_');
+      const termSlug = printTermLabel.replace(/\s+/g, '');
+      pdf.save(`${nameSlug}_Report_${termSlug}.pdf`);
+    } finally {
+      setShowPrintCard(false);
+      setDownloadingPdf(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -431,9 +490,10 @@ export default function StudentDashboardPage() {
           <div className="report-card-no-print" style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <button
               onClick={handleDownloadReportCardPdf}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              disabled={downloadingPdf}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: downloadingPdf ? 'not-allowed' : 'pointer', opacity: downloadingPdf ? 0.7 : 1 }}
             >
-              <FileDown size={14} /> 📥 Download PDF
+              <FileDown size={14} /> {downloadingPdf ? 'Generating PDF...' : '📥 Download PDF'}
             </button>
           </div>
 
@@ -441,7 +501,7 @@ export default function StudentDashboardPage() {
             {/* Header card */}
             <div style={{ background: '#1a237e', borderRadius: 12, padding: '20px 24px', color: 'white', marginBottom: 16 }}>
               <p style={{ margin: '0 0 4px', fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                {reportCard.student.campus === 'AHJ' ? 'ADVENT HOPE JUNIOR SCHOOL' : 'ADVENT HOPE ACADEMY'}
+                {CAMPUS_FULL_NAMES[reportCard.student.campus] || 'ADVENT HOPE SCHOOLS'}
               </p>
               <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>
                 {reportCard.student.name}
@@ -487,6 +547,119 @@ export default function StudentDashboardPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPrintCard && reportCard && (
+        <div
+          ref={printCardRef}
+          id="report-card-print"
+          style={{
+            position: 'fixed', top: 0, left: '-9999px', width: 794,
+            background: 'white', padding: 32, fontFamily: 'Arial, Helvetica, sans-serif', color: '#0f172a',
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Watermark */}
+          <img
+            src={watermarkImage}
+            alt=""
+            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, opacity: 0.08, zIndex: 0 }}
+          />
+
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            {/* Header row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ width: 110, textAlign: 'center' }}>
+                {reportCard.student.campus === 'AHJ' ? (
+                  <img src={ahjCrestImage} width={80} alt="" />
+                ) : (
+                  <strong style={{ fontSize: 12 }}>{printCampusFullName}</strong>
+                )}
+              </div>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <p style={{ fontWeight: 700, color: '#1a237e', fontSize: 16, margin: 0 }}>
+                  {printCampusFullName} LEARNER'S REPORT
+                </p>
+              </div>
+              <div style={{ width: 110, textAlign: 'center' }}>
+                {isCambridgeCurriculum ? (
+                  <img src={cambridgeLogoImage} width={80} alt="" />
+                ) : (
+                  <strong style={{ fontSize: 14 }}>ZIMSEC</strong>
+                )}
+              </div>
+            </div>
+
+            {/* Student info table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 13 }}>
+              <tbody>
+                {[
+                  ['Learner Name:', reportCard.student.name],
+                  ['Stage/Form:', reportCard.student.form || '—'],
+                  ['Term:', printTermLabel || '—'],
+                  ['Attendance:', '___'],
+                  ['Next Term Begins on:', '___'],
+                ].map(([label, value]) => (
+                  <tr key={label}>
+                    <td style={{ border: '1px solid #94a3b8', padding: '8px 12px', fontWeight: 700, width: '35%', background: '#f8f9fa' }}>{label}</td>
+                    <td style={{ border: '1px solid #94a3b8', padding: '8px 12px' }}>{value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Marks table */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24, fontSize: 12 }}>
+              <thead>
+                <tr style={{ background: '#1a237e' }}>
+                  {printColumns.map(h => (
+                    <th
+                      key={h}
+                      style={{ border: '1px solid #94a3b8', padding: '8px 10px', color: 'white', fontWeight: 700, textAlign: h === 'Subject' || h === 'Comments' ? 'left' : 'center' }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {reportCard.subjects.map((s, i) => (
+                  <tr key={s.subjectName} style={{ background: i % 2 === 0 ? '#ffffff' : '#f8f9fa', height: 40 }}>
+                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', fontWeight: 700, textAlign: 'left' }}>{s.subjectName}</td>
+                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{fmt(s.midtermScore)}</td>
+                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{fmt(s.endOfTermScore)}</td>
+                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{fmt(s.total)}</td>
+                    {isCambridgeCurriculum && (
+                      <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{fmt(s.total)}</td>
+                    )}
+                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{s.grade || '—'}</td>
+                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'left' }}>{s.comments || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Footer */}
+            <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                Class Teacher's Comments:{' '}
+                <span style={{ display: 'inline-block', borderBottom: '1px solid #0f172a', width: '65%' }}>&nbsp;</span>
+              </div>
+              <div>
+                Next Term Begins on:{' '}
+                <span style={{ display: 'inline-block', borderBottom: '1px solid #0f172a', width: '55%' }}>&nbsp;</span>
+              </div>
+              <div style={{ display: 'flex', gap: 32 }}>
+                <span>
+                  Signature: <span style={{ display: 'inline-block', borderBottom: '1px solid #0f172a', width: 160 }}>&nbsp;</span>
+                </span>
+                <span>
+                  Date: <span style={{ display: 'inline-block', borderBottom: '1px solid #0f172a', width: 120 }}>&nbsp;</span>
+                </span>
               </div>
             </div>
           </div>
