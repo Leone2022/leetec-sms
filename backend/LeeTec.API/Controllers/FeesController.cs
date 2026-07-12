@@ -329,41 +329,48 @@ namespace LeeTec.API.Controllers
         [HttpGet("student-balances/{termId}")]
         public async Task<IActionResult> GetStudentBalances(int termId, int schoolId = 1)
         {
-            var invoiceRows = await _context.Invoices
-                .Where(i => i.SchoolId == schoolId
-                    && i.TermId == termId)
-                .Include(i => i.Student)
+            var registrations = await _context.TermRegistrations
+                .Where(r => r.TermId == termId && r.SchoolId == schoolId)
+                .Include(r => r.Student)
                 .ToListAsync();
 
-            var invoices = invoiceRows
-                .Select(i => new
+            var invoiceLookup = await _context.Invoices
+                .Where(i => i.SchoolId == schoolId && i.TermId == termId)
+                .GroupBy(i => i.StudentId)
+                .ToDictionaryAsync(g => g.Key, g => g.First());
+
+            var students = registrations
+                .Where(r => r.Student != null)
+                .OrderBy(r => r.Student!.Surname)
+                .Select(r =>
                 {
-                    i.StudentId,
-                    StudentName = i.Student.FirstName + " " + i.Student.Surname,
-                    StudentNumber = i.Student.StudentNumber,
-                    Campus = i.Student.StudentNumber.Contains('/')
-                        ? i.Student.StudentNumber.Substring(0, i.Student.StudentNumber.IndexOf('/'))
-                        : i.Student.StudentNumber,
-                    i.Student.Form,
-                    i.TotalAmount,
-                    i.AmountPaid,
-                    i.Balance,
-                    i.Status,
-                    i.InvoiceNumber,
-                    i.Id
+                    invoiceLookup.TryGetValue(r.StudentId, out var invoice);
+                    return new
+                    {
+                        r.StudentId,
+                        StudentName = r.Student!.FirstName + " " + r.Student.Surname,
+                        StudentNumber = r.Student.StudentNumber,
+                        Campus = r.Campus,
+                        Form = r.Form,
+                        TotalAmount = invoice?.TotalAmount ?? 0,
+                        AmountPaid = invoice?.AmountPaid ?? 0,
+                        Balance = invoice?.Balance ?? 0,
+                        Status = invoice?.Status ?? "NotCharged",
+                        InvoiceNumber = invoice?.InvoiceNumber ?? "",
+                        Id = invoice?.Id
+                    };
                 })
-                .OrderBy(i => i.StudentName)
                 .ToList();
 
             var summary = new
             {
-                TotalStudents = invoices.Count,
-                TotalCharged = invoices.Sum(i => i.TotalAmount),
-                TotalPaid = invoices.Sum(i => i.AmountPaid),
-                TotalOutstanding = invoices.Sum(i => i.Balance)
+                TotalStudents = students.Count,
+                TotalCharged = students.Sum(s => s.TotalAmount),
+                TotalPaid = students.Sum(s => s.AmountPaid),
+                TotalOutstanding = students.Sum(s => s.Balance)
             };
 
-            return Ok(new { summary, students = invoices });
+            return Ok(new { summary, students });
         }
 
         [HttpPost("charge-individual")]
