@@ -438,7 +438,7 @@ export default function SuperAdminPage() {
                             {u.role}
                           </span>
                         </td>
-                        <td>{u.school?.name ?? `School ${u.schoolId}`}</td>
+                        <td>{u.schoolName ?? 'Advent Hope Academy'}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -46,8 +46,8 @@ const NAV: NavItem[] = [
     label: 'Finances',
     Icon: Receipt,
     children: [
-      { label: 'Fees & Billing', path: '/fees', permission: 'Fees & Billing' },
       { label: 'Fee Setup', path: '/fee-setup', permission: 'Fee Setup' },
+      { label: 'Fees & Billing', path: '/fees', permission: 'Fees & Billing' },
       // { label: 'Bursaries', path: '/bursaries' },
     ],
   },

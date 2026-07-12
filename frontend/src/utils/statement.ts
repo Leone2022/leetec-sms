@@ -27,17 +27,22 @@ function getBankDetails(studentNumber: string) {
 export function buildStatementRows(invoices: any[]): StatementRow[] {
   const raw: { date: string; desc: string; charge: number; payment: number }[] = [];
 
+  // Fallback to epoch (not '') for missing dates — an empty string parses to
+  // an Invalid Date, and NaN comparisons in the sort below silently leave
+  // those rows in their original (unsorted) position instead of at the start.
+  const EPOCH = new Date(0).toISOString();
+
   for (const inv of invoices) {
     for (const item of (inv.items || []))
       raw.push({
-        date: inv.issuedDate || inv.createdAt || '',
+        date: inv.issuedDate || inv.createdAt || EPOCH,
         desc: item.description || item.category?.name || '—',
         charge: Number(item.amount || 0),
         payment: 0,
       });
     for (const pmt of (inv.payments || []))
       raw.push({
-        date: pmt.paymentDate || pmt.postedAt || '',
+        date: pmt.paymentDate || pmt.postedAt || EPOCH,
         desc: `Payment — ${pmt.paymentMethod || 'Cash'}${pmt.receiptNumber ? ` (${pmt.receiptNumber})` : ''}`,
         charge: 0,
         payment: Number(pmt.amount || 0),

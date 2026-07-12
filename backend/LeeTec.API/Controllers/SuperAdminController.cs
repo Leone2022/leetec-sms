@@ -70,7 +70,7 @@ namespace LeeTec.API.Controllers
                     u.LastName,
                     u.Email,
                     u.Status,
-                    School = u.School.Name,
+                    SchoolName = u.School.Name,
                     Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList()
                 })
                 .ToListAsync();

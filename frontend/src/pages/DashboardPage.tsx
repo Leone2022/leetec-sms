@@ -14,6 +14,7 @@ export default function DashboardPage() {
     totalCollected: 0,
     totalOutstanding: 0,
   });
+  const [activeTerm, setActiveTerm] = useState<any>(null);
 
   useEffect(() => {
     loadStats();
@@ -21,9 +22,10 @@ export default function DashboardPage() {
 
   const loadStats = async () => {
     try {
-      const [studentsRes, feesRes] = await Promise.all([
+      const [studentsRes, feesRes, termsRes] = await Promise.all([
         studentsAPI.getAll(1),
         feesAPI.getTermInvoices(1, 1),
+        feesAPI.getTerms(1),
       ]);
       setStats({
         totalStudents: studentsRes.data.length,
@@ -31,6 +33,8 @@ export default function DashboardPage() {
         totalCollected: feesRes.data.summary?.totalCollected || 0,
         totalOutstanding: feesRes.data.summary?.totalOutstanding || 0,
       });
+      const active = (termsRes.data as any[]).find((t) => t.isActive) ?? null;
+      setActiveTerm(active);
     } catch (err) {
       console.error(err);
     }
@@ -88,8 +92,8 @@ export default function DashboardPage() {
             {greeting}, {user?.firstName} {user?.lastName}
           </h2>
           <p>
-            Real-time visibility into student records, billing flow, and cash collection for
-            Term 1.
+            Real-time visibility into student records, billing flow, and cash collection for{' '}
+            {activeTerm ? `${activeTerm.name} ${activeTerm.year}` : 'the current term'}.
           </p>
         </section>
 
