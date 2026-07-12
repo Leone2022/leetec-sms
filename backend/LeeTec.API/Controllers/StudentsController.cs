@@ -100,6 +100,23 @@ namespace LeeTec.API.Controllers
                     await _context.SaveChangesAsync();
                 }
 
+                // Register the student for the active term
+                if (activeTerm != null && !await _context.TermRegistrations
+                    .AnyAsync(tr => tr.StudentId == student.Id && tr.TermId == activeTerm.Id))
+                {
+                    _context.TermRegistrations.Add(new TermRegistration
+                    {
+                        StudentId = student.Id,
+                        TermId = activeTerm.Id,
+                        SchoolId = dto.SchoolId,
+                        Campus = prefix,
+                        Form = student.Form,
+                        Status = "Active",
+                        RegisteredAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                }
+
                 await transaction.CommitAsync();
 
                 // Send welcome email with student number if address provided (non-blocking)
