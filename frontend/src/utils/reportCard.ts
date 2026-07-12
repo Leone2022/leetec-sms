@@ -52,7 +52,7 @@ const fmt = (v: number | null | undefined) => (v === null || v === undefined ? '
 // ─── Image loading ──────────────────────────────────────────────────────────
 
 // Vite resolves these at build time — only PNGs present in the folder are included.
-const logoAssets = import.meta.glob('../assets/logos/*.png', {
+const logoAssets = import.meta.glob('../assets/*.png', {
   eager: true,
   query: '?url',
   import: 'default',
@@ -61,7 +61,7 @@ const logoAssets = import.meta.glob('../assets/logos/*.png', {
 async function loadLogo(filename: string): Promise<string | null> {
   const entry = Object.entries(logoAssets).find(([path]) => path.endsWith(`/${filename}`));
   if (!entry) {
-    console.warn(`[ReportCard] Logo not found (add to src/assets/logos/): ${filename}`);
+    console.warn(`[ReportCard] Logo not found (add to src/assets/): ${filename}`);
     return null;
   }
   try {
