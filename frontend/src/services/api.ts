@@ -70,6 +70,7 @@ export const feesAPI = {
   getPackage: (id: number) => api.get(`/fees/packages/${id}`),
   createPackage: (data: any) => api.post('/fees/packages', data),
   updatePackage: (id: number, data: any) => api.put(`/fees/packages/${id}`, data),
+  deletePackage: (id: number) => api.delete(`/fees/packages/${id}`),
   getStudentBalances: (termId: number, schoolId?: number) =>
     api.get(`/fees/student-balances/${termId}?schoolId=${schoolId || 1}`),
   chargeIndividual: (data: any) => api.post('/fees/charge-individual', data),

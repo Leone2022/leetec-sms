@@ -322,6 +322,18 @@ namespace LeeTec.API.Controllers
             });
         }
 
+        [HttpDelete("packages/{id}")]
+        public async Task<IActionResult> DeleteFeePackage(int id)
+        {
+            var package = await _context.FeePackages.FindAsync(id);
+            if (package == null) return NotFound(new { message = "Package not found" });
+
+            package.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Fee package deleted" });
+        }
+
         // =====================
         // DIRECT CHARGES
         // =====================

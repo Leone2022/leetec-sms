@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Search, X, Plus, Zap, CreditCard, FileDown,
   FileSpreadsheet, FileText, Printer, AlertTriangle,
+  Pencil, Trash2,
 } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import jsPDF from 'jspdf';
@@ -148,6 +149,21 @@ export default function FeeSetupPage() {
   const [pkgLoading, setPkgLoading] = useState(false);
   const [pkgApplying, setPkgApplying] = useState(false);
 
+  // ── Fee Package Management (create/edit/delete) ─────────────────────────────
+  const [feePackages, setFeePackages] = useState<any[]>([]);
+  const [feePackagesLoading, setFeePackagesLoading] = useState(false);
+  const [allTerms, setAllTerms] = useState<any[]>([]);
+  const [isPkgFormOpen, setIsPkgFormOpen] = useState(false);
+  const [pkgFormMode, setPkgFormMode] = useState<'create' | 'edit'>('create');
+  const [pkgFormId, setPkgFormId] = useState<number | null>(null);
+  const [pkgFormName, setPkgFormName] = useState('');
+  const [pkgFormStudentType, setPkgFormStudentType] = useState<'Day' | 'Boarding'>('Day');
+  const [pkgFormCampus, setPkgFormCampus] = useState('AHA');
+  const [pkgFormTermId, setPkgFormTermId] = useState<number | ''>('');
+  const [pkgFormItems, setPkgFormItems] = useState<{ feeCategoryId: number | ''; amount: string }[]>([{ feeCategoryId: '', amount: '' }]);
+  const [pkgFormSaving, setPkgFormSaving] = useState(false);
+  const [deletingPkgId, setDeletingPkgId] = useState<number | null>(null);
+
   // ── Bursary / Scholarship Modal ─────────────────────────────────────────────
   const [isBursaryOpen, setIsBursaryOpen] = useState(false);
   const [bursaryStudent, setBursaryStudent] = useState<any>(null);
@@ -194,12 +210,14 @@ export default function FeeSetupPage() {
       const catData: any[] = catsRes.data || [];
       setCategories(catData);
       setAllStudents(studRes.data || []);
+      setAllTerms(termsRes.data || []);
       const active = (termsRes.data as any[]).find((t) => t.isActive) ?? null;
       setActiveTerm(active);
       if (active) {
         const [regRes] = await Promise.all([
           termRegistrationsAPI.getDashboard(active.id),
           loadBalances(active.id),
+          loadFeePackages(active.id),
         ]);
         setRegistrations(regRes.data?.registrations || []);
       }
@@ -220,6 +238,18 @@ export default function FeeSetupPage() {
       console.error(err);
     } finally {
       setBalancesLoading(false);
+    }
+  };
+
+  const loadFeePackages = async (termId: number) => {
+    setFeePackagesLoading(true);
+    try {
+      const res = await feesAPI.getPackages(termId);
+      setFeePackages(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setFeePackagesLoading(false);
     }
   };
 
@@ -365,6 +395,85 @@ export default function FeeSetupPage() {
       showMsg(err.response?.data?.message || 'Failed to charge package', 'error');
     } finally {
       setPkgApplying(false);
+    }
+  };
+
+  // ── Create / Edit / Delete Fee Package ───────────────────────────────────────
+  const openCreatePkgModal = () => {
+    setPkgFormMode('create');
+    setPkgFormId(null);
+    setPkgFormName('');
+    setPkgFormStudentType('Day');
+    setPkgFormCampus('AHA');
+    setPkgFormTermId(activeTerm?.id ?? '');
+    setPkgFormItems([{ feeCategoryId: '', amount: '' }]);
+    setIsPkgFormOpen(true);
+  };
+
+  const openEditPkgModal = (pkg: any) => {
+    const campusMatch = /^(AHJ|AHA|AHS)/.exec(pkg.name || '');
+    setPkgFormMode('edit');
+    setPkgFormId(pkg.id);
+    setPkgFormName(pkg.name || '');
+    setPkgFormStudentType(pkg.studentType === 'Boarding' ? 'Boarding' : 'Day');
+    setPkgFormCampus(campusMatch ? campusMatch[1] : 'AHA');
+    setPkgFormTermId(pkg.termId ?? activeTerm?.id ?? '');
+    setPkgFormItems(
+      (pkg.items ?? []).length
+        ? pkg.items.map((i: any) => ({ feeCategoryId: i.feeCategoryId, amount: String(i.amount) }))
+        : [{ feeCategoryId: '', amount: '' }]
+    );
+    setIsPkgFormOpen(true);
+  };
+
+  const addPkgFormItem = () => setPkgFormItems((items) => [...items, { feeCategoryId: '', amount: '' }]);
+  const removePkgFormItem = (idx: number) => setPkgFormItems((items) => items.filter((_, i) => i !== idx));
+  const updatePkgFormItem = (idx: number, patch: Partial<{ feeCategoryId: number | ''; amount: string }>) =>
+    setPkgFormItems((items) => items.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+
+  const pkgFormTotal = pkgFormItems.reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+
+  const handleSavePackage = async () => {
+    if (!pkgFormName.trim()) { showMsg('Enter a package name', 'error'); return; }
+    if (!pkgFormTermId) { showMsg('Select a term', 'error'); return; }
+    const validItems = pkgFormItems.filter((it) => it.feeCategoryId && Number(it.amount) > 0);
+    if (validItems.length === 0) { showMsg('Add at least one line item with a fee item and amount', 'error'); return; }
+    setPkgFormSaving(true);
+    try {
+      const payload = {
+        name: pkgFormName.trim(),
+        studentType: pkgFormStudentType,
+        schoolId: 1,
+        termId: Number(pkgFormTermId),
+        items: validItems.map((it) => ({ feeCategoryId: Number(it.feeCategoryId), amount: Number(it.amount) })),
+      };
+      if (pkgFormMode === 'edit' && pkgFormId) {
+        await feesAPI.updatePackage(pkgFormId, payload);
+        showMsg('Package updated successfully', 'success');
+      } else {
+        await feesAPI.createPackage(payload);
+        showMsg('Package created successfully', 'success');
+      }
+      setIsPkgFormOpen(false);
+      await loadFeePackages(Number(pkgFormTermId));
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to save package', 'error');
+    } finally {
+      setPkgFormSaving(false);
+    }
+  };
+
+  const handleDeletePackage = async (pkg: any) => {
+    if (!window.confirm(`Delete package "${pkg.name}"? This cannot be undone.`)) return;
+    setDeletingPkgId(pkg.id);
+    try {
+      await feesAPI.deletePackage(pkg.id);
+      showMsg('Package deleted', 'success');
+      if (activeTerm) loadFeePackages(activeTerm.id);
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to delete package', 'error');
+    } finally {
+      setDeletingPkgId(null);
     }
   };
 
@@ -1056,9 +1165,14 @@ export default function FeeSetupPage() {
 
               {/* Fee Structure Reference */}
               <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0' }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>Standard Fee Structures</h3>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>Official fee schedules per campus and curriculum type</p>
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                  <div>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>Standard Fee Structures</h3>
+                    <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>Official fee schedules per campus and curriculum type</p>
+                  </div>
+                  <button className="btn btn-primary" style={{ fontSize: 12, padding: '8px 16px' }} onClick={openCreatePkgModal}>
+                    <Plus size={13} /> Create Package
+                  </button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 1, background: '#f1f5f9' }}>
                   {FEE_PRESETS.map((preset, idx) => (
@@ -1084,6 +1198,57 @@ export default function FeeSetupPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Custom fee packages (this term) */}
+                <div style={{ padding: '14px 18px', borderTop: '1px solid #e2e8f0' }}>
+                  <h4 style={{ fontSize: 12, fontWeight: 700, margin: '0 0 10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Custom Packages{activeTerm ? ` · ${activeTerm.name}` : ''}
+                  </h4>
+                  {feePackagesLoading ? (
+                    <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Loading packages...</p>
+                  ) : !activeTerm ? (
+                    <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Activate a term to manage fee packages.</p>
+                  ) : feePackages.length === 0 ? (
+                    <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>No custom packages created for this term yet.</p>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+                      {feePackages.map((pkg: any) => {
+                        const pkgTotal = (pkg.items ?? []).reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+                        return (
+                          <div key={pkg.id} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                              <div>
+                                <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: '#0f172a' }}>{pkg.name}</p>
+                                <p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>{pkg.studentType === 'Boarding' ? 'Boarder' : 'Day Scholar'}</p>
+                              </div>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a237e', fontFamily: 'ui-monospace, monospace' }}>${pkgTotal.toLocaleString()}</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
+                              {(pkg.items ?? []).map((item: any, i: number) => (
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                                  <span style={{ color: '#475569' }}>{item.feeCategoryName || 'Fee'}</span>
+                                  <span style={{ color: '#0f172a', fontFamily: 'ui-monospace, monospace' }}>${Number(item.amount).toLocaleString()}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>
+                              <button className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 10px', flex: 1 }} onClick={() => openEditPkgModal(pkg)}>
+                                <Pencil size={12} /> Edit
+                              </button>
+                              <button
+                                className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 10px', flex: 1, color: '#dc2626' }}
+                                onClick={() => handleDeletePackage(pkg)}
+                                disabled={deletingPkgId === pkg.id}
+                              >
+                                <Trash2 size={12} /> {deletingPkgId === pkg.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1957,6 +2122,113 @@ export default function FeeSetupPage() {
           </div>
         );
       })()}
+
+      {/* ════ CREATE / EDIT FEE PACKAGE MODAL ════ */}
+      {isPkgFormOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+          onClick={() => setIsPkgFormOpen(false)}>
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{pkgFormMode === 'edit' ? 'Edit Fee Package' : 'Create Fee Package'}</h2>
+              <button onClick={() => setIsPkgFormOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={18} /></button>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={lbl}>Package Name</label>
+                <input type="text" value={pkgFormName} onChange={(e) => setPkgFormName(e.target.value)}
+                  placeholder='e.g. "AHS Day Term 2 2026"' className="text-field" />
+              </div>
+
+              <div>
+                <label style={lbl}>Student Type</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {(['Day', 'Boarding'] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setPkgFormStudentType(t)}
+                      style={{
+                        flex: 1, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        border: pkgFormStudentType === t ? '2px solid #1a237e' : '1px solid #e2e8f0',
+                        background: pkgFormStudentType === t ? '#eef2ff' : 'white',
+                        color: pkgFormStudentType === t ? '#1a237e' : '#475569',
+                      }}
+                    >
+                      {t === 'Day' ? 'Day Scholar' : 'Boarder'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={lbl}>Campus</label>
+                  <select value={pkgFormCampus} onChange={(e) => setPkgFormCampus(e.target.value)}
+                    className="text-field" style={{ appearance: 'auto', cursor: 'pointer' }}>
+                    {['AHJ', 'AHA', 'AHS'].map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Term</label>
+                  <select value={pkgFormTermId} onChange={(e) => setPkgFormTermId(Number(e.target.value) || '')}
+                    className="text-field" style={{ appearance: 'auto', cursor: 'pointer' }}>
+                    <option value="">— Select term —</option>
+                    {allTerms.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={lbl}>Line Items</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {pkgFormItems.map((item, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <select
+                        value={item.feeCategoryId}
+                        onChange={(e) => updatePkgFormItem(idx, { feeCategoryId: Number(e.target.value) || '' })}
+                        className="text-field" style={{ appearance: 'auto', cursor: 'pointer', flex: 2 }}
+                      >
+                        <option value="">— Fee item —</option>
+                        {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <input
+                        type="number" value={item.amount}
+                        onChange={(e) => updatePkgFormItem(idx, { amount: e.target.value })}
+                        placeholder="Amount" className="text-field" style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button" onClick={() => removePkgFormItem(idx)}
+                        disabled={pkgFormItems.length <= 1}
+                        style={{ background: 'none', border: 'none', cursor: pkgFormItems.length <= 1 ? 'default' : 'pointer', color: pkgFormItems.length <= 1 ? '#cbd5e1' : '#dc2626', padding: 4 }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className="btn btn-secondary" style={{ fontSize: 12, marginTop: 8 }} onClick={addPkgFormItem}>
+                  <Plus size={12} /> Add Item
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, background: '#eef2ff' }}>
+                <span style={{ color: '#1a237e' }}>Total</span>
+                <span style={{ fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>${pkgFormTotal.toLocaleString()}</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+                <button className="btn btn-secondary" onClick={() => setIsPkgFormOpen(false)} disabled={pkgFormSaving}>Cancel</button>
+                <button className="btn btn-primary" onClick={handleSavePackage}
+                  disabled={pkgFormSaving}
+                  style={{ opacity: pkgFormSaving ? 0.6 : 1 }}>
+                  {pkgFormSaving ? 'Saving...' : 'Save Package'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════ AWARD BURSARY MODAL ════ */}
       {isBursaryOpen && bursaryStudent && (
