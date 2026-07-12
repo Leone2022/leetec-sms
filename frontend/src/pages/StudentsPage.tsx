@@ -35,7 +35,7 @@ const defaultCurriculum = (campus: string) =>
 
 const FORM_OPTIONS: Record<string, string[]> = {
   AHJ: ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'],
-  AHS: ['Lower 6', 'Upper 6'],
+  AHS: ['Form 5', 'Lower 6', 'Upper 6'],
   AHA: ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'],
 };
 
@@ -49,8 +49,8 @@ const blankStep1 = () => ({
   studentType: 'Day', studentEmail: '',
 });
 
-const blankStep2 = () => ({
-  form: 'Form 1', dateOfEntry: todayISO(), previousSchool: '',
+const blankStep2 = (campus = 'AHA') => ({
+  form: defaultForm(campus), dateOfEntry: todayISO(), previousSchool: '',
   medicalAidSociety: '', medicalAidNo: '', familyDoctorName: '',
   familyDoctorPhone: '', allergies: '', denomination: '', otherInformation: '',
 });
@@ -863,9 +863,7 @@ export default function StudentsPage() {
                           key={code}
                           onClick={() => {
                             setStep1({ ...step1, campus: code, curriculum: defaultCurriculum(code) });
-                            if (!formOptionsForCampus(code).includes(step2.form)) {
-                              setStep2({ ...step2, form: defaultForm(code) });
-                            }
+                            setStep2(s => ({ ...s, form: defaultForm(code) }));
                           }}
                           style={{
                             border: step1.campus === code ? '2px solid #1a237e' : '2px solid #e2e8f0',
