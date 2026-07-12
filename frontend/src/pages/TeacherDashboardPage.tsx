@@ -378,6 +378,15 @@ export default function TeacherDashboardPage() {
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: '#dbeafe', color: '#1d4ed8', fontWeight: 600 }}>{a.campus}</span>
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>{a.form}</span>
                   </div>
+                  {a.curriculumType && (
+                    <div>
+                      {(a.curriculumType || '').includes('ZIMSEC') ? (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: '#dcfce7', color: '#15803d', fontWeight: 600 }}>ZIMSEC</span>
+                      ) : (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: '#dbeafe', color: '#1d4ed8', fontWeight: 600 }}>Cambridge</span>
+                      )}
+                    </div>
+                  )}
                   <button
                     onClick={() => { setSelectedAssignment(a); setRows([]); }}
                     className="btn btn-primary"

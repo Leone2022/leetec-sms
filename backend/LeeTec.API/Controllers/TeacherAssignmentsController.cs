@@ -62,6 +62,7 @@ namespace LeeTec.API.Controllers
                     subjectCode = a.Subject.Code,
                     a.Campus,
                     a.Form,
+                    curriculumType = a.Subject.CurriculumType,
                 })
                 .ToListAsync();
 
