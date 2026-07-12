@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
 using LeeTec.API.Models;
 using LeeTec.API.DTOs;
+using LeeTec.API.Services;
 
 namespace LeeTec.API.Controllers
 {
@@ -11,10 +12,12 @@ namespace LeeTec.API.Controllers
     public class MarksController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IReportCardService _reportCardService;
 
-        public MarksController(AppDbContext context)
+        public MarksController(AppDbContext context, IReportCardService reportCardService)
         {
             _context = context;
+            _reportCardService = reportCardService;
         }
 
         // ENTRY SHEET — students for campus/form/term, with existing marks for the subject+assessment
@@ -203,17 +206,6 @@ namespace LeeTec.API.Controllers
             mark.UpdatedAt = DateTime.UtcNow;
         }
 
-        private static string CalculateGrade(decimal total)
-        {
-            if (total >= 90) return "A*";
-            if (total >= 80) return "A";
-            if (total >= 70) return "B";
-            if (total >= 60) return "C";
-            if (total >= 50) return "D";
-            if (total >= 40) return "E";
-            return "U";
-        }
-
         // PUBLISH REPORT CARDS — mark all students matching campus/form as published for a term
         [HttpPost("publish-report-cards")]
         public async Task<IActionResult> PublishReportCards([FromBody] PublishReportCardsRequest request)
@@ -260,63 +252,21 @@ namespace LeeTec.API.Controllers
             return Ok(new { published });
         }
 
-        // REPORT CARD — combined midterm/end-of-term view for the student portal
+        // REPORT CARD — student portal view. Returns the same ReportCardData shape as
+        // GET /api/reports/report-card/{studentId}, gated behind publish status.
         [HttpGet("report-card/{studentId}/{termId}")]
         public async Task<IActionResult> GetReportCard(int studentId, int termId)
         {
-            // Check if published
             var record = await _context.ReportCardRecords
-                .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == termId);
+                .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == termId && r.Status == "Published");
 
-            var student = await _context.Students
-                .FirstOrDefaultAsync(s => s.Id == studentId);
+            if (record == null)
+                return NotFound(new { message = "Report card not yet published for this term." });
 
-            var term = await _context.Terms
-                .FirstOrDefaultAsync(t => t.Id == termId);
+            var data = await _reportCardService.BuildReportCardDataAsync(studentId, termId);
+            if (data == null) return NotFound(new { message = "Student or term not found" });
 
-            if (student == null) return NotFound(new { message = "Student not found" });
-
-            var campus = student.StudentNumber.Split('/').FirstOrDefault() ?? "";
-
-            var marks = await _context.Marks
-                .Where(m => m.StudentId == studentId && m.TermId == termId)
-                .Include(m => m.Subject)
-                .ToListAsync();
-
-            var grouped = marks
-                .GroupBy(m => new { m.SubjectId, SubjectName = m.Subject?.Name ?? "" })
-                .Select(g => {
-                    var midterm = g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test");
-                    var endOfTerm = g.FirstOrDefault(m => m.AssessmentType == "End of Term Exam");
-                    decimal? midScore = midterm?.Score;
-                    decimal? endScore = endOfTerm?.Score;
-                    decimal? total = midScore.HasValue && endScore.HasValue
-                        ? (midScore.Value + endScore.Value) / 2
-                        : midScore ?? endScore;
-                    return new {
-                        subjectName = g.Key.SubjectName,
-                        midtermScore = midScore,
-                        endOfTermScore = endScore,
-                        total,
-                        grade = total.HasValue ? CalculateGrade(total.Value) : null,
-                        comments = endOfTerm?.Comments ?? midterm?.Comments,
-                    };
-                })
-                .Where(s => s.midtermScore.HasValue || s.endOfTermScore.HasValue)
-                .ToList();
-
-            return Ok(new {
-                isPublished = record?.Status == "Published",
-                student = new {
-                    name = $"{student.FirstName} {student.Surname}",
-                    studentNumber = student.StudentNumber,
-                    form = student.Form,
-                    campus,
-                    curriculum = student.Curriculum,
-                },
-                term = new { name = term?.Name ?? "" },
-                subjects = grouped
-            });
+            return Ok(data);
         }
     }
 }

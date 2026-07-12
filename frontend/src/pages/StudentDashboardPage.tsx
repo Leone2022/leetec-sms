@@ -1,30 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI, subjectsAPI } from '../services/api';
 import { generateStatementPdf, buildStatementRows } from '../utils/statement';
+import { generateReportCard, type ReportCardData } from '../utils/reportCard';
+import { GRADE_REFERENCE_TABLES } from '../utils/grading';
 import {
   LogOut, GraduationCap, LayoutDashboard, DollarSign,
   FileText, Bell, User, Menu, X, FileDown, BookOpen,
 } from 'lucide-react';
-import ahjCrestImage from '../assets/logos/ahj-crest.png';
-import cambridgeLogoImage from '../assets/logos/cambridge-assessment-logo.png';
-import watermarkImage from '../assets/logos/watermark.png';
-
-interface MarksReportCard {
-  isPublished: boolean;
-  student: { name: string; studentNumber: string; form: string; campus: string; curriculum: string };
-  term: { name: string };
-  subjects: {
-    subjectName: string;
-    midtermScore: number | null;
-    endOfTermScore: number | null;
-    total: number | null;
-    grade: string | null;
-    comments: string | null;
-  }[];
-}
 
 const SUBJECT_CHANGE_ELIGIBLE_FORMS = ['Form 5', 'Lower 6', 'Upper 6'];
 
@@ -60,14 +43,13 @@ export default function StudentDashboardPage() {
   // Report card tab state
   const [terms, setTerms] = useState<any[]>([]);
   const [reportTermId, setReportTermId] = useState<number | ''>('');
-  const [reportCard, setReportCard] = useState<MarksReportCard | null>(null);
+  const [reportCard, setReportCard] = useState<ReportCardData | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
+  const [reportNotFound, setReportNotFound] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
-  const [showPrintCard, setShowPrintCard] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const printCardRef = useRef<HTMLDivElement>(null);
 
   // My Subjects tab state
   const [mySubjects, setMySubjects] = useState<any[]>([]);
@@ -197,11 +179,13 @@ export default function StudentDashboardPage() {
     setReportLoading(true);
     setReportCard(null);
     setReportError(false);
+    setReportNotFound(false);
     try {
       const res = await marksAPI.getStudentReportCard(studentId, reportTermId as number);
-      setReportCard(res.data as MarksReportCard);
-    } catch {
-      setReportError(true);
+      setReportCard(res.data as ReportCardData);
+    } catch (err: any) {
+      if (err?.response?.status === 404) setReportNotFound(true);
+      else setReportError(true);
     } finally {
       setReportLoading(false);
     }
@@ -229,56 +213,12 @@ export default function StudentDashboardPage() {
 
   const selectedReportTerm = terms.find(t => t.id === reportTermId);
 
-  const reportCardCurriculum = (reportCard?.student?.curriculum || '').toUpperCase();
-  const isCambridgeCurriculum = reportCardCurriculum.includes('CAMBRIDGE');
-  const reportCardColumns = isCambridgeCurriculum
-    ? { col1: 'Paper 1', col2: 'Paper 2', gradeLabel: 'Band' }
-    : reportCardCurriculum.includes('ZIMSEC')
-    ? { col1: 'CA', col2: 'Written Exam', gradeLabel: 'Grade' }
-    : { col1: 'Mid-term', col2: 'End of Term', gradeLabel: 'Grade' };
-
-  const printColumns = isCambridgeCurriculum
-    ? ['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Band', 'Comments']
-    : ['Subject', 'CA', 'Written Exam', 'Total', 'Grade', 'Comments'];
-
-  const printCampusFullName = CAMPUS_FULL_NAMES[reportCard?.student?.campus ?? ''] || 'ADVENT HOPE SCHOOLS';
-  const printTermLabel = reportCard
-    ? `${reportCard.term.name}${selectedReportTerm?.year ? ' ' + selectedReportTerm.year : ''}`
-    : '';
-
   const handleDownloadReportCardPdf = async () => {
     if (!reportCard) return;
     setDownloadingPdf(true);
-    setShowPrintCard(true);
-    // Wait two frames so the (just-mounted) hidden div is fully laid out before capture.
-    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     try {
-      const node = printCardRef.current;
-      if (!node) return;
-      const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      let heightLeft = imgHeight;
-      let position = 0;
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      const nameSlug = (reportCard.student.name || 'Student').trim().replace(/\s+/g, '_');
-      const termSlug = printTermLabel.replace(/\s+/g, '');
-      pdf.save(`${nameSlug}_Report_${termSlug}.pdf`);
+      await generateReportCard(reportCard);
     } finally {
-      setShowPrintCard(false);
       setDownloadingPdf(false);
     }
   };
@@ -452,6 +392,15 @@ export default function StudentDashboardPage() {
             <option value="">Select term</option>
             {terms.map(t => <option key={t.id} value={t.id}>{t.name} {t.year}</option>)}
           </select>
+          {reportCard && (
+            <button
+              onClick={handleDownloadReportCardPdf}
+              disabled={downloadingPdf}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: downloadingPdf ? 'not-allowed' : 'pointer', opacity: downloadingPdf ? 0.7 : 1 }}
+            >
+              <FileDown size={14} /> {downloadingPdf ? 'Generating...' : 'Download PDF'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -461,7 +410,7 @@ export default function StudentDashboardPage() {
         </div>
       ) : reportLoading ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center', color: '#475569', fontSize: 13 }}>Loading report card...</div>
-      ) : reportError || !reportCard ? (
+      ) : reportError ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center' }}>
           <FileText size={36} style={{ color: '#94a3b8', marginBottom: 12 }} />
           <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Report Card Unavailable</h3>
@@ -469,200 +418,108 @@ export default function StudentDashboardPage() {
             We couldn't load your {selectedReportTerm ? `${selectedReportTerm.name} ${selectedReportTerm.year}` : 'selected term'} report card. Please try again later.
           </p>
         </div>
-      ) : !reportCard.isPublished ? (
+      ) : reportNotFound || !reportCard ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center' }}>
           <FileText size={36} style={{ color: '#94a3b8', marginBottom: 12 }} />
-          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Not Yet Available</h3>
+          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Not Yet Published</h3>
           <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-            Report card not yet available. Please check back later.
-          </p>
-        </div>
-      ) : reportCard.subjects.length === 0 ? (
-        <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center' }}>
-          <FileText size={36} style={{ color: '#94a3b8', marginBottom: 12 }} />
-          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>No Marks Recorded</h3>
-          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-            No marks recorded for this term.
+            Your {selectedReportTerm ? `${selectedReportTerm.name} ${selectedReportTerm.year}` : 'selected term'} report card is being processed. Please check back soon.
           </p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="report-card-no-print" style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={handleDownloadReportCardPdf}
-              disabled={downloadingPdf}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: downloadingPdf ? 'not-allowed' : 'pointer', opacity: downloadingPdf ? 0.7 : 1 }}
-            >
-              <FileDown size={14} /> {downloadingPdf ? 'Generating PDF...' : '📥 Download PDF'}
-            </button>
+          {/* Header card */}
+          <div style={{ background: '#1a237e', borderRadius: 12, padding: '20px 24px', color: 'white' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+              {CAMPUS_FULL_NAMES[reportCard.student.campus] || 'ADVENT HOPE SCHOOLS'}
+            </p>
+            <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>
+              {reportCard.student.firstName} {reportCard.student.surname}
+            </h2>
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, opacity: 0.85 }}>
+              <span><strong>Form:</strong> {reportCard.student.form || '—'}</span>
+              <span><strong>Term:</strong> {reportCard.term.name} {reportCard.term.year}</span>
+              <span><strong>Student No:</strong> {reportCard.student.studentNumber}</span>
+              <span><strong>Curriculum:</strong> {reportCard.gradingCurriculum}</span>
+            </div>
           </div>
 
-          <div className="report-card-printable">
-            {/* Header card */}
-            <div style={{ background: '#1a237e', borderRadius: 12, padding: '20px 24px', color: 'white', marginBottom: 16 }}>
-              <p style={{ margin: '0 0 4px', fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-                {CAMPUS_FULL_NAMES[reportCard.student.campus] || 'ADVENT HOPE SCHOOLS'}
-              </p>
-              <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>
-                {reportCard.student.name}
-              </h2>
-              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, opacity: 0.85 }}>
-                <span><strong>Form:</strong> {reportCard.student.form || '—'}</span>
-                <span><strong>Term:</strong> {reportCard.term.name}</span>
-                <span><strong>Student No:</strong> {reportCard.student.studentNumber}</span>
-              </div>
+          {/* Subject results */}
+          <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Subject Results</h3>
             </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#1a237e' }}>
+                    {['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Band / Grade', 'Comments'].map(h => (
+                      <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Subject' ? 'left' : 'center', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportCard.subjects.map((s, i) => {
+                    const block = s.noTerminalExam ? s.midterm : s.endTerm;
+                    const comments = (s.noTerminalExam ? s.midterm?.comments : s.endTerm?.comments) || '—';
+                    const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+                    return (
+                      <tr key={s.subjectId} style={{ background: rowBg }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>
+                          {s.name}
+                          {s.noTerminalExam && <span style={{ fontSize: 10, color: '#64748b', fontWeight: 400, marginLeft: 6 }}>(No Terminal Exam)</span>}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.paper1)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.paper2)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(block?.total)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{fmt(s.cm)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
+                            {s.grade || '—'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{comments}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-            {/* Subject results */}
+          {/* Grade reference */}
+          {GRADE_REFERENCE_TABLES[reportCard.gradingCurriculum] && (
             <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
               <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Subject Results</h3>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                  {reportCard.gradingCurriculum} — Grading Reference
+                </h3>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <div style={{ padding: '0 18px 12px' }}>
+                <table style={{ borderCollapse: 'collapse', fontSize: 12, marginTop: 12 }}>
                   <thead>
                     <tr style={{ background: '#1a237e' }}>
-                      {['Subject', reportCardColumns.col1, reportCardColumns.col2, 'Total', reportCardColumns.gradeLabel, 'Comments'].map(h => (
-                        <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Subject' || h === 'Comments' ? 'left' : 'center', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                      {GRADE_REFERENCE_TABLES[reportCard.gradingCurriculum].headers.map(h => (
+                        <th key={h} style={{ padding: '7px 24px', color: 'white', fontWeight: 600, fontSize: 11 }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {reportCard.subjects.map((s, i) => {
-                      const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
-                      return (
-                        <tr key={s.subjectName} style={{ background: rowBg }}>
-                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{s.subjectName}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.midtermScore)}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.endOfTermScore)}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.total)}</td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                            <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
-                              {s.grade || '—'}
-                            </span>
-                          </td>
-                          <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{s.comments || '—'}</td>
-                        </tr>
-                      );
-                    })}
+                    {GRADE_REFERENCE_TABLES[reportCard.gradingCurriculum].rows.map(([range, band], i) => (
+                      <tr key={range} style={{ background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                        <td style={{ padding: '6px 24px', textAlign: 'center', color: '#475569' }}>{range}</td>
+                        <td style={{ padding: '6px 24px', textAlign: 'center', fontWeight: 600, color: '#0f172a' }}>{band}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {showPrintCard && reportCard && (
-        <div
-          ref={printCardRef}
-          id="report-card-print"
-          style={{
-            position: 'fixed', top: 0, left: '-9999px', width: 794,
-            background: 'white', padding: 32, fontFamily: 'Arial, Helvetica, sans-serif', color: '#0f172a',
-            boxSizing: 'border-box',
-          }}
-        >
-          {/* Watermark */}
-          <img
-            src={watermarkImage}
-            alt=""
-            style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 400, opacity: 0.08, zIndex: 0 }}
-          />
-
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            {/* Header row */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <div style={{ width: 110, textAlign: 'center' }}>
-                {reportCard.student.campus === 'AHJ' ? (
-                  <img src={ahjCrestImage} width={80} alt="" />
-                ) : (
-                  <strong style={{ fontSize: 12 }}>{printCampusFullName}</strong>
-                )}
-              </div>
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <p style={{ fontWeight: 700, color: '#1a237e', fontSize: 16, margin: 0 }}>
-                  {printCampusFullName} LEARNER'S REPORT
-                </p>
-              </div>
-              <div style={{ width: 110, textAlign: 'center' }}>
-                {isCambridgeCurriculum ? (
-                  <img src={cambridgeLogoImage} width={80} alt="" />
-                ) : (
-                  <strong style={{ fontSize: 14 }}>ZIMSEC</strong>
-                )}
-              </div>
-            </div>
-
-            {/* Student info table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 13 }}>
-              <tbody>
-                {[
-                  ['Learner Name:', reportCard.student.name],
-                  ['Stage/Form:', reportCard.student.form || '—'],
-                  ['Term:', printTermLabel || '—'],
-                  ['Attendance:', '___'],
-                  ['Next Term Begins on:', '___'],
-                ].map(([label, value]) => (
-                  <tr key={label}>
-                    <td style={{ border: '1px solid #94a3b8', padding: '8px 12px', fontWeight: 700, width: '35%', background: '#f8f9fa' }}>{label}</td>
-                    <td style={{ border: '1px solid #94a3b8', padding: '8px 12px' }}>{value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Marks table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24, fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: '#1a237e' }}>
-                  {printColumns.map(h => (
-                    <th
-                      key={h}
-                      style={{ border: '1px solid #94a3b8', padding: '8px 10px', color: 'white', fontWeight: 700, textAlign: h === 'Subject' || h === 'Comments' ? 'left' : 'center' }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {reportCard.subjects.map((s, i) => (
-                  <tr key={s.subjectName} style={{ background: i % 2 === 0 ? '#ffffff' : '#f8f9fa', height: 40 }}>
-                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', fontWeight: 700, textAlign: 'left' }}>{s.subjectName}</td>
-                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{fmt(s.midtermScore)}</td>
-                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{fmt(s.endOfTermScore)}</td>
-                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{fmt(s.total)}</td>
-                    {isCambridgeCurriculum && (
-                      <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{fmt(s.total)}</td>
-                    )}
-                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'center' }}>{s.grade || '—'}</td>
-                    <td style={{ border: '1px solid #94a3b8', padding: '8px 10px', textAlign: 'left' }}>{s.comments || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Footer */}
-            <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                Class Teacher's Comments:{' '}
-                <span style={{ display: 'inline-block', borderBottom: '1px solid #0f172a', width: '65%' }}>&nbsp;</span>
-              </div>
-              <div>
-                Next Term Begins on:{' '}
-                <span style={{ display: 'inline-block', borderBottom: '1px solid #0f172a', width: '55%' }}>&nbsp;</span>
-              </div>
-              <div style={{ display: 'flex', gap: 32 }}>
-                <span>
-                  Signature: <span style={{ display: 'inline-block', borderBottom: '1px solid #0f172a', width: 160 }}>&nbsp;</span>
-                </span>
-                <span>
-                  Date: <span style={{ display: 'inline-block', borderBottom: '1px solid #0f172a', width: 120 }}>&nbsp;</span>
-                </span>
-              </div>
-            </div>
-          </div>
+          <p style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8', margin: 0 }}>
+            This is a computer generated report card. Download the PDF for the official formatted version.
+          </p>
         </div>
       )}
     </div>
@@ -1070,12 +927,6 @@ export default function StudentDashboardPage() {
           .portal-sidebar-desktop { display: flex !important; }
           .portal-topbar { display: none !important; }
           div[style*="position: fixed"][style*="left: 0"] { display: none !important; }
-        }
-        @media print {
-          body * { visibility: hidden; }
-          .report-card-printable, .report-card-printable * { visibility: visible; }
-          .report-card-printable { position: absolute; top: 0; left: 0; width: 100%; margin: 0; padding: 0; }
-          .report-card-no-print { display: none !important; }
         }
       `}</style>
     </div>

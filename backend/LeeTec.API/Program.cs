@@ -54,6 +54,9 @@ var jwtAud    = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? builder.Co
 // Email Service
 builder.Services.AddScoped<IEmailService, EmailService>();
 
+// Report Card Service — shared by admin and student-portal report-card endpoints
+builder.Services.AddScoped<IReportCardService, ReportCardService>();
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
