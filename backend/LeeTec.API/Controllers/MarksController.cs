@@ -288,17 +288,21 @@ namespace LeeTec.API.Controllers
                 .Select(g => {
                     var midterm = g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test");
                     var endOfTerm = g.FirstOrDefault(m => m.AssessmentType == "End of Term Exam");
-                    var midScore = midterm?.Score ?? 0;
-                    var endScore = endOfTerm?.Score ?? 0;
-                    var total = (midScore + endScore) / 2;
+                    decimal? midScore = midterm?.Score;
+                    decimal? endScore = endOfTerm?.Score;
+                    decimal? total = midScore.HasValue && endScore.HasValue
+                        ? (midScore.Value + endScore.Value) / 2
+                        : midScore ?? endScore;
                     return new {
                         subjectName = g.Key.SubjectName,
                         midtermScore = midScore,
                         endOfTermScore = endScore,
-                        total = total,
-                        grade = CalculateGrade(total)
+                        total,
+                        grade = total.HasValue ? CalculateGrade(total.Value) : null,
+                        comments = endOfTerm?.Comments ?? midterm?.Comments,
                     };
                 })
+                .Where(s => s.midtermScore.HasValue || s.endOfTermScore.HasValue)
                 .ToList();
 
             return Ok(new {
@@ -307,7 +311,8 @@ namespace LeeTec.API.Controllers
                     name = $"{student.FirstName} {student.Surname}",
                     studentNumber = student.StudentNumber,
                     form = student.Form,
-                    campus
+                    campus,
+                    curriculum = student.Curriculum,
                 },
                 term = new { name = term?.Name ?? "" },
                 subjects = grouped

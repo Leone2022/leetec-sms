@@ -9,9 +9,16 @@ import {
 
 interface MarksReportCard {
   isPublished: boolean;
-  student: { name: string; studentNumber: string; form: string; campus: string };
+  student: { name: string; studentNumber: string; form: string; campus: string; curriculum: string };
   term: { name: string };
-  subjects: { subjectName: string; midtermScore: number | null; endOfTermScore: number | null; total: number | null; grade: string }[];
+  subjects: {
+    subjectName: string;
+    midtermScore: number | null;
+    endOfTermScore: number | null;
+    total: number | null;
+    grade: string | null;
+    comments: string | null;
+  }[];
 }
 
 const SUBJECT_CHANGE_ELIGIBLE_FORMS = ['Form 5', 'Lower 6', 'Upper 6'];
@@ -207,6 +214,15 @@ export default function StudentDashboardPage() {
     status === 'Paid' ? 'pill-success' : status === 'PartiallyPaid' ? 'pill-warning' : 'pill-danger';
 
   const selectedReportTerm = terms.find(t => t.id === reportTermId);
+
+  const reportCardCurriculum = (reportCard?.student?.curriculum || '').toUpperCase();
+  const reportCardColumns = reportCardCurriculum.includes('CAMBRIDGE')
+    ? { col1: 'Paper 1', col2: 'Paper 2', gradeLabel: 'Band' }
+    : reportCardCurriculum.includes('ZIMSEC')
+    ? { col1: 'CA', col2: 'Written Exam', gradeLabel: 'Grade' }
+    : { col1: 'Mid-term', col2: 'End of Term', gradeLabel: 'Grade' };
+
+  const handleDownloadReportCardPdf = () => window.print();
 
   if (loading) {
     return (
@@ -412,54 +428,66 @@ export default function StudentDashboardPage() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Header card */}
-          <div style={{ background: '#1a237e', borderRadius: 12, padding: '20px 24px', color: 'white' }}>
-            <p style={{ margin: '0 0 4px', fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
-              {reportCard.student.campus === 'AHJ' ? 'ADVENT HOPE JUNIOR SCHOOL' : 'ADVENT HOPE ACADEMY'}
-            </p>
-            <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>
-              {reportCard.student.name}
-            </h2>
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, opacity: 0.85 }}>
-              <span><strong>Form:</strong> {reportCard.student.form || '—'}</span>
-              <span><strong>Term:</strong> {reportCard.term.name}</span>
-              <span><strong>Student No:</strong> {reportCard.student.studentNumber}</span>
-            </div>
+          <div className="report-card-no-print" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={handleDownloadReportCardPdf}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <FileDown size={14} /> 📥 Download PDF
+            </button>
           </div>
 
-          {/* Subject results */}
-          <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Subject Results</h3>
+          <div className="report-card-printable">
+            {/* Header card */}
+            <div style={{ background: '#1a237e', borderRadius: 12, padding: '20px 24px', color: 'white', marginBottom: 16 }}>
+              <p style={{ margin: '0 0 4px', fontSize: 11, opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>
+                {reportCard.student.campus === 'AHJ' ? 'ADVENT HOPE JUNIOR SCHOOL' : 'ADVENT HOPE ACADEMY'}
+              </p>
+              <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>
+                {reportCard.student.name}
+              </h2>
+              <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, opacity: 0.85 }}>
+                <span><strong>Form:</strong> {reportCard.student.form || '—'}</span>
+                <span><strong>Term:</strong> {reportCard.term.name}</span>
+                <span><strong>Student No:</strong> {reportCard.student.studentNumber}</span>
+              </div>
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: '#1a237e' }}>
-                    {['Subject', 'Midterm', 'End of Term', 'Total', 'Grade'].map(h => (
-                      <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Subject' ? 'left' : 'center', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportCard.subjects.map((s, i) => {
-                    const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
-                    return (
-                      <tr key={s.subjectName} style={{ background: rowBg }}>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{s.subjectName}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.midtermScore)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.endOfTermScore)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.total)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                          <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
-                            {s.grade || '—'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+            {/* Subject results */}
+            <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 18px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Subject Results</h3>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#1a237e' }}>
+                      {['Subject', reportCardColumns.col1, reportCardColumns.col2, 'Total', reportCardColumns.gradeLabel, 'Comments'].map(h => (
+                        <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Subject' || h === 'Comments' ? 'left' : 'center', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportCard.subjects.map((s, i) => {
+                      const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+                      return (
+                        <tr key={s.subjectName} style={{ background: rowBg }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{s.subjectName}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.midtermScore)}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.endOfTermScore)}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(s.total)}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
+                              {s.grade || '—'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{s.comments || '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -869,6 +897,12 @@ export default function StudentDashboardPage() {
           .portal-sidebar-desktop { display: flex !important; }
           .portal-topbar { display: none !important; }
           div[style*="position: fixed"][style*="left: 0"] { display: none !important; }
+        }
+        @media print {
+          body * { visibility: hidden; }
+          .report-card-printable, .report-card-printable * { visibility: visible; }
+          .report-card-printable { position: absolute; top: 0; left: 0; width: 100%; margin: 0; padding: 0; }
+          .report-card-no-print { display: none !important; }
         }
       `}</style>
     </div>
