@@ -37,6 +37,7 @@ export default function LoginPage() {
         role: data.roles?.[0] || 'Admin',
         schoolId: 1,
       });
+      localStorage.setItem('admin_permissions', JSON.stringify(data.permissions || []));
       navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');

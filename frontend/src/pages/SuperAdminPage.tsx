@@ -1,11 +1,21 @@
 import { useState, useEffect } from 'react';
-import { superadminAPI } from '../services/api';
+import { superadminAPI, adminAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Users, TrendingUp, Shield, Plus, X, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Building2, Users, TrendingUp, Shield, Plus, X, ToggleLeft, ToggleRight, Pencil, KeyRound, Trash2 } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 
 const blankSchool = () => ({ name: '', address: '', phone: '', email: '' });
+
+const PERMISSION_OPTIONS = [
+  'Students', 'Fees & Billing', 'Fee Setup', 'Marks Entry', 'Bulk Reports',
+  'Subjects', 'Announcements', 'Portal Accounts', 'Terms & Periods', 'Staff Assignments',
+];
+
+const blankAdminForm = () => ({
+  firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
+  permissions: [...PERMISSION_OPTIONS],
+});
 
 export default function SuperAdminPage() {
   const { user } = useAuth();
@@ -21,6 +31,22 @@ export default function SuperAdminPage() {
   const [schoolForm, setSchoolForm] = useState(blankSchool());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ── Admin Accounts ────────────────────────────────────────────────────────
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [isCreateAdminOpen, setIsCreateAdminOpen] = useState(false);
+  const [adminForm, setAdminForm] = useState(blankAdminForm());
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+
+  const [permEditAdmin, setPermEditAdmin] = useState<any>(null);
+  const [permEditValues, setPermEditValues] = useState<string[]>([]);
+  const [isSavingPerms, setIsSavingPerms] = useState(false);
+
+  const [resetPwAdmin, setResetPwAdmin] = useState<any>(null);
+  const [resetPwValue, setResetPwValue] = useState('');
+  const [isResettingPw, setIsResettingPw] = useState(false);
+
+  const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
+
   useEffect(() => {
     if (user?.role !== 'SuperAdmin') {
       navigate('/dashboard');
@@ -31,18 +57,29 @@ export default function SuperAdminPage() {
 
   const loadAll = async () => {
     try {
-      const [statsRes, schoolsRes, usersRes] = await Promise.all([
+      const [statsRes, schoolsRes, usersRes, adminsRes] = await Promise.all([
         superadminAPI.getStats(),
         superadminAPI.getSchools(),
         superadminAPI.getUsers(),
+        adminAPI.getAdmins(),
       ]);
       setStats(statsRes.data);
       setSchools(schoolsRes.data || []);
       setUsers(usersRes.data || []);
+      setAdmins(adminsRes.data || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAdmins = async () => {
+    try {
+      const res = await adminAPI.getAdmins();
+      setAdmins(res.data || []);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -79,6 +116,97 @@ export default function SuperAdminPage() {
     } catch (err: any) {
       console.error(err.response);
       showMessage(err.response?.data?.message || 'Failed to toggle status', 'error');
+    }
+  };
+
+  // ── Admin Account handlers ───────────────────────────────────────────────
+  const toggleAdminFormPermission = (perm: string) => {
+    setAdminForm((f) => ({
+      ...f,
+      permissions: f.permissions.includes(perm)
+        ? f.permissions.filter((p) => p !== perm)
+        : [...f.permissions, perm],
+    }));
+  };
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminForm.firstName.trim() || !adminForm.lastName.trim() || !adminForm.email.trim()) {
+      showMessage('First name, last name and email are required', 'error'); return;
+    }
+    if (adminForm.password.length < 8) { showMessage('Password must be at least 8 characters', 'error'); return; }
+    if (adminForm.password !== adminForm.confirmPassword) { showMessage('Passwords do not match', 'error'); return; }
+    setIsCreatingAdmin(true);
+    try {
+      await adminAPI.createAdmin({
+        firstName: adminForm.firstName.trim(),
+        lastName: adminForm.lastName.trim(),
+        email: adminForm.email.trim(),
+        password: adminForm.password,
+        permissions: adminForm.permissions,
+      });
+      showMessage('Admin account created successfully', 'success');
+      setIsCreateAdminOpen(false);
+      setAdminForm(blankAdminForm());
+      loadAdmins();
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to create admin', 'error');
+    } finally {
+      setIsCreatingAdmin(false);
+    }
+  };
+
+  const openPermissionsModal = (admin: any) => {
+    setPermEditAdmin(admin);
+    setPermEditValues(admin.permissions || []);
+  };
+
+  const togglePermEditValue = (perm: string) => {
+    setPermEditValues((vals) => vals.includes(perm) ? vals.filter((p) => p !== perm) : [...vals, perm]);
+  };
+
+  const handleSavePermissions = async () => {
+    if (!permEditAdmin) return;
+    setIsSavingPerms(true);
+    try {
+      await adminAPI.updateAdminPermissions(permEditAdmin.id, permEditValues);
+      showMessage('Permissions updated successfully', 'success');
+      setPermEditAdmin(null);
+      loadAdmins();
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to update permissions', 'error');
+    } finally {
+      setIsSavingPerms(false);
+    }
+  };
+
+  const handleResetAdminPassword = async () => {
+    if (!resetPwAdmin) return;
+    if (resetPwValue.length < 8) { showMessage('Password must be at least 8 characters', 'error'); return; }
+    setIsResettingPw(true);
+    try {
+      await adminAPI.resetAdminPassword(resetPwAdmin.id, resetPwValue);
+      showMessage('Password reset successfully', 'success');
+      setResetPwAdmin(null);
+      setResetPwValue('');
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to reset password', 'error');
+    } finally {
+      setIsResettingPw(false);
+    }
+  };
+
+  const handleDeleteAdmin = async (admin: any) => {
+    if (!window.confirm(`Delete admin account for ${admin.firstName} ${admin.lastName}? This cannot be undone.`)) return;
+    setDeletingAdminId(admin.id);
+    try {
+      await adminAPI.deleteAdmin(admin.id);
+      showMessage('Admin deleted successfully', 'success');
+      loadAdmins();
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to delete admin', 'error');
+    } finally {
+      setDeletingAdminId(null);
     }
   };
 
@@ -123,6 +251,100 @@ export default function SuperAdminPage() {
               ))}
             </section>
           )}
+
+          {/* Admin Accounts */}
+          <div className="table-card" style={{ marginBottom: 20 }}>
+            <div className="table-head">
+              <div>
+                <h3>Admin Accounts</h3>
+                <p>{admins.length} admin account{admins.length !== 1 ? 's' : ''}</p>
+              </div>
+              <button className="btn btn-primary" onClick={() => { setAdminForm(blankAdminForm()); setIsCreateAdminOpen(true); }}>
+                <Plus size={14} /> Create Admin
+              </button>
+            </div>
+
+            {admins.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#475569' }}>No admin accounts yet</div>
+            ) : (
+              <div className="data-table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th><th>Email</th><th>Status</th><th>Permissions</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {admins.map((a: any) => {
+                      const isSuperAdminRow = a.role === 'SuperAdmin';
+                      const permList: string[] = a.permissions || [];
+                      return (
+                        <tr key={a.id}>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div className="mini-avatar">{a.firstName?.[0]}{a.lastName?.[0]}</div>
+                              <div>
+                                <strong style={{ fontSize: 13 }}>{a.firstName} {a.lastName}</strong>
+                                {isSuperAdminRow && (
+                                  <p style={{ fontSize: 10, color: '#9333ea', margin: 0, fontWeight: 700 }}>SUPERADMIN</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td>{a.email}</td>
+                          <td>
+                            <span className={`pill ${a.status === 'Active' ? 'pill-success' : 'pill-danger'}`}>
+                              {a.status}
+                            </span>
+                          </td>
+                          <td style={{ maxWidth: 260 }}>
+                            {isSuperAdminRow ? (
+                              <span style={{ fontSize: 12, color: '#64748b' }}>All (SuperAdmin)</span>
+                            ) : permList.length === 0 ? (
+                              <span style={{ fontSize: 12, color: '#94a3b8' }}>None</span>
+                            ) : (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }} title={permList.join(', ')}>
+                                {permList.slice(0, 3).map((p) => (
+                                  <span key={p} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 12, background: '#eef2ff', color: '#4338ca', fontWeight: 600 }}>{p}</span>
+                                ))}
+                                {permList.length > 3 && (
+                                  <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 12, background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>+{permList.length - 3} more</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <button
+                                className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12 }}
+                                onClick={() => openPermissionsModal(a)}
+                                disabled={isSuperAdminRow}
+                              >
+                                <Pencil size={12} /> Permissions
+                              </button>
+                              <button
+                                className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12 }}
+                                onClick={() => { setResetPwAdmin(a); setResetPwValue(''); }}
+                              >
+                                <KeyRound size={12} /> Reset Password
+                              </button>
+                              <button
+                                className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12, color: '#dc2626' }}
+                                onClick={() => handleDeleteAdmin(a)}
+                                disabled={isSuperAdminRow || deletingAdminId === a.id}
+                              >
+                                <Trash2 size={12} /> {deletingAdminId === a.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
           {/* Schools */}
           <div className="table-card" style={{ marginBottom: 20 }}>
@@ -269,6 +491,137 @@ export default function SuperAdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Admin Modal */}
+      {isCreateAdminOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+          onClick={() => setIsCreateAdminOpen(false)}>
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Create Admin</h2>
+              <button onClick={() => setIsCreateAdminOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateAdmin} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={labelStyle}>First Name *</label>
+                  <input type="text" value={adminForm.firstName} onChange={(e) => setAdminForm({ ...adminForm, firstName: e.target.value })}
+                    placeholder="First name" required className="text-field" style={fieldStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Last Name *</label>
+                  <input type="text" value={adminForm.lastName} onChange={(e) => setAdminForm({ ...adminForm, lastName: e.target.value })}
+                    placeholder="Last name" required className="text-field" style={fieldStyle} />
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Email *</label>
+                <input type="email" value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                  placeholder="admin@school.ac.zw" required className="text-field" style={fieldStyle} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={labelStyle}>Password *</label>
+                  <input type="password" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                    placeholder="At least 8 characters" required minLength={8} className="text-field" style={fieldStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Confirm Password *</label>
+                  <input type="password" value={adminForm.confirmPassword} onChange={(e) => setAdminForm({ ...adminForm, confirmPassword: e.target.value })}
+                    placeholder="Re-enter password" required minLength={8} className="text-field" style={fieldStyle} />
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Permissions</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+                  {PERMISSION_OPTIONS.map((perm) => (
+                    <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#0f172a', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={adminForm.permissions.includes(perm)} onChange={() => toggleAdminFormPermission(perm)} />
+                      {perm}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid #e2e8f0' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setIsCreateAdminOpen(false)} disabled={isCreatingAdmin}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={isCreatingAdmin} style={{ opacity: isCreatingAdmin ? 0.7 : 1 }}>
+                  {isCreatingAdmin ? 'Creating...' : 'Create Admin'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Permissions Modal */}
+      {permEditAdmin && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+          onClick={() => setPermEditAdmin(null)}>
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '460px' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Edit Permissions</h2>
+                <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{permEditAdmin.firstName} {permEditAdmin.lastName}</p>
+              </div>
+              <button onClick={() => setPermEditAdmin(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+                {PERMISSION_OPTIONS.map((perm) => (
+                  <label key={perm} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#0f172a', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={permEditValues.includes(perm)} onChange={() => togglePermEditValue(perm)} />
+                    {perm}
+                  </label>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid #e2e8f0' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setPermEditAdmin(null)} disabled={isSavingPerms}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={handleSavePermissions} disabled={isSavingPerms} style={{ opacity: isSavingPerms ? 0.7 : 1 }}>
+                  {isSavingPerms ? 'Saving...' : 'Save Permissions'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetPwAdmin && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+          onClick={() => setResetPwAdmin(null)}>
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '420px' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Reset Password</h2>
+                <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{resetPwAdmin.firstName} {resetPwAdmin.lastName}</p>
+              </div>
+              <button onClick={() => setResetPwAdmin(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={labelStyle}>New Password *</label>
+                <input type="password" value={resetPwValue} onChange={(e) => setResetPwValue(e.target.value)}
+                  placeholder="At least 8 characters" minLength={8} className="text-field" style={fieldStyle} />
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingTop: '8px', borderTop: '1px solid #e2e8f0' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setResetPwAdmin(null)} disabled={isResettingPw}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={handleResetAdminPassword} disabled={isResettingPw} style={{ opacity: isResettingPw ? 0.7 : 1 }}>
+                  {isResettingPw ? 'Resetting...' : 'Reset Password'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

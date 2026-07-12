@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using LeeTec.API.Data;
 using LeeTec.API.Models;
 using LeeTec.API.DTOs;
@@ -60,13 +61,27 @@ namespace LeeTec.API.Controllers
             var token = GenerateToken(user);
             var roles = user.UserRoles.Select(ur => ur.Role.Name).ToList();
 
+            List<string> permissions;
+            try
+            {
+                permissions = string.IsNullOrWhiteSpace(user.Permissions)
+                    ? new List<string>()
+                    : (JsonSerializer.Deserialize<List<string>>(user.Permissions) ?? new List<string>());
+            }
+            catch (JsonException)
+            {
+                permissions = new List<string>();
+            }
+
             return Ok(new AuthResponseDTO
             {
                 Token = token,
+                Id = user.Id,
                 Email = user.Email,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
-                Roles = roles
+                Roles = roles,
+                Permissions = permissions
             });
         }
 

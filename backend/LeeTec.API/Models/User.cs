@@ -13,6 +13,7 @@ namespace LeeTec.API.Models
         public string? PhoneNumber { get; set; }
         public string Status { get; set; } = "Active";
         public bool EmailVerified { get; set; } = false;
+        public string Permissions { get; set; } = "";
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using LeeTec.API.Data;
 using LeeTec.API.Models;
 using LeeTec.API.DTOs;
@@ -64,6 +65,147 @@ namespace LeeTec.API.Controllers
                 firstName = user.FirstName,
                 surname = user.LastName,
             });
+        }
+
+        // =====================
+        // ADMIN ACCOUNTS
+        // =====================
+
+        // GET /api/admin/admins
+        [HttpGet("admins")]
+        public async Task<IActionResult> GetAdmins()
+        {
+            var admins = await _context.Users
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .Where(u => u.UserRoles.Any(ur => ur.Role.Name == "Admin" || ur.Role.Name == "SuperAdmin"))
+                .OrderBy(u => u.LastName).ThenBy(u => u.FirstName)
+                .ToListAsync();
+
+            var result = admins.Select(u => new
+            {
+                u.Id,
+                u.FirstName,
+                u.LastName,
+                u.Email,
+                u.Status,
+                role = u.UserRoles.Any(ur => ur.Role.Name == "SuperAdmin") ? "SuperAdmin" : "Admin",
+                permissions = ParsePermissions(u.Permissions),
+                u.CreatedAt,
+            });
+
+            return Ok(result);
+        }
+
+        // POST /api/admin/create-admin
+        [HttpPost("create-admin")]
+        public async Task<IActionResult> CreateAdmin([FromBody] CreateAdminDTO dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
+                return BadRequest(new { message = "Email already in use" });
+
+            var adminRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
+            if (adminRole == null)
+            {
+                adminRole = new Role { Name = "Admin", Description = "School administrator", IsSystemRole = true };
+                _context.Roles.Add(adminRole);
+                await _context.SaveChangesAsync();
+            }
+
+            var user = new User
+            {
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                Email = dto.Email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+                SchoolId = dto.SchoolId,
+                Status = "Active",
+                EmailVerified = true,
+                Permissions = JsonSerializer.Serialize(dto.Permissions ?? new List<string>()),
+            };
+
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync();
+
+            _context.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id,
+                RoleId = adminRole.Id,
+            });
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Admin created successfully",
+                id = user.Id,
+                firstName = user.FirstName,
+                lastName = user.LastName,
+                email = user.Email,
+                status = user.Status,
+                role = "Admin",
+                permissions = dto.Permissions ?? new List<string>(),
+                createdAt = user.CreatedAt,
+            });
+        }
+
+        // PUT /api/admin/admins/{id}/permissions
+        [HttpPut("admins/{id}/permissions")]
+        public async Task<IActionResult> UpdateAdminPermissions(int id, [FromBody] UpdateAdminPermissionsDTO dto)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound(new { message = "Admin not found" });
+
+            user.Permissions = JsonSerializer.Serialize(dto.Permissions ?? new List<string>());
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Permissions updated successfully" });
+        }
+
+        // PUT /api/admin/admins/{id}/reset-password
+        [HttpPut("admins/{id}/reset-password")]
+        public async Task<IActionResult> ResetAdminPassword(int id, [FromBody] AdminResetPasswordRequest dto)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound(new { message = "Admin not found" });
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password reset successfully" });
+        }
+
+        // DELETE /api/admin/admins/{id}
+        [HttpDelete("admins/{id}")]
+        public async Task<IActionResult> DeleteAdmin(int id)
+        {
+            var user = await _context.Users
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null) return NotFound(new { message = "Admin not found" });
+
+            if (user.UserRoles.Any(ur => ur.Role.Name == "SuperAdmin"))
+                return BadRequest(new { message = "Cannot delete SuperAdmin accounts" });
+
+            _context.UserRoles.RemoveRange(user.UserRoles);
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Admin deleted successfully" });
+        }
+
+        private static List<string> ParsePermissions(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return new List<string>();
+            try
+            {
+                return JsonSerializer.Deserialize<List<string>>(raw) ?? new List<string>();
+            }
+            catch (JsonException)
+            {
+                return new List<string>();
+            }
         }
 
         // GET /api/admin/student-credentials?termId={}&schoolId={}

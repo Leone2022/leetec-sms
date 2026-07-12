@@ -236,6 +236,19 @@ export const adminAPI = {
     api.put(`/admin/subject-change-requests/${id}/approve`),
   rejectSubjectRequest: (id: number) =>
     api.put(`/admin/subject-change-requests/${id}/reject`),
+  getAdmins: () => api.get('/admin/admins'),
+  createAdmin: (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    permissions: string[];
+  }) => api.post('/admin/create-admin', data),
+  updateAdminPermissions: (id: number, permissions: string[]) =>
+    api.put(`/admin/admins/${id}/permissions`, { permissions }),
+  resetAdminPassword: (id: number, newPassword: string) =>
+    api.put(`/admin/admins/${id}/reset-password`, { newPassword }),
+  deleteAdmin: (id: number) => api.delete(`/admin/admins/${id}`),
 };
 
 export const teacherAuthAPI = {

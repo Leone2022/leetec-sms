@@ -25,36 +25,38 @@ import {
 interface NavChild {
   label: string;
   path: string;
+  permission?: string;
 }
 
 interface NavItem {
   label: string;
   Icon: React.ComponentType<{ size?: number; className?: string }>;
   path?: string;
+  permission?: string;
   superAdminOnly?: boolean;
   children?: NavChild[];
 }
 
 const NAV: NavItem[] = [
   { label: 'Dashboard', Icon: LayoutDashboard, path: '/dashboard' },
-  { label: 'Students', Icon: Users, path: '/students' },
+  { label: 'Students', Icon: Users, path: '/students', permission: 'Students' },
   { label: 'Subject Requests', Icon: ArrowLeftRight, path: '/subject-requests' },
   {
     label: 'Finances',
     Icon: Receipt,
     children: [
-      { label: 'Fees & Billing', path: '/fees' },
-      { label: 'Fee Setup', path: '/fee-setup' },
+      { label: 'Fees & Billing', path: '/fees', permission: 'Fees & Billing' },
+      { label: 'Fee Setup', path: '/fee-setup', permission: 'Fee Setup' },
       // { label: 'Bursaries', path: '/bursaries' },
     ],
   },
-  { label: 'Portal Accounts', Icon: Globe, path: '/portal-accounts' },
-  { label: 'Terms & Periods', Icon: Calendar, path: '/terms' },
-  { label: 'Subjects', Icon: BookOpen, path: '/subjects' },
-  { label: 'Marks Entry', Icon: ClipboardList, path: '/marks-entry' },
-  { label: 'Bulk Reports', Icon: FileStack, path: '/bulk-reports' },
-  { label: 'Announcements', Icon: Bell, path: '/announcements' },
-  { label: 'Staff Assignments', Icon: Users, path: '/teacher-assignments' },
+  { label: 'Portal Accounts', Icon: Globe, path: '/portal-accounts', permission: 'Portal Accounts' },
+  { label: 'Terms & Periods', Icon: Calendar, path: '/terms', permission: 'Terms & Periods' },
+  { label: 'Subjects', Icon: BookOpen, path: '/subjects', permission: 'Subjects' },
+  { label: 'Marks Entry', Icon: ClipboardList, path: '/marks-entry', permission: 'Marks Entry' },
+  { label: 'Bulk Reports', Icon: FileStack, path: '/bulk-reports', permission: 'Bulk Reports' },
+  { label: 'Announcements', Icon: Bell, path: '/announcements', permission: 'Announcements' },
+  { label: 'Staff Assignments', Icon: Users, path: '/teacher-assignments', permission: 'Staff Assignments' },
   { label: 'Super Admin', Icon: Shield, path: '/super-admin', superAdminOnly: true },
 ];
 
@@ -93,7 +95,21 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
   const close = () => setOpen(false);
   const toggle = () => setOpen((v) => !v);
 
-  const visibleNav = NAV.filter((item) => !item.superAdminOnly || isSuperAdmin);
+  const permissions: string[] = (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('admin_permissions') || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch {
+      return [];
+    }
+  })();
+  const hasPermission = (permission?: string) => !permission || isSuperAdmin || permissions.includes(permission);
+
+  const visibleNav = NAV
+    .filter((item) => !item.superAdminOnly || isSuperAdmin)
+    .filter((item) => hasPermission(item.permission))
+    .map((item) => item.children ? { ...item, children: item.children.filter((c) => hasPermission(c.permission)) } : item)
+    .filter((item) => !item.children || item.children.length > 0);
 
   return (
     <div className={`admin-shell${open ? ' sidebar-open' : ''}`}>

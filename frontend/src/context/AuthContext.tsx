@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     localStorage.removeItem('leetec_token');
     localStorage.removeItem('leetec_user');
+    localStorage.removeItem('admin_permissions');
     setToken(null);
     setUser(null);
   };
