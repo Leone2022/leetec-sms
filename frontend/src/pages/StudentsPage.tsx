@@ -33,6 +33,16 @@ const CURRICULUM_OPTIONS: Record<string, string[] | null> = {
 const defaultCurriculum = (campus: string) =>
   campus === 'AHJ' ? 'Cambridge' : (CURRICULUM_OPTIONS[campus]?.[0] ?? 'Cambridge');
 
+const FORM_OPTIONS: Record<string, string[]> = {
+  AHJ: ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'],
+  AHS: ['Lower 6', 'Upper 6'],
+  AHA: ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'],
+};
+
+const formOptionsForCampus = (campus: string) => FORM_OPTIONS[campus] ?? FORM_OPTIONS.AHA;
+
+const defaultForm = (campus: string) => formOptionsForCampus(campus)[0];
+
 const blankStep1 = () => ({
   firstName: '', surname: '', dateOfBirth: '', gender: 'Male',
   race: '', birthCertificateNo: '', campus: 'AHA', curriculum: defaultCurriculum('AHA'),
@@ -851,7 +861,12 @@ export default function StudentsPage() {
                       ].map(({ code, name, desc }) => (
                         <div
                           key={code}
-                          onClick={() => setStep1({ ...step1, campus: code, curriculum: defaultCurriculum(code) })}
+                          onClick={() => {
+                            setStep1({ ...step1, campus: code, curriculum: defaultCurriculum(code) });
+                            if (!formOptionsForCampus(code).includes(step2.form)) {
+                              setStep2({ ...step2, form: defaultForm(code) });
+                            }
+                          }}
                           style={{
                             border: step1.campus === code ? '2px solid #1a237e' : '2px solid #e2e8f0',
                             background: step1.campus === code ? '#eef2ff' : 'white',
@@ -939,11 +954,10 @@ export default function StudentsPage() {
                   <div style={{ ...gridThree, marginBottom: '20px' }}>
                     <div>
                       <label style={labelStyle}>Form</label>
-                      {sel(step2.form, (v) => setStep2({ ...step2, form: v }),
-                        step1.campus === 'AHJ' ? ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'] :
-                        step1.campus === 'AHS' ? ['Lower 6', 'Upper 6'] :
-                        ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6']
-                      )}
+                      {sel(step2.form, (v) => {
+                        console.log('step2.form changed:', v);
+                        setStep2({ ...step2, form: v });
+                      }, formOptionsForCampus(step1.campus))}
                     </div>
                     <div>
                       <label style={labelStyle}>Date of Entry</label>
