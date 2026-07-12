@@ -14,6 +14,9 @@ namespace LeeTec.API.Models
         public string Status { get; set; } = "Active";
         public bool EmailVerified { get; set; } = false;
         public string Permissions { get; set; } = "";
+        public string? TempPassword { get; set; }
+        public DateTime? TempPasswordExpiry { get; set; }
+        public bool MustChangePassword { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation

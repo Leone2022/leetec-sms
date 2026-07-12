@@ -20,6 +20,12 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+
   useEffect(() => { document.title = 'LeeTec SMS — Admin Login'; }, []);
 
   const handleLogin = async (e: { preventDefault(): void }) => {
@@ -38,11 +44,38 @@ export default function LoginPage() {
         schoolId: 1,
       });
       localStorage.setItem('admin_permissions', JSON.stringify(data.permissions || []));
-      navigate('/dashboard');
+      navigate(data.mustChangePassword ? '/change-password' : '/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.message || 'Invalid email or password');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openForgotPassword = () => {
+    setForgotEmail(email);
+    setForgotError('');
+    setForgotSent(false);
+    setShowForgotPassword(true);
+  };
+
+  const backToLogin = () => {
+    setShowForgotPassword(false);
+    setForgotError('');
+    setForgotSent(false);
+  };
+
+  const handleForgotPassword = async (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      await authAPI.forgotPassword(forgotEmail);
+      setForgotSent(true);
+    } catch (err: any) {
+      setForgotError(err.response?.data?.message || 'Failed to send temporary password');
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -102,77 +135,130 @@ export default function LoginPage() {
 
           <div className="auth-login-wrap">
             <div className="auth-login-card">
-              <span className="auth-badge">Staff Access</span>
-              <h2 className="auth-login-title">Welcome back</h2>
-              <p className="auth-login-sub">Sign in to continue to your school dashboard.</p>
+              {showForgotPassword ? (
+                <>
+                  <span className="auth-badge">Staff Access</span>
+                  <h2 className="auth-login-title">Forgot your password?</h2>
+                  <p className="auth-login-sub">Enter your email and we'll send you a temporary password.</p>
 
-              {error && <div className="auth-error">{error}</div>}
+                  {forgotError && <div className="auth-error">{forgotError}</div>}
 
-              <form onSubmit={handleLogin} className="auth-form">
-                <div>
-                  <label className="auth-label" htmlFor="email">
-                    Email address
-                  </label>
-                  <div className="field-wrap" style={{ marginTop: 6 }}>
-                    <span className="field-icon field-icon-left">
-                      <Mail size={15} />
-                    </span>
-                    <input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@school.ac.zw"
-                      required
-                      className="text-field"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="auth-label-row">
-                    <label className="auth-label" htmlFor="password">
-                      Password
-                    </label>
-                    <a href="#" className="auth-forgot">
-                      Forgot password?
-                    </a>
-                  </div>
-                  <div className="field-wrap">
-                    <span className="field-icon field-icon-left">
-                      <Lock size={15} />
-                    </span>
-                    <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      required
-                      className="text-field with-right"
-                    />
-                    <button
-                      type="button"
-                      className="field-icon field-icon-right"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                  </div>
-                </div>
-
-                <button type="submit" disabled={loading} className="btn btn-primary">
-                  {loading ? (
-                    'Signing in...'
+                  {forgotSent ? (
+                    <div className="auth-form" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      <div style={{ fontSize: 13, color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '12px 14px' }}>
+                        Check your email for a temporary password.
+                      </div>
+                      <a href="#" onClick={(e) => { e.preventDefault(); backToLogin(); }} className="auth-forgot" style={{ textAlign: 'center' }}>
+                        Back to Login
+                      </a>
+                    </div>
                   ) : (
-                    <>
-                      <span>Continue</span>
-                      <ArrowRight size={15} />
-                    </>
+                    <form onSubmit={handleForgotPassword} className="auth-form">
+                      <div>
+                        <label className="auth-label" htmlFor="forgot-email">
+                          Email address
+                        </label>
+                        <div className="field-wrap" style={{ marginTop: 6 }}>
+                          <span className="field-icon field-icon-left">
+                            <Mail size={15} />
+                          </span>
+                          <input
+                            id="forgot-email"
+                            type="email"
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            placeholder="admin@school.ac.zw"
+                            required
+                            className="text-field"
+                          />
+                        </div>
+                      </div>
+
+                      <button type="submit" disabled={forgotLoading} className="btn btn-primary">
+                        {forgotLoading ? 'Sending...' : 'Send Temporary Password'}
+                      </button>
+
+                      <a href="#" onClick={(e) => { e.preventDefault(); backToLogin(); }} className="auth-forgot" style={{ textAlign: 'center' }}>
+                        Back to Login
+                      </a>
+                    </form>
                   )}
-                </button>
-              </form>
+                </>
+              ) : (
+                <>
+                  <span className="auth-badge">Staff Access</span>
+                  <h2 className="auth-login-title">Welcome back</h2>
+                  <p className="auth-login-sub">Sign in to continue to your school dashboard.</p>
+
+                  {error && <div className="auth-error">{error}</div>}
+
+                  <form onSubmit={handleLogin} className="auth-form">
+                    <div>
+                      <label className="auth-label" htmlFor="email">
+                        Email address
+                      </label>
+                      <div className="field-wrap" style={{ marginTop: 6 }}>
+                        <span className="field-icon field-icon-left">
+                          <Mail size={15} />
+                        </span>
+                        <input
+                          id="email"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="admin@school.ac.zw"
+                          required
+                          className="text-field"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="auth-label-row">
+                        <label className="auth-label" htmlFor="password">
+                          Password
+                        </label>
+                        <a href="#" onClick={(e) => { e.preventDefault(); openForgotPassword(); }} className="auth-forgot">
+                          Forgot password?
+                        </a>
+                      </div>
+                      <div className="field-wrap">
+                        <span className="field-icon field-icon-left">
+                          <Lock size={15} />
+                        </span>
+                        <input
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Enter your password"
+                          required
+                          className="text-field with-right"
+                        />
+                        <button
+                          type="button"
+                          className="field-icon field-icon-right"
+                          onClick={() => setShowPassword((v) => !v)}
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button type="submit" disabled={loading} className="btn btn-primary">
+                      {loading ? (
+                        'Signing in...'
+                      ) : (
+                        <>
+                          <span>Continue</span>
+                          <ArrowRight size={15} />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </>
+              )}
 
               <div className="auth-divider" />
 

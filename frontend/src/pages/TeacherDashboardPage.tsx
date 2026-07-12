@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { marksAPI, feesAPI } from '../services/api';
+import { marksAPI, feesAPI, authAPI } from '../services/api';
 import { teacherAssignmentsAPI } from '../services/api';
 import {
   GraduationCap, LogOut, BookOpen, User, Menu, X,
@@ -188,6 +188,31 @@ export default function TeacherDashboardPage() {
     localStorage.removeItem('teacher_token');
     localStorage.removeItem('teacher_info');
     navigate('/teacher-login');
+  };
+
+  // Change password (My Profile)
+  const [cpCurrentPassword, setCpCurrentPassword] = useState('');
+  const [cpNewPassword, setCpNewPassword] = useState('');
+  const [cpConfirmPassword, setCpConfirmPassword] = useState('');
+  const [cpLoading, setCpLoading] = useState(false);
+  const [cpError, setCpError] = useState('');
+
+  const handleChangePassword = async (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    setCpError('');
+    if (cpNewPassword.length < 8) { setCpError('New password must be at least 8 characters'); return; }
+    if (cpNewPassword !== cpConfirmPassword) { setCpError('Passwords do not match'); return; }
+    setCpLoading(true);
+    try {
+      const teacherToken = localStorage.getItem('teacher_token') || undefined;
+      await authAPI.changePassword(cpCurrentPassword, cpNewPassword, teacherToken);
+      showMsg('Password changed successfully', 'success');
+      setCpCurrentPassword(''); setCpNewPassword(''); setCpConfirmPassword('');
+    } catch (err: any) {
+      setCpError(err.response?.data?.message || 'Failed to change password');
+    } finally {
+      setCpLoading(false);
+    }
   };
 
   const firstName = teacherInfo?.firstName ?? '';
@@ -431,6 +456,33 @@ export default function TeacherDashboardPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '20px 24px', marginTop: 16 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 16px' }}>Change Password</p>
+        {cpError && (
+          <div style={{ fontSize: 12, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 12px', marginBottom: 14 }}>{cpError}</div>
+        )}
+        <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 340 }}>
+          <div>
+            <label style={lbl}>Current / Temporary Password</label>
+            <input className="text-field" style={fld} type="password" value={cpCurrentPassword}
+              onChange={e => setCpCurrentPassword(e.target.value)} required />
+          </div>
+          <div>
+            <label style={lbl}>New Password</label>
+            <input className="text-field" style={fld} type="password" value={cpNewPassword}
+              onChange={e => setCpNewPassword(e.target.value)} placeholder="At least 8 characters" required minLength={8} />
+          </div>
+          <div>
+            <label style={lbl}>Confirm New Password</label>
+            <input className="text-field" style={fld} type="password" value={cpConfirmPassword}
+              onChange={e => setCpConfirmPassword(e.target.value)} placeholder="Re-enter new password" required minLength={8} />
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={cpLoading} style={{ alignSelf: 'flex-start' }}>
+            {cpLoading ? 'Saving...' : 'Change Password'}
+          </button>
+        </form>
       </div>
     </div>
   );

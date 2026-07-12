@@ -21,6 +21,7 @@ import StudentDashboardPage from './pages/StudentDashboardPage.tsx';
 import ActivatePage from './pages/ActivatePage.tsx';
 import PortalAccountsPage from './pages/PortalAccountsPage.tsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.tsx';
+import ChangePasswordPage from './pages/ChangePasswordPage.tsx';
 
 // Roles that should not reach the admin console (they have their own portals)
 const NON_ADMIN_ROLES = ['Student', 'ClassTeacher', 'SubjectTeacher', 'Teacher'];
@@ -66,6 +67,7 @@ function App() {
       {/* Student Activation */}
       <Route path="/activate" element={<ActivatePage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/change-password" element={<ChangePasswordPage />} />
 
       {/* Portal Accounts */}
       <Route path="/portal-accounts" element={<AdminRoute><PortalAccountsPage /></AdminRoute>} />

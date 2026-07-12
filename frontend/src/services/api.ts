@@ -29,6 +29,16 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (email: string, password: string) => api.post('/auth/login', { email, password }),
   register: (data: any) => api.post('/auth/register', data),
+  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  // `token` override lets callers outside the admin session (e.g. the teacher
+  // portal, which keeps its own bearer token under a different localStorage key)
+  // authenticate this call without relying on the default request interceptor.
+  changePassword: (currentPassword: string, newPassword: string, token?: string) =>
+    api.post(
+      '/auth/change-password',
+      { currentPassword, newPassword },
+      token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+    ),
 };
 
 export const studentsAPI = {

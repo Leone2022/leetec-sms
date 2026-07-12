@@ -20,6 +20,7 @@ import {
   Bell,
   Globe,
   ArrowLeftRight,
+  KeyRound,
 } from 'lucide-react';
 
 interface NavChild {
@@ -195,6 +196,14 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
               <p className="admin-user-role">{user?.role}</p>
             </div>
           </div>
+          <button
+            className="btn btn-secondary admin-logout"
+            onClick={() => { navigate('/change-password'); close(); }}
+            style={{ marginBottom: 8 }}
+          >
+            <KeyRound size={14} />
+            <span>Change Password</span>
+          </button>
           <button
             className="btn btn-secondary admin-logout"
             onClick={() => { logout(); navigate('/login'); }}
