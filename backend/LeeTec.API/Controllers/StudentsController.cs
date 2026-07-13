@@ -28,8 +28,7 @@ namespace LeeTec.API.Controllers
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var count = await _context.Students
-                    .CountAsync(s => s.SchoolId == dto.SchoolId);
+
 
                 var prefix = dto.Campus switch
                 {
