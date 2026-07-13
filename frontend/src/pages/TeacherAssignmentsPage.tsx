@@ -6,7 +6,7 @@ import { Users, Plus, X, Trash2, UserPlus } from 'lucide-react';
 const CAMPUSES = ['AHJ', 'AHA', 'AHS'];
 
 const FORM_OPTIONS: Record<string, string[]> = {
-  AHJ: ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'],
+  AHJ: ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'],
   AHA: ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'],
   AHS: ['Lower 6', 'Upper 6'],
 };

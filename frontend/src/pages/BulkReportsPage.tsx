@@ -7,7 +7,7 @@ import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
 
 const PUBLISH_FORM_OPTIONS = [
   'All',
-  'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7',
+  'Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7',
   'Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6',
   'Lower 6', 'Upper 6',
 ];
