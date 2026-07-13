@@ -108,17 +108,25 @@ export default function StudentsPage() {
   const [activeTerm, setActiveTerm] = useState<{ name: string; year: number } | null>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editTab, setEditTab] = useState<'personal' | 'medical' | 'family'>('personal');
+  const [editTab, setEditTab] = useState<'personal' | 'medical' | 'family' | 'guardians'>('personal');
   const [editForm, setEditForm] = useState<{
     firstName: string; surname: string; dateOfBirth: string; gender: string;
     race: string; form: string; curriculum: string; email: string; studentType: string;
-    familyDoctorName: string; familyDoctorPhone: string; medicalAidSociety: string; medicalAidNo: string; allergies: string;
-    maritalStatus: string; homeLanguage: string; religion: string; homeAddress: string; homeTelephone: string; cell: string; familyEmail: string;
+    previousSchool: string; medicalAidSociety: string; medicalAidNo: string;
+    familyDoctorName: string; familyDoctorPhone: string; allergies: string; denomination: string; otherInformation: string;
+    homeAddress: string; homeTelephone: string; cell: string; homeLanguage: string; religion: string; maritalStatus: string; familyEmail: string;
   }>({
     firstName: '', surname: '', dateOfBirth: '', gender: 'Male', race: '', form: '', curriculum: '', email: '', studentType: 'Day',
-    familyDoctorName: '', familyDoctorPhone: '', medicalAidSociety: '', medicalAidNo: '', allergies: '',
-    maritalStatus: '', homeLanguage: '', religion: '', homeAddress: '', homeTelephone: '', cell: '', familyEmail: '',
+    previousSchool: '', medicalAidSociety: '', medicalAidNo: '',
+    familyDoctorName: '', familyDoctorPhone: '', allergies: '', denomination: '', otherInformation: '',
+    homeAddress: '', homeTelephone: '', cell: '', homeLanguage: '', religion: '', maritalStatus: '', familyEmail: '',
   });
+  const blankGuardianEdit = () => ({
+    title: '', forenames: '', surname: '', nationality: '', occupation: '',
+    companyName: '', businessTelephone: '', cell: '', email: '', relationship: '',
+  });
+  const [editFather, setEditFather] = useState(blankGuardianEdit());
+  const [editMother, setEditMother] = useState(blankGuardianEdit());
   const [editError, setEditError] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
@@ -552,6 +560,9 @@ export default function StudentsPage() {
   const openEditModal = () => {
     const s = profileStudent || selectedStudent;
     const family = s.family ?? {};
+    const guardians: any[] = s.guardians ?? [];
+    const father = guardians.find((g) => g.guardianType === 'Father') ?? guardians[0] ?? {};
+    const mother = guardians.find((g) => g.guardianType === 'Mother') ?? guardians[1] ?? {};
     setEditForm({
       firstName: s.firstName ?? '',
       surname: s.surname ?? '',
@@ -562,18 +573,33 @@ export default function StudentsPage() {
       curriculum: s.curriculum ?? '',
       email: '',
       studentType: s.studentType ?? 'Day',
-      familyDoctorName: s.familyDoctorName ?? '',
-      familyDoctorPhone: s.familyDoctorPhone ?? '',
+      previousSchool: s.previousSchool ?? '',
       medicalAidSociety: s.medicalAidSociety ?? '',
       medicalAidNo: s.medicalAidNo ?? '',
+      familyDoctorName: s.familyDoctorName ?? '',
+      familyDoctorPhone: s.familyDoctorPhone ?? '',
       allergies: s.allergies ?? '',
-      maritalStatus: family.maritalStatus ?? '',
-      homeLanguage: family.homeLanguage ?? '',
-      religion: family.religion ?? '',
+      denomination: s.denomination ?? '',
+      otherInformation: s.otherInformation ?? '',
       homeAddress: family.homeAddress ?? '',
       homeTelephone: family.homeTelephone ?? '',
       cell: family.cell ?? '',
+      homeLanguage: family.homeLanguage ?? '',
+      religion: family.religion ?? '',
+      maritalStatus: family.maritalStatus ?? '',
       familyEmail: family.email ?? '',
+    });
+    setEditFather({
+      title: father.title ?? '', forenames: father.forenames ?? '', surname: father.surname ?? '',
+      nationality: father.nationality ?? '', occupation: father.occupation ?? '', companyName: father.companyName ?? '',
+      businessTelephone: father.businessTelephone ?? '', cell: father.cell ?? '', email: father.email ?? '',
+      relationship: father.guardianType ?? '',
+    });
+    setEditMother({
+      title: mother.title ?? '', forenames: mother.forenames ?? '', surname: mother.surname ?? '',
+      nationality: mother.nationality ?? '', occupation: mother.occupation ?? '', companyName: mother.companyName ?? '',
+      businessTelephone: mother.businessTelephone ?? '', cell: mother.cell ?? '', email: mother.email ?? '',
+      relationship: mother.guardianType ?? '',
     });
     setEditTab('personal');
     setEditError('');
@@ -589,6 +615,7 @@ export default function StudentsPage() {
     setEditSubmitting(true);
     setEditError('');
     try {
+      // 1. Personal, medical & academic details — all columns on Student itself
       await studentsAPI.updateStudent(selectedStudent.id, {
         firstName: editForm.firstName.trim(),
         surname: editForm.surname.trim(),
@@ -599,19 +626,49 @@ export default function StudentsPage() {
         studentType: editForm.studentType,
         curriculum: editForm.curriculum,
         email: editForm.email.trim() || undefined,
-        familyDoctorName: editForm.familyDoctorName.trim(),
-        familyDoctorPhone: editForm.familyDoctorPhone.trim(),
+        previousSchool: editForm.previousSchool.trim(),
         medicalAidSociety: editForm.medicalAidSociety.trim(),
         medicalAidNo: editForm.medicalAidNo.trim(),
+        familyDoctorName: editForm.familyDoctorName.trim(),
+        familyDoctorPhone: editForm.familyDoctorPhone.trim(),
         allergies: editForm.allergies.trim(),
-        maritalStatus: editForm.maritalStatus.trim(),
-        homeLanguage: editForm.homeLanguage.trim(),
-        religion: editForm.religion.trim(),
+        denomination: editForm.denomination.trim(),
+        otherInformation: editForm.otherInformation.trim(),
+      });
+
+      // 2. Family details, only if at least one field was filled in
+      const familyFields = {
         homeAddress: editForm.homeAddress.trim(),
         homeTelephone: editForm.homeTelephone.trim(),
         cell: editForm.cell.trim(),
-        familyEmail: editForm.familyEmail.trim(),
-      });
+        homeLanguage: editForm.homeLanguage.trim(),
+        religion: editForm.religion.trim(),
+        maritalStatus: editForm.maritalStatus.trim(),
+        email: editForm.familyEmail.trim(),
+      };
+      if (Object.values(familyFields).some((v) => v)) {
+        await studentsAPI.updateFamily(selectedStudent.id, familyFields);
+      }
+
+      // 3. Guardians, only if at least one guardian has a field filled in
+      const guardianHasValue = (g: typeof editFather) => Object.values(g).some((v) => v.trim());
+      if (guardianHasValue(editFather) || guardianHasValue(editMother)) {
+        await studentsAPI.updateGuardians(selectedStudent.id, {
+          father: guardianHasValue(editFather) ? {
+            title: editFather.title.trim(), forenames: editFather.forenames.trim(), surname: editFather.surname.trim(),
+            nationality: editFather.nationality.trim(), occupation: editFather.occupation.trim(), companyName: editFather.companyName.trim(),
+            businessTelephone: editFather.businessTelephone.trim(), cell: editFather.cell.trim(), email: editFather.email.trim(),
+            relationship: editFather.relationship.trim(),
+          } : undefined,
+          mother: guardianHasValue(editMother) ? {
+            title: editMother.title.trim(), forenames: editMother.forenames.trim(), surname: editMother.surname.trim(),
+            nationality: editMother.nationality.trim(), occupation: editMother.occupation.trim(), companyName: editMother.companyName.trim(),
+            businessTelephone: editMother.businessTelephone.trim(), cell: editMother.cell.trim(), email: editMother.email.trim(),
+            relationship: editMother.relationship.trim(),
+          } : undefined,
+        });
+      }
+
       setIsEditModalOpen(false);
       showMessage('Student updated successfully', 'success');
       loadStudents();
@@ -1730,8 +1787,9 @@ export default function StudentsPage() {
                 <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 10, padding: 4 }}>
                   {([
                     { id: 'personal' as const, label: 'Personal' },
-                    { id: 'medical' as const, label: 'Medical' },
+                    { id: 'medical' as const, label: 'Medical & Academic' },
                     { id: 'family' as const, label: 'Family' },
+                    { id: 'guardians' as const, label: 'Guardians' },
                   ]).map(({ id, label }) => (
                     <button
                       key={id}
@@ -1810,18 +1868,18 @@ export default function StudentsPage() {
                   </div>
                 )}
 
-                {/* Medical */}
+                {/* Medical & Academic */}
                 {editTab === 'medical' && (
                   <div>
-                    <p style={sectionHeadStyle}>Medical Information</p>
+                    <p style={sectionHeadStyle}>Medical & Academic Information</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       <div>
-                        <label style={labelStyle}>Family Doctor Name</label>
-                        {ef(editForm.familyDoctorName, (v) => setEditForm((f) => ({ ...f, familyDoctorName: v })), { placeholder: 'Doctor name' })}
+                        <label style={labelStyle}>Previous School</label>
+                        {ef(editForm.previousSchool, (v) => setEditForm((f) => ({ ...f, previousSchool: v })), { placeholder: 'Previous school name' })}
                       </div>
                       <div>
-                        <label style={labelStyle}>Family Doctor Phone</label>
-                        {ef(editForm.familyDoctorPhone, (v) => setEditForm((f) => ({ ...f, familyDoctorPhone: v })), { placeholder: 'Doctor phone number' })}
+                        <label style={labelStyle}>Denomination</label>
+                        {ef(editForm.denomination, (v) => setEditForm((f) => ({ ...f, denomination: v })), { placeholder: 'Religious denomination' })}
                       </div>
                       <div>
                         <label style={labelStyle}>Medical Aid Society</label>
@@ -1831,9 +1889,21 @@ export default function StudentsPage() {
                         <label style={labelStyle}>Medical Aid No.</label>
                         {ef(editForm.medicalAidNo, (v) => setEditForm((f) => ({ ...f, medicalAidNo: v })), { placeholder: 'Medical aid number' })}
                       </div>
+                      <div>
+                        <label style={labelStyle}>Family Doctor Name</label>
+                        {ef(editForm.familyDoctorName, (v) => setEditForm((f) => ({ ...f, familyDoctorName: v })), { placeholder: 'Doctor name' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Doctor Phone</label>
+                        {ef(editForm.familyDoctorPhone, (v) => setEditForm((f) => ({ ...f, familyDoctorPhone: v })), { placeholder: 'Doctor phone number' })}
+                      </div>
                       <div style={{ gridColumn: 'span 2' }}>
                         <label style={labelStyle}>Allergies</label>
                         {ef(editForm.allergies, (v) => setEditForm((f) => ({ ...f, allergies: v })), { placeholder: 'Any allergies or medical conditions' })}
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Other Information</label>
+                        {ef(editForm.otherInformation, (v) => setEditForm((f) => ({ ...f, otherInformation: v })), { placeholder: 'Any other relevant information' })}
                       </div>
                     </div>
                   </div>
@@ -1873,6 +1943,62 @@ export default function StudentsPage() {
                         {ef(editForm.homeAddress, (v) => setEditForm((f) => ({ ...f, homeAddress: v })), { placeholder: 'Home address' })}
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Guardians */}
+                {editTab === 'guardians' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {([
+                      { label: 'Father / Guardian 1', value: editFather, setValue: setEditFather },
+                      { label: 'Mother / Guardian 2', value: editMother, setValue: setEditMother },
+                    ]).map(({ label, value, setValue }) => (
+                      <div key={label}>
+                        <p style={sectionHeadStyle}>{label}</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                          <div>
+                            <label style={labelStyle}>Title</label>
+                            {ef(value.title, (v) => setValue((f) => ({ ...f, title: v })), { placeholder: 'e.g. Mr' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Relationship</label>
+                            {ef(value.relationship, (v) => setValue((f) => ({ ...f, relationship: v })), { placeholder: 'e.g. Father' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Forenames</label>
+                            {ef(value.forenames, (v) => setValue((f) => ({ ...f, forenames: v })), { placeholder: 'Forenames' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Surname</label>
+                            {ef(value.surname, (v) => setValue((f) => ({ ...f, surname: v })), { placeholder: 'Surname' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Nationality</label>
+                            {ef(value.nationality, (v) => setValue((f) => ({ ...f, nationality: v })), { placeholder: 'Nationality' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Occupation</label>
+                            {ef(value.occupation, (v) => setValue((f) => ({ ...f, occupation: v })), { placeholder: 'Occupation' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Company</label>
+                            {ef(value.companyName, (v) => setValue((f) => ({ ...f, companyName: v })), { placeholder: 'Company name' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Work Phone</label>
+                            {ef(value.businessTelephone, (v) => setValue((f) => ({ ...f, businessTelephone: v })), { placeholder: 'Work phone number' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Cell</label>
+                            {ef(value.cell, (v) => setValue((f) => ({ ...f, cell: v })), { placeholder: 'Cell number' })}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Email</label>
+                            {ef(value.email, (v) => setValue((f) => ({ ...f, email: v })), { type: 'email', placeholder: 'guardian@example.com' })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
 

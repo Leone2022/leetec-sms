@@ -157,7 +157,7 @@ namespace LeeTec.API.Controllers
             }
         }
 
-        // UPDATE STUDENT
+        // UPDATE STUDENT (personal, medical & academic details — all columns on Student itself)
         [Authorize]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateStudent(int id, [FromBody] UpdateStudentDTO dto)
@@ -174,37 +174,105 @@ namespace LeeTec.API.Controllers
             student.StudentType = dto.StudentType;
             student.Curriculum = dto.Curriculum;
 
-            // Medical details live directly on the Student record
-            if (dto.FamilyDoctorName != null) student.FamilyDoctorName = dto.FamilyDoctorName.Trim();
-            if (dto.FamilyDoctorPhone != null) student.FamilyDoctorPhone = dto.FamilyDoctorPhone.Trim();
+            if (dto.PreviousSchool != null) student.PreviousSchool = dto.PreviousSchool.Trim();
             if (dto.MedicalAidSociety != null) student.MedicalAidSociety = dto.MedicalAidSociety.Trim();
             if (dto.MedicalAidNo != null) student.MedicalAidNo = dto.MedicalAidNo.Trim();
+            if (dto.FamilyDoctorName != null) student.FamilyDoctorName = dto.FamilyDoctorName.Trim();
+            if (dto.FamilyDoctorPhone != null) student.FamilyDoctorPhone = dto.FamilyDoctorPhone.Trim();
             if (dto.Allergies != null) student.Allergies = dto.Allergies.Trim();
-
-            // Family info lives in a related Family record — upsert it
-            var hasFamilyFields = dto.MaritalStatus != null || dto.HomeLanguage != null || dto.Religion != null
-                || dto.HomeAddress != null || dto.HomeTelephone != null || dto.Cell != null || dto.FamilyEmail != null;
-
-            if (hasFamilyFields)
-            {
-                var family = await _context.Families.FirstOrDefaultAsync(f => f.StudentId == id);
-                if (family == null)
-                {
-                    family = new Family { StudentId = id, CreatedAt = DateTime.UtcNow };
-                    _context.Families.Add(family);
-                }
-
-                if (dto.MaritalStatus != null) family.MaritalStatus = dto.MaritalStatus.Trim();
-                if (dto.HomeLanguage != null) family.HomeLanguage = dto.HomeLanguage.Trim();
-                if (dto.Religion != null) family.Religion = dto.Religion.Trim();
-                if (dto.HomeAddress != null) family.HomeAddress = dto.HomeAddress.Trim();
-                if (dto.HomeTelephone != null) family.HomeTelephone = dto.HomeTelephone.Trim();
-                if (dto.Cell != null) family.Cell = dto.Cell.Trim();
-                if (dto.FamilyEmail != null) family.Email = dto.FamilyEmail.Trim();
-            }
+            if (dto.Denomination != null) student.Denomination = dto.Denomination.Trim();
+            if (dto.OtherInformation != null) student.OtherInformation = dto.OtherInformation.Trim();
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Student updated successfully" });
+        }
+
+        // UPDATE FAMILY DETAILS (upsert)
+        [Authorize]
+        [HttpPut("{id}/family")]
+        public async Task<IActionResult> UpdateFamily(int id, [FromBody] UpdateFamilyDTO dto)
+        {
+            var student = await _context.Students.FindAsync(id);
+            if (student == null) return NotFound(new { message = "Student not found" });
+
+            var family = await _context.Families.FirstOrDefaultAsync(f => f.StudentId == id);
+            if (family == null)
+            {
+                family = new Family { StudentId = id, CreatedAt = DateTime.UtcNow };
+                _context.Families.Add(family);
+            }
+
+            if (dto.HomeAddress != null) family.HomeAddress = dto.HomeAddress.Trim();
+            if (dto.HomeTelephone != null) family.HomeTelephone = dto.HomeTelephone.Trim();
+            if (dto.Cell != null) family.Cell = dto.Cell.Trim();
+            if (dto.HomeLanguage != null) family.HomeLanguage = dto.HomeLanguage.Trim();
+            if (dto.Religion != null) family.Religion = dto.Religion.Trim();
+            if (dto.MaritalStatus != null) family.MaritalStatus = dto.MaritalStatus.Trim();
+            if (dto.Email != null) family.Email = dto.Email.Trim();
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Family details updated successfully" });
+        }
+
+        // UPDATE GUARDIANS (upsert Father/Guardian 1 and Mother/Guardian 2 by slot)
+        [Authorize]
+        [HttpPut("{id}/guardians")]
+        public async Task<IActionResult> UpdateGuardians(int id, [FromBody] UpdateGuardiansDTO dto)
+        {
+            var student = await _context.Students.FindAsync(id);
+            if (student == null) return NotFound(new { message = "Student not found" });
+
+            var guardians = await _context.Guardians
+                .Where(g => g.StudentId == id)
+                .OrderBy(g => g.Id)
+                .ToListAsync();
+
+            void Upsert(Guardian? existing, GuardianFieldsDTO? fields, string defaultType)
+            {
+                if (fields == null) return;
+                var hasAnyValue = !string.IsNullOrWhiteSpace(fields.Title)
+                    || !string.IsNullOrWhiteSpace(fields.Forenames)
+                    || !string.IsNullOrWhiteSpace(fields.Surname)
+                    || !string.IsNullOrWhiteSpace(fields.Nationality)
+                    || !string.IsNullOrWhiteSpace(fields.Occupation)
+                    || !string.IsNullOrWhiteSpace(fields.CompanyName)
+                    || !string.IsNullOrWhiteSpace(fields.BusinessTelephone)
+                    || !string.IsNullOrWhiteSpace(fields.Cell)
+                    || !string.IsNullOrWhiteSpace(fields.Email)
+                    || !string.IsNullOrWhiteSpace(fields.Relationship);
+                if (!hasAnyValue) return;
+
+                if (existing == null)
+                {
+                    existing = new Guardian
+                    {
+                        StudentId = id,
+                        GuardianType = !string.IsNullOrWhiteSpace(fields.Relationship) ? fields.Relationship : defaultType,
+                        CreatedAt = DateTime.UtcNow,
+                    };
+                    _context.Guardians.Add(existing);
+                }
+                else if (!string.IsNullOrWhiteSpace(fields.Relationship))
+                {
+                    existing.GuardianType = fields.Relationship;
+                }
+
+                if (fields.Title != null) existing.Title = fields.Title.Trim();
+                if (fields.Forenames != null) existing.Forenames = fields.Forenames.Trim();
+                if (fields.Surname != null) existing.Surname = fields.Surname.Trim();
+                if (fields.Nationality != null) existing.Nationality = fields.Nationality.Trim();
+                if (fields.Occupation != null) existing.Occupation = fields.Occupation.Trim();
+                if (fields.CompanyName != null) existing.CompanyName = fields.CompanyName.Trim();
+                if (fields.BusinessTelephone != null) existing.BusinessTelephone = fields.BusinessTelephone.Trim();
+                if (fields.Cell != null) existing.Cell = fields.Cell.Trim();
+                if (fields.Email != null) existing.Email = fields.Email.Trim();
+            }
+
+            Upsert(guardians.ElementAtOrDefault(0), dto.Father, "Father");
+            Upsert(guardians.ElementAtOrDefault(1), dto.Mother, "Mother");
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Guardians updated successfully" });
         }
 
         // GET SINGLE STUDENT

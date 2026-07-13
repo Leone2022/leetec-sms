@@ -59,6 +59,8 @@ export const studentsAPI = {
     api.post(`/students/${id}/invoicing`, data),
   deleteStudent: (id: number) => api.delete(`/students/${id}`),
   updateStudent: (id: number, data: any) => api.put(`/students/${id}`, data),
+  updateFamily: (id: number, data: any) => api.put(`/students/${id}/family`, data),
+  updateGuardians: (id: number, data: any) => api.put(`/students/${id}/guardians`, data),
   getStudentSubjects: (studentId: number) =>
     api.get(`/students/${studentId}/subjects`),
   addStudentSubject: (studentId: number, subjectId: number, termId: number) =>

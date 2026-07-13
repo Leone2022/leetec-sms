@@ -37,21 +37,46 @@ namespace LeeTec.API.DTOs
         public string Curriculum { get; set; } = string.Empty;
         public string? Email { get; set; }
 
-        // Medical (stored directly on Student)
-        public string? FamilyDoctorName { get; set; }
-        public string? FamilyDoctorPhone { get; set; }
+        // Medical & Academic (stored directly on Student)
+        public string? PreviousSchool { get; set; }
         public string? MedicalAidSociety { get; set; }
         public string? MedicalAidNo { get; set; }
+        public string? FamilyDoctorName { get; set; }
+        public string? FamilyDoctorPhone { get; set; }
         public string? Allergies { get; set; }
+        public string? Denomination { get; set; }
+        public string? OtherInformation { get; set; }
+    }
 
-        // Family info (upserted into the related Family record)
-        public string? MaritalStatus { get; set; }
-        public string? HomeLanguage { get; set; }
-        public string? Religion { get; set; }
+    public class UpdateFamilyDTO
+    {
         public string? HomeAddress { get; set; }
         public string? HomeTelephone { get; set; }
         public string? Cell { get; set; }
-        public string? FamilyEmail { get; set; }
+        public string? HomeLanguage { get; set; }
+        public string? Religion { get; set; }
+        public string? MaritalStatus { get; set; }
+        public string? Email { get; set; }
+    }
+
+    public class GuardianFieldsDTO
+    {
+        public string? Title { get; set; }
+        public string? Forenames { get; set; }
+        public string? Surname { get; set; }
+        public string? Nationality { get; set; }
+        public string? Occupation { get; set; }
+        public string? CompanyName { get; set; }
+        public string? BusinessTelephone { get; set; }
+        public string? Cell { get; set; }
+        public string? Email { get; set; }
+        public string? Relationship { get; set; } // maps to Guardian.GuardianType
+    }
+
+    public class UpdateGuardiansDTO
+    {
+        public GuardianFieldsDTO? Father { get; set; }
+        public GuardianFieldsDTO? Mother { get; set; }
     }
 
     public class ActivateDTO
