@@ -79,6 +79,7 @@ export default function StudentsPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [enrolledStudentNumber, setEnrolledStudentNumber] = useState<string | null>(null);
+  const [enrolledTerm, setEnrolledTerm] = useState<{ name: string; year: number } | null>(null);
 
   const [step1, setStep1] = useState(blankStep1());
   const [step2, setStep2] = useState(blankStep2());
@@ -104,6 +105,7 @@ export default function StudentsPage() {
   const [addingSubject, setAddingSubject] = useState(false);
   const [removingSubjectId, setRemovingSubjectId] = useState<number | null>(null);
   const [activeTermId, setActiveTermId] = useState<number | ''>('');
+  const [activeTerm, setActiveTerm] = useState<{ name: string; year: number } | null>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState<{
@@ -119,7 +121,10 @@ export default function StudentsPage() {
     feesAPI.getTerms(1).then(res => {
       const data: any[] = res.data || [];
       const active = data.find((t: any) => t.isActive) ?? data[0];
-      if (active) setActiveTermId(active.id);
+      if (active) {
+        setActiveTermId(active.id);
+        setActiveTerm({ name: active.name, year: active.year });
+      }
     }).catch(() => {});
   }, []);
 
@@ -150,6 +155,7 @@ export default function StudentsPage() {
     setContact2(blankContact());
     setWizardStep(1);
     setEnrolledStudentNumber(null);
+    setEnrolledTerm(null);
     setIsWizardOpen(true);
   };
 
@@ -157,6 +163,7 @@ export default function StudentsPage() {
     setIsWizardOpen(false);
     setWizardStep(1);
     setEnrolledStudentNumber(null);
+    setEnrolledTerm(null);
   };
 
   const handleFinalSubmit = async () => {
@@ -312,6 +319,10 @@ export default function StudentsPage() {
       // Always show success if the main enrolment worked
       loadStudents();
       setEnrolledStudentNumber(studentNumber);
+
+      const termName = enrolRes.data?.termName ?? activeTerm?.name;
+      const termYear = enrolRes.data?.termYear ?? activeTerm?.year;
+      setEnrolledTerm(termName && termYear ? { name: termName, year: termYear } : null);
     } catch (err: any) {
       const status = err.response?.status;
       const data = err.response?.data;
@@ -796,7 +807,9 @@ export default function StudentsPage() {
                 <div style={{ background: '#f0fdf4', border: '2px solid #bbf7d0', borderRadius: '12px', padding: '20px 24px', marginBottom: '28px', display: 'inline-block', minWidth: '240px' }}>
                   <p style={{ fontSize: '12px', color: '#15803d', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Student Number</p>
                   <p style={{ fontSize: '28px', fontWeight: '700', color: '#15803d', fontFamily: 'ui-monospace, monospace', margin: '0 0 10px' }}>{enrolledStudentNumber}</p>
-                  <p style={{ fontSize: '12px', color: '#15803d', fontWeight: '500', margin: 0 }}>Enrolled for Term 1 · 2026 Academic Year</p>
+                  <p style={{ fontSize: '12px', color: '#15803d', fontWeight: '500', margin: 0 }}>
+                    {enrolledTerm ? `Enrolled for ${enrolledTerm.name} · ${enrolledTerm.year} Academic Year` : 'Enrolled successfully'}
+                  </p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
                   <button
@@ -808,6 +821,7 @@ export default function StudentsPage() {
                   <button
                     onClick={() => {
                       setEnrolledStudentNumber(null);
+                      setEnrolledTerm(null);
                       setStep1(blankStep1());
                       setStep2(blankStep2());
                       setStep3(blankStep3());

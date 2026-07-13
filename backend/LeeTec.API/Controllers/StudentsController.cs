@@ -143,6 +143,8 @@ namespace LeeTec.API.Controllers
                     studentNumber = student.StudentNumber,
                     studentId = student.Id,
                     campus = prefix,
+                    termName = activeTerm?.Name,
+                    termYear = activeTerm?.Year,
                 });
             }
             catch (Exception ex)
