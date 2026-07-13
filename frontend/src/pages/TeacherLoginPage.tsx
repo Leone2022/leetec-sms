@@ -75,6 +75,8 @@ export default function TeacherLoginPage() {
 
           <div className="auth-login-wrap">
             <div className="auth-login-card">
+              <img src="/leetec.jpg" alt="LeeTec Solutions"
+                style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', marginBottom: 16 }} />
               <span className="auth-badge">Teacher Access</span>
               <h2 className="auth-login-title">Welcome back</h2>
               <p className="auth-login-sub">Sign in with your staff account to access your classes.</p>

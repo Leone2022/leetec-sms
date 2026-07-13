@@ -11,7 +11,6 @@ import {
   ChevronRight,
   ChevronDown,
   X,
-  GraduationCap,
   Calendar,
   Shield,
   BookOpen,
@@ -116,7 +115,8 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
     <div className={`admin-shell${open ? ' sidebar-open' : ''}`}>
       <aside className="admin-sidebar">
         <div className="admin-sidebar-header">
-          <div className="admin-logo"><GraduationCap size={16} /></div>
+          <img src="/leetec.jpg" alt="LeeTec"
+            style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
           <div>
             <p className="admin-brand-title">LeeTec SMS</p>
             <p className="admin-brand-subtitle">Admin Console</p>

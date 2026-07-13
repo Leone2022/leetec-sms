@@ -137,6 +137,8 @@ export default function StudentPortalLoginPage() {
 
           <div className="auth-login-wrap">
             <div className="auth-login-card">
+              <img src="/leetec.jpg" alt="LeeTec Solutions"
+                style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', marginBottom: 16 }} />
               {/* Tab switcher (only login + register) */}
               {tab !== 'forgot' && (
                 <>

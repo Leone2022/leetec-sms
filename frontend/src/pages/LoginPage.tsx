@@ -135,6 +135,8 @@ export default function LoginPage() {
 
           <div className="auth-login-wrap">
             <div className="auth-login-card">
+              <img src="/leetec.jpg" alt="LeeTec Solutions"
+                style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', marginBottom: 16 }} />
               {showForgotPassword ? (
                 <>
                   <span className="auth-badge">Staff Access</span>
