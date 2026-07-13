@@ -115,8 +115,22 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
     <div className={`admin-shell${open ? ' sidebar-open' : ''}`}>
       <aside className="admin-sidebar">
         <div className="admin-sidebar-header">
-          <img src="/leetec.jpg" alt="LeeTec"
-            style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
+          <img src="/leetec.jpg"
+            alt="LeeTec"
+            style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover' }}
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling?.setAttribute('style', 'display:flex');
+            }}
+          />
+          <div style={{
+            display: 'none',
+            width: 48, height: 48,
+            background: 'linear-gradient(135deg, #1a237e, #3949ab)',
+            borderRadius: 10,
+            alignItems: 'center', justifyContent: 'center',
+            color: 'white', fontWeight: 800, fontSize: 16
+          }}>LC</div>
           <div>
             <p className="admin-brand-title">LeeTec SMS</p>
             <p className="admin-brand-subtitle">Admin Console</p>

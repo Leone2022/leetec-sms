@@ -93,7 +93,7 @@ export default function DashboardPage() {
           </h2>
           <p>
             Real-time visibility into student records, billing flow, and cash collection for{' '}
-            {activeTerm ? `${activeTerm.name} ${activeTerm.year}` : 'the current term'}.
+            {activeTerm ? activeTerm.name : 'the current term'}.
           </p>
         </section>
 
