@@ -36,7 +36,8 @@ namespace LeeTec.API.Controllers
                     "AHS" => "AHS",
                     _     => "AHA"
                 };
-                var lastStudent = _context.Students.Where(s => s.StudentNumber.StartsWith($"{prefix}/{DateTime.Now.Year}/")).OrderByDescending(s => s.StudentNumber).FirstOrDefault();
+                var yearPrefix = $"{prefix}/{DateTime.Now.Year}/";
+                var lastStudent = _context.Students.Where(s => s.StudentNumber.StartsWith(yearPrefix)).OrderByDescending(s => s.StudentNumber).FirstOrDefault();
                 int nextNumber = 1;
                 if (lastStudent != null) { var parts = lastStudent.StudentNumber.Split('/'); if (parts.Length == 3 && int.TryParse(parts[2], out int last)) nextNumber = last + 1; }
                 var studentNumber = $"{prefix}/{DateTime.Now.Year}/{nextNumber:D4}";
