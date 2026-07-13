@@ -315,6 +315,30 @@ namespace LeeTec.API.Controllers
                     .Where(p => p.StudentId == id).ToListAsync();
                 _context.StudentPortalAccounts.RemoveRange(portalAccounts);
 
+                var studentSubjects = await _context.StudentSubjects
+                    .Where(s => s.StudentId == id).ToListAsync();
+                _context.StudentSubjects.RemoveRange(studentSubjects);
+
+                var termRegistrations = await _context.TermRegistrations
+                    .Where(t => t.StudentId == id).ToListAsync();
+                _context.TermRegistrations.RemoveRange(termRegistrations);
+
+                var marks = await _context.Marks
+                    .Where(m => m.StudentId == id).ToListAsync();
+                _context.Marks.RemoveRange(marks);
+
+                var invoices = await _context.Invoices
+                    .Where(i => i.StudentId == id).ToListAsync();
+                foreach (var inv in invoices) {
+                    var items = await _context.InvoiceItems
+                        .Where(ii => ii.InvoiceId == inv.Id).ToListAsync();
+                    _context.InvoiceItems.RemoveRange(items);
+                    var payments = await _context.Payments
+                        .Where(p => p.InvoiceId == inv.Id).ToListAsync();
+                    _context.Payments.RemoveRange(payments);
+                }
+                _context.Invoices.RemoveRange(invoices);
+
                 _context.Students.Remove(student);
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
