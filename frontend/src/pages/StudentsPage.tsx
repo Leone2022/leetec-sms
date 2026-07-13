@@ -108,10 +108,17 @@ export default function StudentsPage() {
   const [activeTerm, setActiveTerm] = useState<{ name: string; year: number } | null>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTab, setEditTab] = useState<'personal' | 'medical' | 'family'>('personal');
   const [editForm, setEditForm] = useState<{
     firstName: string; surname: string; dateOfBirth: string; gender: string;
     race: string; form: string; curriculum: string; email: string; studentType: string;
-  }>({ firstName: '', surname: '', dateOfBirth: '', gender: 'Male', race: '', form: '', curriculum: '', email: '', studentType: 'Day' });
+    familyDoctorName: string; familyDoctorPhone: string; medicalAidSociety: string; medicalAidNo: string; allergies: string;
+    maritalStatus: string; homeLanguage: string; religion: string; homeAddress: string; homeTelephone: string; cell: string; familyEmail: string;
+  }>({
+    firstName: '', surname: '', dateOfBirth: '', gender: 'Male', race: '', form: '', curriculum: '', email: '', studentType: 'Day',
+    familyDoctorName: '', familyDoctorPhone: '', medicalAidSociety: '', medicalAidNo: '', allergies: '',
+    maritalStatus: '', homeLanguage: '', religion: '', homeAddress: '', homeTelephone: '', cell: '', familyEmail: '',
+  });
   const [editError, setEditError] = useState('');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
@@ -544,6 +551,7 @@ export default function StudentsPage() {
 
   const openEditModal = () => {
     const s = profileStudent || selectedStudent;
+    const family = s.family ?? {};
     setEditForm({
       firstName: s.firstName ?? '',
       surname: s.surname ?? '',
@@ -554,7 +562,20 @@ export default function StudentsPage() {
       curriculum: s.curriculum ?? '',
       email: '',
       studentType: s.studentType ?? 'Day',
+      familyDoctorName: s.familyDoctorName ?? '',
+      familyDoctorPhone: s.familyDoctorPhone ?? '',
+      medicalAidSociety: s.medicalAidSociety ?? '',
+      medicalAidNo: s.medicalAidNo ?? '',
+      allergies: s.allergies ?? '',
+      maritalStatus: family.maritalStatus ?? '',
+      homeLanguage: family.homeLanguage ?? '',
+      religion: family.religion ?? '',
+      homeAddress: family.homeAddress ?? '',
+      homeTelephone: family.homeTelephone ?? '',
+      cell: family.cell ?? '',
+      familyEmail: family.email ?? '',
     });
+    setEditTab('personal');
     setEditError('');
     setIsEditModalOpen(true);
   };
@@ -578,6 +599,18 @@ export default function StudentsPage() {
         studentType: editForm.studentType,
         curriculum: editForm.curriculum,
         email: editForm.email.trim() || undefined,
+        familyDoctorName: editForm.familyDoctorName.trim(),
+        familyDoctorPhone: editForm.familyDoctorPhone.trim(),
+        medicalAidSociety: editForm.medicalAidSociety.trim(),
+        medicalAidNo: editForm.medicalAidNo.trim(),
+        allergies: editForm.allergies.trim(),
+        maritalStatus: editForm.maritalStatus.trim(),
+        homeLanguage: editForm.homeLanguage.trim(),
+        religion: editForm.religion.trim(),
+        homeAddress: editForm.homeAddress.trim(),
+        homeTelephone: editForm.homeTelephone.trim(),
+        cell: editForm.cell.trim(),
+        familyEmail: editForm.familyEmail.trim(),
       });
       setIsEditModalOpen(false);
       showMessage('Student updated successfully', 'success');
@@ -1693,64 +1726,155 @@ export default function StudentsPage() {
                   </div>
                 </div>
 
-                {/* Editable fields */}
-                <div>
-                  <p style={sectionHeadStyle}>Personal Details</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <div>
-                      <label style={labelStyle}>First Name *</label>
-                      {ef(editForm.firstName, (v) => setEditForm((f) => ({ ...f, firstName: v })), { placeholder: 'First name' })}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Surname *</label>
-                      {ef(editForm.surname, (v) => setEditForm((f) => ({ ...f, surname: v })), { placeholder: 'Surname' })}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Date of Birth</label>
-                      {ef(editForm.dateOfBirth, (v) => setEditForm((f) => ({ ...f, dateOfBirth: v })), { type: 'date' })}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Gender</label>
-                      {esel(editForm.gender, (v) => setEditForm((f) => ({ ...f, gender: v })), ['Male', 'Female'])}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Race</label>
-                      {ef(editForm.race, (v) => setEditForm((f) => ({ ...f, race: v })), { placeholder: 'e.g. African' })}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Form / Class</label>
-                      {esel(editForm.form, (v) => setEditForm((f) => ({ ...f, form: v })), formOptions)}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Curriculum</label>
-                      {esel(editForm.curriculum, (v) => setEditForm((f) => ({ ...f, curriculum: v })), curriculumOptions)}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Student Email</label>
-                      {ef(editForm.email, (v) => setEditForm((f) => ({ ...f, email: v })), { type: 'email', placeholder: 'student@example.com' })}
-                    </div>
-                    <div style={{ gridColumn: 'span 2' }}>
-                      <label style={labelStyle}>Student Type</label>
-                      <div style={{ display: 'flex', gap: 10 }}>
-                        {(['Day', 'Boarding'] as const).map((type) => (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => setEditForm((f) => ({ ...f, studentType: type }))}
-                            style={{
-                              flex: 1, padding: '10px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
-                              border: editForm.studentType === type ? '2px solid #1a237e' : '2px solid #e2e8f0',
-                              background: editForm.studentType === type ? '#1a237e' : 'white',
-                              color: editForm.studentType === type ? 'white' : '#475569',
-                            }}
-                          >
-                            {type === 'Day' ? 'Day Scholar' : 'Boarder'}
-                          </button>
-                        ))}
+                {/* Tab switcher */}
+                <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', borderRadius: 10, padding: 4 }}>
+                  {([
+                    { id: 'personal' as const, label: 'Personal' },
+                    { id: 'medical' as const, label: 'Medical' },
+                    { id: 'family' as const, label: 'Family' },
+                  ]).map(({ id, label }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setEditTab(id)}
+                      style={{
+                        flex: 1, padding: '8px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                        fontSize: 13, fontWeight: 600,
+                        background: editTab === id ? '#1a237e' : 'transparent',
+                        color: editTab === id ? 'white' : '#475569',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Personal Details */}
+                {editTab === 'personal' && (
+                  <div>
+                    <p style={sectionHeadStyle}>Personal Details</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={labelStyle}>First Name *</label>
+                        {ef(editForm.firstName, (v) => setEditForm((f) => ({ ...f, firstName: v })), { placeholder: 'First name' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Surname *</label>
+                        {ef(editForm.surname, (v) => setEditForm((f) => ({ ...f, surname: v })), { placeholder: 'Surname' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Date of Birth</label>
+                        {ef(editForm.dateOfBirth, (v) => setEditForm((f) => ({ ...f, dateOfBirth: v })), { type: 'date' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Gender</label>
+                        {esel(editForm.gender, (v) => setEditForm((f) => ({ ...f, gender: v })), ['Male', 'Female'])}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Race</label>
+                        {ef(editForm.race, (v) => setEditForm((f) => ({ ...f, race: v })), { placeholder: 'e.g. African' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Form / Class</label>
+                        {esel(editForm.form, (v) => setEditForm((f) => ({ ...f, form: v })), formOptions)}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Curriculum</label>
+                        {esel(editForm.curriculum, (v) => setEditForm((f) => ({ ...f, curriculum: v })), curriculumOptions)}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Student Email</label>
+                        {ef(editForm.email, (v) => setEditForm((f) => ({ ...f, email: v })), { type: 'email', placeholder: 'student@example.com' })}
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Student Type</label>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                          {(['Day', 'Boarding'] as const).map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => setEditForm((f) => ({ ...f, studentType: type }))}
+                              style={{
+                                flex: 1, padding: '10px', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                                border: editForm.studentType === type ? '2px solid #1a237e' : '2px solid #e2e8f0',
+                                background: editForm.studentType === type ? '#1a237e' : 'white',
+                                color: editForm.studentType === type ? 'white' : '#475569',
+                              }}
+                            >
+                              {type === 'Day' ? 'Day Scholar' : 'Boarder'}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {/* Medical */}
+                {editTab === 'medical' && (
+                  <div>
+                    <p style={sectionHeadStyle}>Medical Information</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={labelStyle}>Family Doctor Name</label>
+                        {ef(editForm.familyDoctorName, (v) => setEditForm((f) => ({ ...f, familyDoctorName: v })), { placeholder: 'Doctor name' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Family Doctor Phone</label>
+                        {ef(editForm.familyDoctorPhone, (v) => setEditForm((f) => ({ ...f, familyDoctorPhone: v })), { placeholder: 'Doctor phone number' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Medical Aid Society</label>
+                        {ef(editForm.medicalAidSociety, (v) => setEditForm((f) => ({ ...f, medicalAidSociety: v })), { placeholder: 'Medical aid society' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Medical Aid No.</label>
+                        {ef(editForm.medicalAidNo, (v) => setEditForm((f) => ({ ...f, medicalAidNo: v })), { placeholder: 'Medical aid number' })}
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Allergies</label>
+                        {ef(editForm.allergies, (v) => setEditForm((f) => ({ ...f, allergies: v })), { placeholder: 'Any allergies or medical conditions' })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Family */}
+                {editTab === 'family' && (
+                  <div>
+                    <p style={sectionHeadStyle}>Family Information</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={labelStyle}>Marital Status</label>
+                        {ef(editForm.maritalStatus, (v) => setEditForm((f) => ({ ...f, maritalStatus: v })), { placeholder: 'e.g. Married' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Home Language</label>
+                        {ef(editForm.homeLanguage, (v) => setEditForm((f) => ({ ...f, homeLanguage: v })), { placeholder: 'e.g. Shona' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Religion</label>
+                        {ef(editForm.religion, (v) => setEditForm((f) => ({ ...f, religion: v })), { placeholder: 'e.g. Adventist' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Home Telephone</label>
+                        {ef(editForm.homeTelephone, (v) => setEditForm((f) => ({ ...f, homeTelephone: v })), { placeholder: 'Home telephone' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Cell</label>
+                        {ef(editForm.cell, (v) => setEditForm((f) => ({ ...f, cell: v })), { placeholder: 'Cell number' })}
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Family Email</label>
+                        {ef(editForm.familyEmail, (v) => setEditForm((f) => ({ ...f, familyEmail: v })), { type: 'email', placeholder: 'family@example.com' })}
+                      </div>
+                      <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Home Address</label>
+                        {ef(editForm.homeAddress, (v) => setEditForm((f) => ({ ...f, homeAddress: v })), { placeholder: 'Home address' })}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {editError && (
                   <div style={{ color: '#dc2626', fontSize: '13px', fontWeight: '600', padding: '10px 14px', background: '#fef2f2', borderRadius: '6px', border: '1px solid #fecaca' }}>

@@ -174,6 +174,35 @@ namespace LeeTec.API.Controllers
             student.StudentType = dto.StudentType;
             student.Curriculum = dto.Curriculum;
 
+            // Medical details live directly on the Student record
+            if (dto.FamilyDoctorName != null) student.FamilyDoctorName = dto.FamilyDoctorName.Trim();
+            if (dto.FamilyDoctorPhone != null) student.FamilyDoctorPhone = dto.FamilyDoctorPhone.Trim();
+            if (dto.MedicalAidSociety != null) student.MedicalAidSociety = dto.MedicalAidSociety.Trim();
+            if (dto.MedicalAidNo != null) student.MedicalAidNo = dto.MedicalAidNo.Trim();
+            if (dto.Allergies != null) student.Allergies = dto.Allergies.Trim();
+
+            // Family info lives in a related Family record — upsert it
+            var hasFamilyFields = dto.MaritalStatus != null || dto.HomeLanguage != null || dto.Religion != null
+                || dto.HomeAddress != null || dto.HomeTelephone != null || dto.Cell != null || dto.FamilyEmail != null;
+
+            if (hasFamilyFields)
+            {
+                var family = await _context.Families.FirstOrDefaultAsync(f => f.StudentId == id);
+                if (family == null)
+                {
+                    family = new Family { StudentId = id, CreatedAt = DateTime.UtcNow };
+                    _context.Families.Add(family);
+                }
+
+                if (dto.MaritalStatus != null) family.MaritalStatus = dto.MaritalStatus.Trim();
+                if (dto.HomeLanguage != null) family.HomeLanguage = dto.HomeLanguage.Trim();
+                if (dto.Religion != null) family.Religion = dto.Religion.Trim();
+                if (dto.HomeAddress != null) family.HomeAddress = dto.HomeAddress.Trim();
+                if (dto.HomeTelephone != null) family.HomeTelephone = dto.HomeTelephone.Trim();
+                if (dto.Cell != null) family.Cell = dto.Cell.Trim();
+                if (dto.FamilyEmail != null) family.Email = dto.FamilyEmail.Trim();
+            }
+
             await _context.SaveChangesAsync();
             return Ok(new { message = "Student updated successfully" });
         }
@@ -295,6 +324,53 @@ namespace LeeTec.API.Controllers
                 var student = await _context.Students.FindAsync(id);
                 if (student == null) return NotFound(new { message = "Student not found" });
 
+                // Invoices are referenced by Payments and InvoiceItems, so those
+                // must go first — otherwise removing the Invoice rows alone still
+                // violates the FK constraint on Payments/InvoiceItems.
+                var invoiceIds = await _context.Invoices
+                    .Where(i => i.StudentId == id)
+                    .Select(i => i.Id)
+                    .ToListAsync();
+
+                var payments = await _context.Payments
+                    .Where(p => p.StudentId == id || invoiceIds.Contains(p.InvoiceId))
+                    .ToListAsync();
+                _context.Payments.RemoveRange(payments);
+
+                var invoiceItems = await _context.InvoiceItems
+                    .Where(ii => invoiceIds.Contains(ii.InvoiceId))
+                    .ToListAsync();
+                _context.InvoiceItems.RemoveRange(invoiceItems);
+
+                var invoices = await _context.Invoices
+                    .Where(i => i.StudentId == id)
+                    .ToListAsync();
+                _context.Invoices.RemoveRange(invoices);
+
+                var bursaries = await _context.Bursaries
+                    .Where(b => b.StudentId == id).ToListAsync();
+                _context.Bursaries.RemoveRange(bursaries);
+
+                var activationTokens = await _context.ActivationTokens
+                    .Where(a => a.StudentId == id).ToListAsync();
+                _context.ActivationTokens.RemoveRange(activationTokens);
+
+                var portalAccounts = await _context.StudentPortalAccounts
+                    .Where(p => p.StudentId == id).ToListAsync();
+                _context.StudentPortalAccounts.RemoveRange(portalAccounts);
+
+                var marks = await _context.Marks
+                    .Where(m => m.StudentId == id).ToListAsync();
+                _context.Marks.RemoveRange(marks);
+
+                var studentSubjects = await _context.StudentSubjects
+                    .Where(ss => ss.StudentId == id).ToListAsync();
+                _context.StudentSubjects.RemoveRange(studentSubjects);
+
+                var termRegistrations = await _context.TermRegistrations
+                    .Where(tr => tr.StudentId == id).ToListAsync();
+                _context.TermRegistrations.RemoveRange(termRegistrations);
+
                 var family = await _context.Families
                     .FirstOrDefaultAsync(f => f.StudentId == id);
                 if (family != null) _context.Families.Remove(family);
@@ -310,10 +386,6 @@ namespace LeeTec.API.Controllers
                 var invoicing = await _context.InvoicingDetails
                     .FirstOrDefaultAsync(i => i.StudentId == id);
                 if (invoicing != null) _context.InvoicingDetails.Remove(invoicing);
-
-                var portalAccounts = await _context.StudentPortalAccounts
-                    .Where(p => p.StudentId == id).ToListAsync();
-                _context.StudentPortalAccounts.RemoveRange(portalAccounts);
 
                 _context.Students.Remove(student);
                 await _context.SaveChangesAsync();

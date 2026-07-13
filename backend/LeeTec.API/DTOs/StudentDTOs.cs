@@ -36,6 +36,22 @@ namespace LeeTec.API.DTOs
         public string StudentType { get; set; } = "Day";
         public string Curriculum { get; set; } = string.Empty;
         public string? Email { get; set; }
+
+        // Medical (stored directly on Student)
+        public string? FamilyDoctorName { get; set; }
+        public string? FamilyDoctorPhone { get; set; }
+        public string? MedicalAidSociety { get; set; }
+        public string? MedicalAidNo { get; set; }
+        public string? Allergies { get; set; }
+
+        // Family info (upserted into the related Family record)
+        public string? MaritalStatus { get; set; }
+        public string? HomeLanguage { get; set; }
+        public string? Religion { get; set; }
+        public string? HomeAddress { get; set; }
+        public string? HomeTelephone { get; set; }
+        public string? Cell { get; set; }
+        public string? FamilyEmail { get; set; }
     }
 
     public class ActivateDTO
