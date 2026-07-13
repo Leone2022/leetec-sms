@@ -135,8 +135,30 @@ export default function LoginPage() {
 
           <div className="auth-login-wrap">
             <div className="auth-login-card">
-              <img src="/leetec.jpg" alt="LeeTec Solutions"
-                style={{ width: 64, height: 64, borderRadius: 12, objectFit: 'cover', marginBottom: 16 }} />
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 16
+              }}>
+                <div style={{
+                  width: 48,
+                  height: 48,
+                  background: 'linear-gradient(135deg, #1a237e, #3949ab)',
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontWeight: 800,
+                  fontSize: 20,
+                  letterSpacing: -1
+                }}>LC</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: '#1a237e' }}>LeeTec</div>
+                  <div style={{ fontSize: 11, color: '#64748b', letterSpacing: 2 }}>SOLUTIONS</div>
+                </div>
+              </div>
               {showForgotPassword ? (
                 <>
                   <span className="auth-badge">Staff Access</span>
