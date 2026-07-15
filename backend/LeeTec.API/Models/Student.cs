@@ -8,6 +8,7 @@ namespace LeeTec.API.Models
         public int SchoolId { get; set; }
         public int? UserId { get; set; }
         public string StudentNumber { get; set; } = string.Empty;
+        public string Campus { get; set; } = string.Empty; // AHJ | AHA | AHS — kept in sync with the StudentNumber prefix
 
         // A. PUPIL DETAILS
         public string Surname { get; set; } = string.Empty;

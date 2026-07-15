@@ -36,6 +36,7 @@ namespace LeeTec.API.DTOs
         public string StudentType { get; set; } = "Day";
         public string Curriculum { get; set; } = string.Empty;
         public string? Email { get; set; }
+        public string? Campus { get; set; }
 
         // Medical & Academic (stored directly on Student)
         public string? PreviousSchool { get; set; }

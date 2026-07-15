@@ -111,12 +111,12 @@ export default function StudentsPage() {
   const [editTab, setEditTab] = useState<'personal' | 'medical' | 'family' | 'guardians'>('personal');
   const [editForm, setEditForm] = useState<{
     firstName: string; surname: string; dateOfBirth: string; gender: string;
-    race: string; form: string; curriculum: string; email: string; studentType: string;
+    race: string; campus: string; form: string; curriculum: string; email: string; studentType: string;
     previousSchool: string; medicalAidSociety: string; medicalAidNo: string;
     familyDoctorName: string; familyDoctorPhone: string; allergies: string; denomination: string; otherInformation: string;
     homeAddress: string; homeTelephone: string; cell: string; homeLanguage: string; religion: string; maritalStatus: string; familyEmail: string;
   }>({
-    firstName: '', surname: '', dateOfBirth: '', gender: 'Male', race: '', form: '', curriculum: '', email: '', studentType: 'Day',
+    firstName: '', surname: '', dateOfBirth: '', gender: 'Male', race: '', campus: 'AHA', form: '', curriculum: '', email: '', studentType: 'Day',
     previousSchool: '', medicalAidSociety: '', medicalAidNo: '',
     familyDoctorName: '', familyDoctorPhone: '', allergies: '', denomination: '', otherInformation: '',
     homeAddress: '', homeTelephone: '', cell: '', homeLanguage: '', religion: '', maritalStatus: '', familyEmail: '',
@@ -563,12 +563,14 @@ export default function StudentsPage() {
     const guardians: any[] = s.guardians ?? [];
     const father = guardians.find((g) => g.guardianType === 'Father') ?? guardians[0] ?? {};
     const mother = guardians.find((g) => g.guardianType === 'Mother') ?? guardians[1] ?? {};
+    const currentCampus = (s.studentNumber ?? '').split('/')[0] || 'AHA';
     setEditForm({
       firstName: s.firstName ?? '',
       surname: s.surname ?? '',
       dateOfBirth: s.dateOfBirth ? new Date(s.dateOfBirth).toISOString().split('T')[0] : '',
       gender: s.gender ?? 'Male',
       race: s.race ?? '',
+      campus: currentCampus,
       form: s.form ?? '',
       curriculum: s.curriculum ?? '',
       email: '',
@@ -616,12 +618,13 @@ export default function StudentsPage() {
     setEditError('');
     try {
       // 1. Personal, medical & academic details — all columns on Student itself
-      await studentsAPI.updateStudent(selectedStudent.id, {
+      const updateRes = await studentsAPI.updateStudent(selectedStudent.id, {
         firstName: editForm.firstName.trim(),
         surname: editForm.surname.trim(),
         dateOfBirth: editForm.dateOfBirth,
         gender: editForm.gender,
         race: editForm.race.trim(),
+        campus: editForm.campus,
         form: editForm.form,
         studentType: editForm.studentType,
         curriculum: editForm.curriculum,
@@ -635,6 +638,7 @@ export default function StudentsPage() {
         denomination: editForm.denomination.trim(),
         otherInformation: editForm.otherInformation.trim(),
       });
+      const newStudentNumber: string | undefined = updateRes.data?.newStudentNumber;
 
       // 2. Family details, only if at least one field was filled in
       const familyFields = {
@@ -670,7 +674,11 @@ export default function StudentsPage() {
       }
 
       setIsEditModalOpen(false);
-      showMessage('Student updated successfully', 'success');
+      if (newStudentNumber) {
+        showMessage(`Campus updated. New student number: ${newStudentNumber}`, 'success');
+      } else {
+        showMessage('Student updated successfully', 'success');
+      }
       loadStudents();
       const detailRes = await studentsAPI.getById(selectedStudent.id);
       setProfileStudent(detailRes.data);
@@ -680,6 +688,7 @@ export default function StudentsPage() {
         surname: editForm.surname.trim(),
         form: editForm.form,
         gender: editForm.gender,
+        studentNumber: newStudentNumber || prev.studentNumber,
       }));
     } catch (err: any) {
       setEditError(err.response?.data?.message || 'Failed to update student');
@@ -1708,15 +1717,29 @@ export default function StudentsPage() {
 
       {/* ─── EDIT MODAL ─── */}
       {isEditModalOpen && selectedStudent && (() => {
-        const campus = (selectedStudent.studentNumber ?? '').split('/')[0];
-        const campusLabel = campus === 'AHJ' ? 'Advent Hope Junior' : campus === 'AHS' ? 'Advent Hope Senior' : 'Advent Hope Academy';
-        const formOptions = campus === 'AHJ'
+        const originalCampus = (selectedStudent.studentNumber ?? '').split('/')[0];
+        const formOptions = editForm.campus === 'AHJ'
           ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6']
-          : campus === 'AHS' ? ['Lower 6', 'Upper 6']
+          : editForm.campus === 'AHS' ? ['Lower 6', 'Upper 6']
           : ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
-        const curriculumOptions = campus === 'AHJ' ? ['Cambridge']
-          : campus === 'AHS' ? ['ZIMSEC A-Level', 'Cambridge A-Level']
+        const curriculumOptions = editForm.campus === 'AHJ' ? ['Cambridge']
+          : editForm.campus === 'AHS' ? ['ZIMSEC A-Level', 'Cambridge A-Level']
           : ['ZIMSEC O-Level', 'Cambridge IGCSE'];
+        const handleEditCampusChange = (newCampus: string) => {
+          const newFormOptions = newCampus === 'AHJ'
+            ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6']
+            : newCampus === 'AHS' ? ['Lower 6', 'Upper 6']
+            : ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
+          const newCurriculumOptions = newCampus === 'AHJ' ? ['Cambridge']
+            : newCampus === 'AHS' ? ['ZIMSEC A-Level', 'Cambridge A-Level']
+            : ['ZIMSEC O-Level', 'Cambridge IGCSE'];
+          setEditForm((f) => ({
+            ...f,
+            campus: newCampus,
+            form: newFormOptions[0],
+            curriculum: newCurriculumOptions[0],
+          }));
+        };
         const roStyle: React.CSSProperties = {
           padding: '8px 14px', background: '#f1f5f9', color: '#64748b',
           borderRadius: '6px', fontSize: '13px', fontWeight: '600',
@@ -1767,14 +1790,10 @@ export default function StudentsPage() {
                 {/* Read-only fields */}
                 <div>
                   <p style={sectionHeadStyle}>Read-Only</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
                       <label style={labelStyle}>Student Number</label>
                       <div style={roStyle}>{selectedStudent.studentNumber}</div>
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Campus</label>
-                      <div style={roStyle}>{campusLabel}</div>
                     </div>
                     <div>
                       <label style={labelStyle}>Birth Cert. No.</label>
@@ -1832,6 +1851,15 @@ export default function StudentsPage() {
                         <label style={labelStyle}>Race</label>
                         {ef(editForm.race, (v) => setEditForm((f) => ({ ...f, race: v })), { placeholder: 'e.g. African' })}
                       </div>
+                      <div>
+                        <label style={labelStyle}>Campus</label>
+                        {esel(editForm.campus, handleEditCampusChange, ['AHJ', 'AHA', 'AHS'])}
+                      </div>
+                      {editForm.campus !== originalCampus && (
+                        <div style={{ gridColumn: 'span 2', fontSize: 12, fontWeight: 600, color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 12px' }}>
+                          ⚠️ Changing campus will also update the student number to match the new campus.
+                        </div>
+                      )}
                       <div>
                         <label style={labelStyle}>Form / Class</label>
                         {esel(editForm.form, (v) => setEditForm((f) => ({ ...f, form: v })), formOptions)}

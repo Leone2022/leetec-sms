@@ -47,6 +47,7 @@ namespace LeeTec.API.Controllers
                     SchoolId = dto.SchoolId,
                     UserId = null,
                     StudentNumber = studentNumber,
+                    Campus = prefix,
                     Surname = dto.Surname,
                     FirstName = dto.FirstName,
                     DateOfBirth = dto.DateOfBirth,
@@ -165,29 +166,130 @@ namespace LeeTec.API.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateStudent(int id, [FromBody] UpdateStudentDTO dto)
         {
-            var student = await _context.Students.FindAsync(id);
-            if (student == null) return NotFound(new { message = "Student not found" });
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var student = await _context.Students.FindAsync(id);
+                if (student == null) return NotFound(new { message = "Student not found" });
 
-            student.FirstName = dto.FirstName.Trim();
-            student.Surname = dto.Surname.Trim();
-            student.DateOfBirth = dto.DateOfBirth;
-            student.Gender = dto.Gender;
-            student.Race = dto.Race;
-            student.Form = dto.Form;
-            student.StudentType = dto.StudentType;
-            student.Curriculum = dto.Curriculum;
+                student.FirstName = dto.FirstName.Trim();
+                student.Surname = dto.Surname.Trim();
+                student.DateOfBirth = dto.DateOfBirth;
+                student.Gender = dto.Gender;
+                student.Race = dto.Race;
+                student.Form = dto.Form;
+                student.StudentType = dto.StudentType;
+                student.Curriculum = dto.Curriculum;
 
-            if (dto.PreviousSchool != null) student.PreviousSchool = dto.PreviousSchool.Trim();
-            if (dto.MedicalAidSociety != null) student.MedicalAidSociety = dto.MedicalAidSociety.Trim();
-            if (dto.MedicalAidNo != null) student.MedicalAidNo = dto.MedicalAidNo.Trim();
-            if (dto.FamilyDoctorName != null) student.FamilyDoctorName = dto.FamilyDoctorName.Trim();
-            if (dto.FamilyDoctorPhone != null) student.FamilyDoctorPhone = dto.FamilyDoctorPhone.Trim();
-            if (dto.Allergies != null) student.Allergies = dto.Allergies.Trim();
-            if (dto.Denomination != null) student.Denomination = dto.Denomination.Trim();
-            if (dto.OtherInformation != null) student.OtherInformation = dto.OtherInformation.Trim();
+                if (dto.PreviousSchool != null) student.PreviousSchool = dto.PreviousSchool.Trim();
+                if (dto.MedicalAidSociety != null) student.MedicalAidSociety = dto.MedicalAidSociety.Trim();
+                if (dto.MedicalAidNo != null) student.MedicalAidNo = dto.MedicalAidNo.Trim();
+                if (dto.FamilyDoctorName != null) student.FamilyDoctorName = dto.FamilyDoctorName.Trim();
+                if (dto.FamilyDoctorPhone != null) student.FamilyDoctorPhone = dto.FamilyDoctorPhone.Trim();
+                if (dto.Allergies != null) student.Allergies = dto.Allergies.Trim();
+                if (dto.Denomination != null) student.Denomination = dto.Denomination.Trim();
+                if (dto.OtherInformation != null) student.OtherInformation = dto.OtherInformation.Trim();
 
-            await _context.SaveChangesAsync();
-            return Ok(new { message = "Student updated successfully" });
+                string? oldStudentNumber = null;
+                string? newStudentNumber = null;
+
+                if (!string.IsNullOrWhiteSpace(dto.Campus))
+                {
+                    // 1. Normalise the requested campus the same way EnrolStudent does
+                    var newCampus = dto.Campus switch
+                    {
+                        "AHJ" => "AHJ",
+                        "AHS" => "AHS",
+                        _ => "AHA"
+                    };
+
+                    var currentCampus = !string.IsNullOrWhiteSpace(student.Campus)
+                        ? student.Campus
+                        : (student.StudentNumber ?? "").Split('/')[0];
+
+                    if (!string.Equals(currentCampus, newCampus, StringComparison.OrdinalIgnoreCase))
+                    {
+                        oldStudentNumber = student.StudentNumber;
+
+                        // 2. Find the highest existing student number for that campus/year
+                        var yearPrefix = $"{newCampus}/{DateTime.Now.Year}/";
+                        var lastStudent = _context.Students
+                            .Where(s => s.Id != id && s.StudentNumber.StartsWith(yearPrefix))
+                            .OrderByDescending(s => s.StudentNumber)
+                            .FirstOrDefault();
+                        int nextNumber = 1;
+                        if (lastStudent != null)
+                        {
+                            var parts = lastStudent.StudentNumber.Split('/');
+                            if (parts.Length == 3 && int.TryParse(parts[2], out int last)) nextNumber = last + 1;
+                        }
+
+                        // 3. Generate new student number
+                        newStudentNumber = $"{newCampus}/{DateTime.Now.Year}/{nextNumber:D4}";
+
+                        // 4-5. Update Campus and StudentNumber
+                        student.Campus = newCampus;
+                        student.StudentNumber = newStudentNumber;
+
+                        // 6. Re-derive StudentSubjects for the active term against the new campus
+                        var activeTerm = await _context.Terms
+                            .FirstOrDefaultAsync(t => t.IsActive && t.SchoolId == student.SchoolId);
+
+                        if (activeTerm != null)
+                        {
+                            var oldSubjects = await _context.StudentSubjects
+                                .Where(ss => ss.StudentId == id && ss.TermId == activeTerm.Id)
+                                .ToListAsync();
+                            _context.StudentSubjects.RemoveRange(oldSubjects);
+
+                            var subjectCurriculumType = student.Curriculum.StartsWith("ZIMSEC", StringComparison.OrdinalIgnoreCase)
+                                ? "ZIMSEC"
+                                : "Cambridge";
+
+                            var matchingSubjects = await _context.Subjects
+                                .Where(s => s.SchoolId == student.SchoolId && s.Campus == newCampus
+                                    && s.CurriculumType == subjectCurriculumType && s.IsActive)
+                                .ToListAsync();
+
+                            foreach (var subject in matchingSubjects)
+                            {
+                                _context.StudentSubjects.Add(new StudentSubject
+                                {
+                                    StudentId = id,
+                                    SubjectId = subject.Id,
+                                    TermId = activeTerm.Id,
+                                    SchoolId = student.SchoolId,
+                                    IsActive = true,
+                                    CreatedAt = DateTime.UtcNow,
+                                });
+                            }
+
+                            // The active term's registration also records Campus/Form —
+                            // leaving it pointed at the old campus would make the student
+                            // show up under the wrong campus everywhere that reads
+                            // TermRegistrations instead of Student directly.
+                            var registration = await _context.TermRegistrations
+                                .FirstOrDefaultAsync(tr => tr.StudentId == id && tr.TermId == activeTerm.Id);
+                            if (registration != null)
+                            {
+                                registration.Campus = newCampus;
+                                registration.Form = student.Form;
+                            }
+                        }
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                // 7. Return both old and new student number
+                return Ok(new { message = "Student updated successfully", oldStudentNumber, newStudentNumber });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { message = "Failed to update student.", error = ex.Message });
+            }
         }
 
         // UPDATE FAMILY DETAILS (upsert)
