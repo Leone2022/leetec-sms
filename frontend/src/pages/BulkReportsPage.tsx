@@ -45,9 +45,68 @@ export default function BulkReportsPage() {
   const [publishForm, setPublishForm] = useState('All');
   const [publishingReportCards, setPublishingReportCards] = useState(false);
 
+  // Tabs
+  const [tab, setTab] = useState<'completion' | 'approvals'>('completion');
+
+  // Approve Marks tab
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+  const [loadingApprovals, setLoadingApprovals] = useState(false);
+  const [actioningKey, setActioningKey] = useState<string | null>(null);
+
   const showMsg = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
+  };
+
+  const loadPendingApprovals = async () => {
+    setLoadingApprovals(true);
+    try {
+      const res = await marksAPI.getPendingApproval(1);
+      setPendingApprovals(res.data || []);
+    } catch {
+      showMsg('Failed to load pending approvals', 'error');
+    } finally {
+      setLoadingApprovals(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === 'approvals') loadPendingApprovals();
+  }, [tab]);
+
+  const approvalKey = (g: any) => `${g.subjectId}-${g.termId}-${g.campus}-${g.form}`;
+
+  const handleApproveAll = async (g: any) => {
+    const key = approvalKey(g);
+    setActioningKey(key);
+    try {
+      const res = await marksAPI.approveMarks({
+        subjectId: g.subjectId, termId: g.termId, campus: g.campus, form: g.form, approvedBy: 'Admin',
+      });
+      showMsg(`Approved ${res.data?.approved ?? 0} marks for ${g.subjectName} — ${g.form}`, 'success');
+      await loadPendingApprovals();
+    } catch {
+      showMsg('Failed to approve marks', 'error');
+    } finally {
+      setActioningKey(null);
+    }
+  };
+
+  const handleSendBack = async (g: any) => {
+    const comment = window.prompt(`Send ${g.subjectName} — ${g.form} marks back to Draft. Optional comment for the teacher:`) ?? undefined;
+    const key = approvalKey(g);
+    setActioningKey(key);
+    try {
+      const res = await marksAPI.sendBackMarks({
+        subjectId: g.subjectId, termId: g.termId, campus: g.campus, form: g.form, comment,
+      });
+      showMsg(`Sent ${res.data?.sentBack ?? 0} marks back to Draft`, 'success');
+      await loadPendingApprovals();
+    } catch {
+      showMsg('Failed to send marks back', 'error');
+    } finally {
+      setActioningKey(null);
+    }
   };
 
   useEffect(() => {
@@ -232,6 +291,87 @@ export default function BulkReportsPage() {
         </div>
       )}
 
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 4, background: 'white', borderRadius: 10, padding: 5, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', marginBottom: 16, width: 'fit-content' }}>
+        {([
+          { id: 'completion' as const, label: 'Report Cards' },
+          { id: 'approvals' as const, label: '📋 Approve Marks' },
+        ]).map(({ id, label }) => (
+          <button key={id} onClick={() => setTab(id)} style={{
+            display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px',
+            borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            background: tab === id ? '#1a237e' : 'transparent',
+            color: tab === id ? 'white' : '#475569',
+          }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'approvals' && (
+        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>Pending Approvals</h3>
+            <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>
+              {pendingApprovals.length} submission{pendingApprovals.length !== 1 ? 's' : ''} awaiting review
+            </p>
+          </div>
+
+          {loadingApprovals ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#475569', fontSize: 13 }}>Loading...</div>
+          ) : pendingApprovals.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 13 }}>No marks are currently pending approval.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Form</th>
+                    <th>Campus</th>
+                    <th>Teacher</th>
+                    <th style={{ textAlign: 'center' }}>No. of Students</th>
+                    <th>Submitted Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingApprovals.map((g: any) => {
+                    const key = approvalKey(g);
+                    const busy = actioningKey === key;
+                    return (
+                      <tr key={key}>
+                        <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{g.subjectName}</td>
+                        <td>{g.form}</td>
+                        <td>{g.campus}</td>
+                        <td>{g.teacher || '—'}</td>
+                        <td style={{ textAlign: 'center' }}>{g.studentCount}</td>
+                        <td style={{ fontSize: 12, color: '#64748b' }}>
+                          {g.submittedDate ? new Date(g.submittedDate).toLocaleDateString('en-GB') : '—'}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn btn-primary" style={{ fontSize: 11, padding: '6px 10px' }}
+                              onClick={() => handleApproveAll(g)} disabled={busy}>
+                              ✅ Approve All
+                            </button>
+                            <button className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 10px' }}
+                              onClick={() => handleSendBack(g)} disabled={busy}>
+                              ↩ Send Back
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'completion' && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Publish Report Cards */}
@@ -453,6 +593,7 @@ export default function BulkReportsPage() {
           )}
         </div>
       </div>
+      )}
     </AdminLayout>
   );
 }

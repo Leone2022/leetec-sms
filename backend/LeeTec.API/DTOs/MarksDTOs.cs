@@ -64,5 +64,33 @@ namespace LeeTec.API.DTOs
         public decimal? Paper2Score { get; set; }
         public decimal? Score { get; set; }
         public string? Comments { get; set; }
+        public string? Status { get; set; }
+    }
+
+    public class SubmitMarksDTO
+    {
+        public int SubjectId { get; set; }
+        public int TermId { get; set; }
+        public string Campus { get; set; } = string.Empty;
+        public string Form { get; set; } = string.Empty;
+        public string SubmittedBy { get; set; } = string.Empty;
+    }
+
+    public class ApproveMarksDTO
+    {
+        public int SubjectId { get; set; }
+        public int TermId { get; set; }
+        public string Campus { get; set; } = string.Empty;
+        public string Form { get; set; } = string.Empty;
+        public string ApprovedBy { get; set; } = string.Empty;
+    }
+
+    public class SendBackMarksDTO
+    {
+        public int SubjectId { get; set; }
+        public int TermId { get; set; }
+        public string Campus { get; set; } = string.Empty;
+        public string Form { get; set; } = string.Empty;
+        public string? Comment { get; set; }
     }
 }

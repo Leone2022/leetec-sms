@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
@@ -74,11 +75,14 @@ namespace LeeTec.API.Controllers
                     Paper2Score = mark?.Paper2Score,
                     Score = mark?.Score,
                     Comments = mark?.Comments,
+                    Status = mark?.Status ?? "Draft",
                 };
             }).ToList();
 
             return Ok(result);
         }
+
+        private static readonly HashSet<string> LockedMarkStatuses = new(StringComparer.OrdinalIgnoreCase) { "Submitted", "Approved" };
 
         // BULK SAVE — upsert marks for a subject + term + assessment type
         [HttpPost("bulk-save")]
@@ -106,6 +110,9 @@ namespace LeeTec.API.Controllers
                         && (m.AssessmentType == "Mid-term Test" || m.AssessmentType == "End of Term Exam"))
                     .ToListAsync();
 
+                if (combinedExisting.Any(m => LockedMarkStatuses.Contains(m.Status)))
+                    return StatusCode(403, new { message = "These marks have been submitted and cannot be edited. Contact admin." });
+
                 int combinedSaved = 0;
                 foreach (var entry in dto.Marks)
                 {
@@ -124,6 +131,9 @@ namespace LeeTec.API.Controllers
                 .Where(m => m.TermId == dto.TermId && m.SubjectId == dto.SubjectId && m.AssessmentType == dto.AssessmentType && studentIds.Contains(m.StudentId))
                 .ToListAsync();
 
+            if (existingMarks.Any(m => LockedMarkStatuses.Contains(m.Status)))
+                return StatusCode(403, new { message = "These marks have been submitted and cannot be edited. Contact admin." });
+
             int saved = 0;
             foreach (var entry in dto.Entries)
             {
@@ -137,6 +147,7 @@ namespace LeeTec.API.Controllers
                         SubjectId = dto.SubjectId,
                         TermId = dto.TermId,
                         AssessmentType = dto.AssessmentType,
+                        Status = "Draft",
                         CreatedAt = DateTime.UtcNow,
                     };
                     _context.Marks.Add(mark);
@@ -152,6 +163,131 @@ namespace LeeTec.API.Controllers
 
             await _context.SaveChangesAsync();
             return Ok(new { message = $"Marks saved for {saved} students", saved });
+        }
+
+        // SUBMIT MARKS FOR REVIEW — Draft marks for this subject/term/campus/form become Submitted
+        [HttpPost("submit")]
+        public async Task<IActionResult> SubmitMarks([FromBody] SubmitMarksDTO dto)
+        {
+            var studentIds = await _context.TermRegistrations
+                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
+                .Select(tr => tr.StudentId)
+                .ToListAsync();
+
+            var marks = await _context.Marks
+                .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId
+                    && studentIds.Contains(m.StudentId) && m.Status == "Draft")
+                .ToListAsync();
+
+            foreach (var mark in marks)
+            {
+                mark.Status = "Submitted";
+                mark.SubmittedBy = dto.SubmittedBy;
+                mark.SubmittedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { submitted = marks.Count, message = "Marks submitted for review" });
+        }
+
+        // APPROVE MARKS — Submitted marks for this subject/term/campus/form become Approved
+        [Authorize]
+        [HttpPost("approve")]
+        public async Task<IActionResult> ApproveMarks([FromBody] ApproveMarksDTO dto)
+        {
+            var studentIds = await _context.TermRegistrations
+                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
+                .Select(tr => tr.StudentId)
+                .ToListAsync();
+
+            var marks = await _context.Marks
+                .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId
+                    && studentIds.Contains(m.StudentId) && m.Status == "Submitted")
+                .ToListAsync();
+
+            foreach (var mark in marks)
+            {
+                mark.Status = "Approved";
+                mark.ApprovedBy = dto.ApprovedBy;
+                mark.ApprovedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { approved = marks.Count });
+        }
+
+        // SEND BACK — Submitted marks for this subject/term/campus/form revert to Draft
+        [Authorize]
+        [HttpPost("send-back")]
+        public async Task<IActionResult> SendBackMarks([FromBody] SendBackMarksDTO dto)
+        {
+            var studentIds = await _context.TermRegistrations
+                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
+                .Select(tr => tr.StudentId)
+                .ToListAsync();
+
+            var marks = await _context.Marks
+                .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId
+                    && studentIds.Contains(m.StudentId) && m.Status == "Submitted")
+                .ToListAsync();
+
+            foreach (var mark in marks)
+            {
+                mark.Status = "Draft";
+                mark.SubmittedBy = null;
+                mark.SubmittedAt = null;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { sentBack = marks.Count, comment = dto.Comment });
+        }
+
+        // PENDING APPROVAL — all Submitted marks grouped by subject/term/campus/form
+        [Authorize]
+        [HttpGet("pending-approval")]
+        public async Task<IActionResult> GetPendingApproval([FromQuery] int schoolId = 1)
+        {
+            var submittedMarks = await _context.Marks
+                .Where(m => m.Status == "Submitted")
+                .Include(m => m.Subject)
+                .ToListAsync();
+
+            if (submittedMarks.Count == 0) return Ok(new List<object>());
+
+            var termIds = submittedMarks.Select(m => m.TermId).Distinct().ToList();
+            var studentIds = submittedMarks.Select(m => m.StudentId).Distinct().ToList();
+
+            var registrations = await _context.TermRegistrations
+                .Where(tr => tr.SchoolId == schoolId && termIds.Contains(tr.TermId) && studentIds.Contains(tr.StudentId))
+                .ToListAsync();
+
+            var regLookup = registrations
+                .GroupBy(r => (r.StudentId, r.TermId))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var grouped = submittedMarks
+                .Select(m => new
+                {
+                    Mark = m,
+                    Reg = regLookup.TryGetValue((m.StudentId, m.TermId), out var r) ? r : null,
+                })
+                .Where(x => x.Reg != null)
+                .GroupBy(x => new { x.Mark.SubjectId, SubjectName = x.Mark.Subject != null ? x.Mark.Subject.Name : "", x.Mark.TermId, Campus = x.Reg!.Campus, Form = x.Reg!.Form })
+                .Select(g => new
+                {
+                    subjectId = g.Key.SubjectId,
+                    subjectName = g.Key.SubjectName,
+                    termId = g.Key.TermId,
+                    campus = g.Key.Campus,
+                    form = g.Key.Form,
+                    teacher = g.Select(x => x.Mark.SubmittedBy).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "—",
+                    studentCount = g.Select(x => x.Mark.StudentId).Distinct().Count(),
+                    submittedDate = g.Min(x => x.Mark.SubmittedAt),
+                })
+                .OrderBy(g => g.subjectName).ThenBy(g => g.form)
+                .ToList();
+
+            return Ok(grouped);
         }
 
         // STUDENT MARKS — all marks for a student in a term, grouped by subject
@@ -195,6 +331,7 @@ namespace LeeTec.API.Controllers
                     SubjectId = dto.SubjectId,
                     TermId = dto.TermId,
                     AssessmentType = assessmentType,
+                    Status = "Draft",
                     CreatedAt = DateTime.UtcNow,
                 };
                 _context.Marks.Add(mark);

@@ -14,7 +14,14 @@ interface MarkRow {
   midtermScore: string;
   endOfTermScore: string;
   comments: string;
+  status: string;
 }
+
+const STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+  Draft: { label: 'Draft', bg: '#f1f5f9', color: '#475569' },
+  Submitted: { label: 'Submitted', bg: '#fff7ed', color: '#c2410c' },
+  Approved: { label: 'Approved ✅', bg: '#f0fdf4', color: '#15803d' },
+};
 
 const calculateGrade = (total: number) => {
   if (total >= 90) return 'A*';
@@ -55,6 +62,7 @@ export default function TeacherDashboardPage() {
   const [rows, setRows] = useState<MarkRow[]>([]);
   const [entryLoading, setEntryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const showMsg = (text: string, type: 'success' | 'error') => {
@@ -109,8 +117,12 @@ export default function TeacherDashboardPage() {
       const midData: any[] = midRes.data || [];
       const endData: any[] = endRes.data || [];
       const endByStudent = new Map(endData.map(d => [d.studentId, d]));
+      const statusRank: Record<string, number> = { Draft: 0, Submitted: 1, Approved: 2 };
       setRows(midData.map(d => {
         const endD = endByStudent.get(d.studentId);
+        const midStatus = d.status || 'Draft';
+        const endStatus = endD?.status || 'Draft';
+        const status = statusRank[midStatus] >= statusRank[endStatus] ? midStatus : endStatus;
         return {
           studentId: d.studentId,
           studentName: d.studentName,
@@ -118,6 +130,7 @@ export default function TeacherDashboardPage() {
           midtermScore: d.score != null ? String(d.score) : '',
           endOfTermScore: endD?.score != null ? String(endD.score) : '',
           comments: d.comments || endD?.comments || '',
+          status,
         };
       }));
     } catch (err: any) {
@@ -181,6 +194,27 @@ export default function TeacherDashboardPage() {
       else showMsg('Failed to save marks', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSubmitForReview = async () => {
+    if (!termId || !selectedAssignment || !teacherInfo?.id) return;
+    if (!window.confirm('Once submitted, marks cannot be edited without admin approval. Proceed?')) return;
+    setSubmitting(true);
+    try {
+      await marksAPI.submitMarks({
+        subjectId: selectedAssignment.subjectId,
+        termId: termId as number,
+        campus: selectedAssignment.campus,
+        form: selectedAssignment.form,
+        submittedBy: `${firstName} ${surname}`.trim() || teacherInfo.email,
+      });
+      showMsg('✅ Marks submitted successfully', 'success');
+      await loadEntrySheet();
+    } catch {
+      showMsg('Failed to submit marks', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -311,7 +345,7 @@ export default function TeacherDashboardPage() {
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <ClipboardList size={17} style={{ color: '#94a3b8' }} />
-            <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleSaveAll} disabled={saving || rows.length === 0}>
+            <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleSaveAll} disabled={saving || rows.length === 0 || !rows.some(r => r.status === 'Draft')}>
               💾 {saving ? 'Saving...' : 'Save All'}
             </button>
           </div>
@@ -335,41 +369,59 @@ export default function TeacherDashboardPage() {
                   <th style={{ textAlign: 'center' }}>Total</th>
                   <th style={{ textAlign: 'center' }}>Grade</th>
                   <th>Comments</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(row => (
-                  <tr key={row.studentId}>
-                    <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{row.studentName}</td>
-                    <td style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>{row.studentNumber}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <input className="text-field" style={scoreInput} type="number" min={0} max={100}
-                        value={row.midtermScore}
-                        onChange={e => updateRow(row.studentId, 'midtermScore', clamp(e.target.value, 100))} />
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <input className="text-field" style={scoreInput} type="number" min={0} max={100}
-                        value={row.endOfTermScore}
-                        onChange={e => updateRow(row.studentId, 'endOfTermScore', clamp(e.target.value, 100))} />
-                    </td>
-                    <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{total(row)}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      {grade(row) && (
-                        <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
-                          {grade(row)}
+                {rows.map(row => {
+                  const locked = row.status !== 'Draft';
+                  const badge = STATUS_BADGE[row.status] ?? STATUS_BADGE.Draft;
+                  return (
+                    <tr key={row.studentId}>
+                      <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{row.studentName}</td>
+                      <td style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>{row.studentNumber}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input className="text-field" style={scoreInput} type="number" min={0} max={100}
+                          value={row.midtermScore} disabled={locked}
+                          onChange={e => updateRow(row.studentId, 'midtermScore', clamp(e.target.value, 100))} />
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <input className="text-field" style={scoreInput} type="number" min={0} max={100}
+                          value={row.endOfTermScore} disabled={locked}
+                          onChange={e => updateRow(row.studentId, 'endOfTermScore', clamp(e.target.value, 100))} />
+                      </td>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{total(row)}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        {grade(row) && (
+                          <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
+                            {grade(row)}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <input className="text-field" style={fld}
+                          value={row.comments} disabled={locked}
+                          onChange={e => updateRow(row.studentId, 'comments', e.target.value)}
+                          placeholder="Optional comments" />
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span style={{ padding: '2px 10px', borderRadius: 12, background: badge.bg, color: badge.color, fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
+                          {badge.label}
                         </span>
-                      )}
-                    </td>
-                    <td>
-                      <input className="text-field" style={fld}
-                        value={row.comments}
-                        onChange={e => updateRow(row.studentId, 'comments', e.target.value)}
-                        placeholder="Optional comments" />
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {rows.some(r => r.status === 'Draft') && (
+          <div style={{ padding: '14px 18px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleSubmitForReview} disabled={submitting}>
+              📤 {submitting ? 'Submitting...' : 'Submit for Review'}
+            </button>
           </div>
         )}
       </div>

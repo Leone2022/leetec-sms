@@ -182,6 +182,14 @@ export const marksAPI = {
     api.post('/marks/publish-report-cards', data),
   getStudentReportCard: (studentId: number, termId: number) =>
     api.get(`/marks/report-card/${studentId}/${termId}`),
+  submitMarks: (data: { subjectId: number; termId: number; campus: string; form: string; submittedBy: string }) =>
+    api.post('/marks/submit', data),
+  approveMarks: (data: { subjectId: number; termId: number; campus: string; form: string; approvedBy: string }) =>
+    api.post('/marks/approve', data),
+  sendBackMarks: (data: { subjectId: number; termId: number; campus: string; form: string; comment?: string }) =>
+    api.post('/marks/send-back', data),
+  getPendingApproval: (schoolId = 1) =>
+    api.get(`/marks/pending-approval?schoolId=${schoolId}`),
 };
 
 export const reportsAPI = {

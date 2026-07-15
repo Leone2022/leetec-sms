@@ -22,6 +22,13 @@ namespace LeeTec.API.Models
 
         public string? Comments { get; set; }
 
+        // Draft | Submitted | Approved
+        public string Status { get; set; } = "Draft";
+        public string? SubmittedBy { get; set; }
+        public DateTime? SubmittedAt { get; set; }
+        public string? ApprovedBy { get; set; }
+        public DateTime? ApprovedAt { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
