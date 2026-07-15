@@ -190,6 +190,16 @@ export const marksAPI = {
     api.post('/marks/send-back', data),
   getPendingApproval: (schoolId = 1) =>
     api.get(`/marks/pending-approval?schoolId=${schoolId}`),
+  getApprovedGroups: (schoolId = 1) =>
+    api.get(`/marks/approved-groups?schoolId=${schoolId}`),
+  requestAmendment: (data: any) =>
+    api.post('/marks/request-amendment', data),
+  getAmendmentRequests: () =>
+    api.get('/marks/amendment-requests'),
+  approveAmendment: (data: any) =>
+    api.post('/marks/approve-amendment', data),
+  rejectAmendment: (data: any) =>
+    api.post('/marks/reject-amendment', data),
 };
 
 export const reportsAPI = {

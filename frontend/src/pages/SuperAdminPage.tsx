@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { superadminAPI, adminAPI } from '../services/api';
+import { superadminAPI, adminAPI, marksAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Users, TrendingUp, Shield, Plus, X, ToggleLeft, ToggleRight, Pencil, KeyRound, Trash2 } from 'lucide-react';
@@ -47,6 +47,11 @@ export default function SuperAdminPage() {
 
   const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
 
+  // ── Marks Amendment Requests ─────────────────────────────────────────────
+  const [amendmentRequests, setAmendmentRequests] = useState<any[]>([]);
+  const [loadingAmendments, setLoadingAmendments] = useState(false);
+  const [actioningAmendmentKey, setActioningAmendmentKey] = useState<string | null>(null);
+
   useEffect(() => {
     if (user?.role !== 'SuperAdmin') {
       navigate('/dashboard');
@@ -57,20 +62,66 @@ export default function SuperAdminPage() {
 
   const loadAll = async () => {
     try {
-      const [statsRes, schoolsRes, usersRes, adminsRes] = await Promise.all([
+      const [statsRes, schoolsRes, usersRes, adminsRes, amendmentsRes] = await Promise.all([
         superadminAPI.getStats(),
         superadminAPI.getSchools(),
         superadminAPI.getUsers(),
         adminAPI.getAdmins(),
+        marksAPI.getAmendmentRequests(),
       ]);
       setStats(statsRes.data);
       setSchools(schoolsRes.data || []);
       setUsers(usersRes.data || []);
       setAdmins(adminsRes.data || []);
+      setAmendmentRequests(amendmentsRes.data || []);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAmendmentRequests = async () => {
+    setLoadingAmendments(true);
+    try {
+      const res = await marksAPI.getAmendmentRequests();
+      setAmendmentRequests(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingAmendments(false);
+    }
+  };
+
+  const amendmentKey = (g: any) => `${g.subjectId}-${g.termId}-${g.campus}-${g.form}`;
+
+  const handleApproveAmendment = async (g: any) => {
+    const key = amendmentKey(g);
+    setActioningAmendmentKey(key);
+    try {
+      await marksAPI.approveAmendment({ subjectId: g.subjectId, termId: g.termId, campus: g.campus, form: g.form });
+      showMessage('Marks unlocked for teacher to re-enter', 'success');
+      await loadAmendmentRequests();
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to approve amendment', 'error');
+    } finally {
+      setActioningAmendmentKey(null);
+    }
+  };
+
+  const handleRejectAmendment = async (g: any) => {
+    const reason = window.prompt(`Reject the amendment request for ${g.subjectName} — ${g.form}? Optional reason:`);
+    if (reason === null) return;
+    const key = amendmentKey(g);
+    setActioningAmendmentKey(key);
+    try {
+      await marksAPI.rejectAmendment({ subjectId: g.subjectId, termId: g.termId, campus: g.campus, form: g.form, reason: reason || undefined });
+      showMessage('Amendment request rejected', 'success');
+      await loadAmendmentRequests();
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to reject amendment', 'error');
+    } finally {
+      setActioningAmendmentKey(null);
     }
   };
 
@@ -334,6 +385,75 @@ export default function SuperAdminPage() {
                                 disabled={isSuperAdminRow || deletingAdminId === a.id}
                               >
                                 <Trash2 size={12} /> {deletingAdminId === a.id ? 'Deleting...' : 'Delete'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Marks Amendment Requests */}
+          <div className="table-card" style={{ marginBottom: 20 }}>
+            <div className="table-head">
+              <div>
+                <h3>
+                  📝 Marks Amendment Requests
+                  {amendmentRequests.length > 0 && (
+                    <span style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px', borderRadius: 12, background: '#fef3c7', color: '#92400e', fontWeight: 700 }}>
+                      {amendmentRequests.length}
+                    </span>
+                  )}
+                </h3>
+                <p>Requests to amend already-approved marks</p>
+              </div>
+            </div>
+
+            {loadingAmendments ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#475569' }}>Loading...</div>
+            ) : amendmentRequests.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#475569' }}>No amendment requests</div>
+            ) : (
+              <div className="data-table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Subject</th><th>Form</th><th>Campus</th><th>Reason</th><th>Meeting Date</th><th>Minute Ref</th><th>Requested By</th><th>Date</th><th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {amendmentRequests.map((g: any) => {
+                      const key = amendmentKey(g);
+                      const busy = actioningAmendmentKey === key;
+                      return (
+                        <tr key={key}>
+                          <td>{g.subjectName}</td>
+                          <td>{g.form}</td>
+                          <td>{g.campus}</td>
+                          <td style={{ maxWidth: 220 }}>{g.reason}</td>
+                          <td>{g.meetingDate}</td>
+                          <td>{g.minuteReference}</td>
+                          <td>{g.requestedBy}</td>
+                          <td>{g.requestedAt ? new Date(g.requestedAt).toLocaleDateString() : ''}</td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              <button
+                                className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12, color: '#16a34a' }}
+                                onClick={() => handleApproveAmendment(g)}
+                                disabled={busy}
+                              >
+                                ✅ {busy ? 'Working...' : 'Approve'}
+                              </button>
+                              <button
+                                className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: 12, color: '#dc2626' }}
+                                onClick={() => handleRejectAmendment(g)}
+                                disabled={busy}
+                              >
+                                ❌ Reject
                               </button>
                             </div>
                           </td>

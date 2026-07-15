@@ -30,6 +30,13 @@ namespace LeeTec.API.Models
         public DateTime? ApprovedAt { get; set; }
         public string? SendBackComment { get; set; }
 
+        public bool AmendmentRequested { get; set; } = false;
+        public string? AmendmentReason { get; set; }
+        public string? MeetingDate { get; set; }
+        public string? MinuteReference { get; set; }
+        public string? AmendmentRequestedBy { get; set; }
+        public DateTime? AmendmentRequestedAt { get; set; }
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

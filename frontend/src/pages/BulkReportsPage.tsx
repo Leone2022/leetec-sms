@@ -68,6 +68,15 @@ export default function BulkReportsPage() {
   const [viewMarksRows, setViewMarksRows] = useState<any[]>([]);
   const [viewMarksLoading, setViewMarksLoading] = useState(false);
 
+  // Approved Marks (eligible for amendment request)
+  const [approvedGroups, setApprovedGroups] = useState<any[]>([]);
+  const [loadingApprovedGroups, setLoadingApprovedGroups] = useState(false);
+
+  // Request Amendment modal
+  const [amendmentGroup, setAmendmentGroup] = useState<any>(null);
+  const [amendmentForm, setAmendmentForm] = useState({ reason: '', meetingDate: '', minuteReference: '' });
+  const [submittingAmendment, setSubmittingAmendment] = useState(false);
+
   const showMsg = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
@@ -85,8 +94,54 @@ export default function BulkReportsPage() {
     }
   };
 
+  const loadApprovedGroups = async () => {
+    setLoadingApprovedGroups(true);
+    try {
+      const res = await marksAPI.getApprovedGroups(1);
+      setApprovedGroups(res.data || []);
+    } catch {
+      showMsg('Failed to load approved marks', 'error');
+    } finally {
+      setLoadingApprovedGroups(false);
+    }
+  };
+
+  const openRequestAmendment = (g: any) => {
+    setAmendmentGroup(g);
+    setAmendmentForm({ reason: '', meetingDate: '', minuteReference: '' });
+  };
+
+  const handleSubmitAmendment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amendmentGroup) return;
+    if (!amendmentForm.reason.trim() || !amendmentForm.meetingDate || !amendmentForm.minuteReference.trim()) {
+      showMsg('Reason, meeting date and minute reference are required', 'error');
+      return;
+    }
+    setSubmittingAmendment(true);
+    try {
+      await marksAPI.requestAmendment({
+        subjectId: amendmentGroup.subjectId,
+        termId: amendmentGroup.termId,
+        campus: amendmentGroup.campus,
+        form: amendmentGroup.form,
+        reason: amendmentForm.reason.trim(),
+        meetingDate: amendmentForm.meetingDate,
+        minuteReference: amendmentForm.minuteReference.trim(),
+        requestedBy: 'Admin',
+      });
+      showMsg('Amendment request sent to Super Admin', 'success');
+      setAmendmentGroup(null);
+      await loadApprovedGroups();
+    } catch (err: any) {
+      showMsg(err.response?.data?.message || 'Failed to submit amendment request', 'error');
+    } finally {
+      setSubmittingAmendment(false);
+    }
+  };
+
   useEffect(() => {
-    if (tab === 'approvals') loadPendingApprovals();
+    if (tab === 'approvals') { loadPendingApprovals(); loadApprovedGroups(); }
   }, [tab]);
 
   const approvalKey = (g: any) => `${g.subjectId}-${g.termId}-${g.campus}-${g.form}`;
@@ -361,7 +416,8 @@ export default function BulkReportsPage() {
       </div>
 
       {tab === 'approvals' && (
-        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <>
+        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden', marginBottom: 16 }}>
           <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0' }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>Pending Approvals</h3>
             <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>
@@ -425,6 +481,58 @@ export default function BulkReportsPage() {
             </div>
           )}
         </div>
+
+        <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid #e2e8f0' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>Approved Marks</h3>
+            <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>
+              {approvedGroups.length} group{approvedGroups.length !== 1 ? 's' : ''} approved — request an amendment if marks need correcting
+            </p>
+          </div>
+
+          {loadingApprovedGroups ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#475569', fontSize: 13 }}>Loading...</div>
+          ) : approvedGroups.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 13 }}>No approved marks yet.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Subject</th>
+                    <th>Form</th>
+                    <th>Campus</th>
+                    <th>Approved By</th>
+                    <th style={{ textAlign: 'center' }}>No. of Students</th>
+                    <th>Approved Date</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvedGroups.map((g: any) => (
+                    <tr key={approvalKey(g)}>
+                      <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{g.subjectName}</td>
+                      <td>{g.form}</td>
+                      <td>{g.campus}</td>
+                      <td>{g.teacher || '—'}</td>
+                      <td style={{ textAlign: 'center' }}>{g.studentCount}</td>
+                      <td style={{ fontSize: 12, color: '#64748b' }}>
+                        {g.approvedDate ? new Date(g.approvedDate).toLocaleDateString('en-GB') : '—'}
+                      </td>
+                      <td>
+                        <button className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 10px' }}
+                          onClick={() => openRequestAmendment(g)}>
+                          🔄 Request Amendment
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        </>
       )}
 
       {tab === 'completion' && (
@@ -715,6 +823,57 @@ export default function BulkReportsPage() {
                 ✅ Approve All
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Request Amendment modal */}
+      {amendmentGroup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}
+          onClick={() => setAmendmentGroup(null)}>
+          <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', width: '100%', maxWidth: 480 }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0' }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Request Marks Amendment</h2>
+              <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{amendmentGroup.subjectName} · {amendmentGroup.campus} · {amendmentGroup.form}</p>
+            </div>
+            <form onSubmit={handleSubmitAmendment} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={lbl}>Reason *</label>
+                <textarea
+                  className="text-field" style={{ width: '100%', boxSizing: 'border-box', minHeight: 80, resize: 'vertical', paddingTop: 8 }}
+                  value={amendmentForm.reason}
+                  onChange={(e) => setAmendmentForm((f) => ({ ...f, reason: e.target.value }))}
+                  placeholder="Why these marks need to be corrected"
+                  required
+                />
+              </div>
+              <div>
+                <label style={lbl}>Meeting Date *</label>
+                <input
+                  type="date" className="text-field" style={{ width: '100%' }}
+                  value={amendmentForm.meetingDate}
+                  onChange={(e) => setAmendmentForm((f) => ({ ...f, meetingDate: e.target.value }))}
+                  required
+                />
+              </div>
+              <div>
+                <label style={lbl}>Minute Reference *</label>
+                <input
+                  type="text" className="text-field" style={{ width: '100%', boxSizing: 'border-box' }}
+                  value={amendmentForm.minuteReference}
+                  onChange={(e) => setAmendmentForm((f) => ({ ...f, minuteReference: e.target.value }))}
+                  placeholder="e.g. MIN/2026/003"
+                  required
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setAmendmentGroup(null)} disabled={submittingAmendment}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submittingAmendment}>
+                  {submittingAmendment ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

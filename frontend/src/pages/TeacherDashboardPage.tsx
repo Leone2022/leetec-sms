@@ -16,6 +16,7 @@ interface MarkRow {
   comments: string;
   status: string;
   sendBackComment: string | null;
+  amendmentRequestedAt: string | null;
 }
 
 const STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
@@ -133,6 +134,7 @@ export default function TeacherDashboardPage() {
           comments: d.comments || endD?.comments || '',
           status,
           sendBackComment: d.sendBackComment || endD?.sendBackComment || null,
+          amendmentRequestedAt: d.amendmentRequestedAt || endD?.amendmentRequestedAt || null,
         };
       }));
     } catch (err: any) {
@@ -364,6 +366,13 @@ export default function TeacherDashboardPage() {
           <div style={{ margin: '14px 18px 0', padding: '12px 16px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: 13, fontWeight: 600 }}>
             ⚠️ Marks sent back by admin: {rows.find(r => r.status === 'Draft' && r.sendBackComment)?.sendBackComment}
             <div style={{ fontWeight: 400, marginTop: 2 }}>Please review and resubmit.</div>
+          </div>
+        )}
+
+        {rows.some(r => r.status === 'Draft' && r.amendmentRequestedAt) && (
+          <div style={{ margin: '14px 18px 0', padding: '12px 16px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', fontSize: 13, fontWeight: 600 }}>
+            ✅ Amendment approved! You can now re-enter the corrected marks.
+            <div style={{ fontWeight: 400, marginTop: 2 }}>Remember to save and resubmit for approval.</div>
           </div>
         )}
 

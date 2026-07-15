@@ -66,6 +66,7 @@ namespace LeeTec.API.DTOs
         public string? Comments { get; set; }
         public string? Status { get; set; }
         public string? SendBackComment { get; set; }
+        public DateTime? AmendmentRequestedAt { get; set; }
     }
 
     public class SubmitMarksDTO
@@ -93,5 +94,34 @@ namespace LeeTec.API.DTOs
         public string Campus { get; set; } = string.Empty;
         public string Form { get; set; } = string.Empty;
         public string? Comment { get; set; }
+    }
+
+    public class RequestAmendmentDTO
+    {
+        public int SubjectId { get; set; }
+        public int TermId { get; set; }
+        public string Campus { get; set; } = string.Empty;
+        public string Form { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        public string MeetingDate { get; set; } = string.Empty;
+        public string MinuteReference { get; set; } = string.Empty;
+        public string RequestedBy { get; set; } = string.Empty;
+    }
+
+    public class AmendmentGroupActionDTO
+    {
+        public int SubjectId { get; set; }
+        public int TermId { get; set; }
+        public string Campus { get; set; } = string.Empty;
+        public string Form { get; set; } = string.Empty;
+    }
+
+    public class RejectAmendmentDTO
+    {
+        public int SubjectId { get; set; }
+        public int TermId { get; set; }
+        public string Campus { get; set; } = string.Empty;
+        public string Form { get; set; } = string.Empty;
+        public string? Reason { get; set; }
     }
 }

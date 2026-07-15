@@ -77,6 +77,7 @@ namespace LeeTec.API.Controllers
                     Comments = mark?.Comments,
                     Status = mark?.Status ?? "Draft",
                     SendBackComment = mark?.SendBackComment,
+                    AmendmentRequestedAt = mark?.AmendmentRequestedAt,
                 };
             }).ToList();
 
@@ -300,6 +301,190 @@ namespace LeeTec.API.Controllers
                 .ToList();
 
             return Ok(grouped);
+        }
+
+        // APPROVED GROUPS — Approved marks (not already under an amendment request) grouped
+        // by subject/term/campus/form, so the admin can pick one to request an amendment for.
+        [Authorize]
+        [HttpGet("approved-groups")]
+        public async Task<IActionResult> GetApprovedGroups([FromQuery] int schoolId = 1)
+        {
+            var approvedMarks = await _context.Marks
+                .Where(m => m.Status == "Approved" && !m.AmendmentRequested)
+                .Include(m => m.Subject)
+                .ToListAsync();
+
+            if (approvedMarks.Count == 0) return Ok(new List<object>());
+
+            var termIds = approvedMarks.Select(m => m.TermId).Distinct().ToList();
+            var studentIds = approvedMarks.Select(m => m.StudentId).Distinct().ToList();
+
+            var registrations = await _context.TermRegistrations
+                .Where(tr => tr.SchoolId == schoolId && termIds.Contains(tr.TermId) && studentIds.Contains(tr.StudentId))
+                .ToListAsync();
+
+            var regLookup = registrations
+                .GroupBy(r => (r.StudentId, r.TermId))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var grouped = approvedMarks
+                .Select(m => new
+                {
+                    Mark = m,
+                    Reg = regLookup.TryGetValue((m.StudentId, m.TermId), out var r) ? r : null,
+                })
+                .Where(x => x.Reg != null)
+                .GroupBy(x => new { x.Mark.SubjectId, SubjectName = x.Mark.Subject != null ? x.Mark.Subject.Name : "", x.Mark.TermId, Campus = x.Reg!.Campus, Form = x.Reg!.Form })
+                .Select(g => new
+                {
+                    subjectId = g.Key.SubjectId,
+                    subjectName = g.Key.SubjectName,
+                    termId = g.Key.TermId,
+                    campus = g.Key.Campus,
+                    form = g.Key.Form,
+                    teacher = g.Select(x => x.Mark.ApprovedBy).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "—",
+                    studentCount = g.Select(x => x.Mark.StudentId).Distinct().Count(),
+                    approvedDate = g.Min(x => x.Mark.ApprovedAt),
+                })
+                .OrderBy(g => g.subjectName).ThenBy(g => g.form)
+                .ToList();
+
+            return Ok(grouped);
+        }
+
+        // REQUEST AMENDMENT — admin flags Approved/Published marks for a subject/term/campus/form
+        // for Super Admin review, attaching the meeting minute that authorised the change.
+        [Authorize]
+        [HttpPost("request-amendment")]
+        public async Task<IActionResult> RequestAmendment([FromBody] RequestAmendmentDTO dto)
+        {
+            var studentIds = await _context.TermRegistrations
+                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
+                .Select(tr => tr.StudentId)
+                .ToListAsync();
+
+            var marks = await _context.Marks
+                .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId
+                    && studentIds.Contains(m.StudentId)
+                    && (m.Status == "Approved" || m.Status == "Published"))
+                .ToListAsync();
+
+            foreach (var mark in marks)
+            {
+                mark.AmendmentRequested = true;
+                mark.AmendmentReason = dto.Reason;
+                mark.MeetingDate = dto.MeetingDate;
+                mark.MinuteReference = dto.MinuteReference;
+                mark.AmendmentRequestedBy = dto.RequestedBy;
+                mark.AmendmentRequestedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Amendment request submitted to Super Admin" });
+        }
+
+        // AMENDMENT REQUESTS — all marks currently flagged for amendment, grouped by subject/term/campus/form
+        [Authorize]
+        [HttpGet("amendment-requests")]
+        public async Task<IActionResult> GetAmendmentRequests([FromQuery] int schoolId = 1)
+        {
+            var requestedMarks = await _context.Marks
+                .Where(m => m.AmendmentRequested)
+                .Include(m => m.Subject)
+                .ToListAsync();
+
+            if (requestedMarks.Count == 0) return Ok(new List<object>());
+
+            var termIds = requestedMarks.Select(m => m.TermId).Distinct().ToList();
+            var studentIds = requestedMarks.Select(m => m.StudentId).Distinct().ToList();
+
+            var registrations = await _context.TermRegistrations
+                .Where(tr => tr.SchoolId == schoolId && termIds.Contains(tr.TermId) && studentIds.Contains(tr.StudentId))
+                .ToListAsync();
+
+            var regLookup = registrations
+                .GroupBy(r => (r.StudentId, r.TermId))
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var grouped = requestedMarks
+                .Select(m => new
+                {
+                    Mark = m,
+                    Reg = regLookup.TryGetValue((m.StudentId, m.TermId), out var r) ? r : null,
+                })
+                .Where(x => x.Reg != null)
+                .GroupBy(x => new { x.Mark.SubjectId, SubjectName = x.Mark.Subject != null ? x.Mark.Subject.Name : "", x.Mark.TermId, Campus = x.Reg!.Campus, Form = x.Reg!.Form })
+                .Select(g => new
+                {
+                    subjectId = g.Key.SubjectId,
+                    subjectName = g.Key.SubjectName,
+                    termId = g.Key.TermId,
+                    campus = g.Key.Campus,
+                    form = g.Key.Form,
+                    reason = g.Select(x => x.Mark.AmendmentReason).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
+                    meetingDate = g.Select(x => x.Mark.MeetingDate).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
+                    minuteReference = g.Select(x => x.Mark.MinuteReference).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
+                    requestedBy = g.Select(x => x.Mark.AmendmentRequestedBy).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "—",
+                    requestedAt = g.Min(x => x.Mark.AmendmentRequestedAt),
+                })
+                .OrderByDescending(g => g.requestedAt)
+                .ToList();
+
+            return Ok(grouped);
+        }
+
+        // APPROVE AMENDMENT — unlock the flagged marks back to Draft so the teacher can re-enter them.
+        // SuperAdmin-only in intent; enforced the same way the rest of this app enforces SuperAdmin
+        // pages today (frontend role gate) since admin JWTs don't carry a Role claim to check here.
+        [Authorize]
+        [HttpPost("approve-amendment")]
+        public async Task<IActionResult> ApproveAmendment([FromBody] AmendmentGroupActionDTO dto)
+        {
+            var studentIds = await _context.TermRegistrations
+                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
+                .Select(tr => tr.StudentId)
+                .ToListAsync();
+
+            var marks = await _context.Marks
+                .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId
+                    && studentIds.Contains(m.StudentId) && m.AmendmentRequested)
+                .ToListAsync();
+
+            foreach (var mark in marks)
+            {
+                mark.Status = "Draft";
+                mark.AmendmentRequested = false;
+                mark.AmendmentReason = null;
+                mark.MeetingDate = null;
+                mark.MinuteReference = null;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Amendment approved. Teacher can now re-enter marks." });
+        }
+
+        // REJECT AMENDMENT — clear the flag, leave marks and their Published/Approved status untouched.
+        [Authorize]
+        [HttpPost("reject-amendment")]
+        public async Task<IActionResult> RejectAmendment([FromBody] RejectAmendmentDTO dto)
+        {
+            var studentIds = await _context.TermRegistrations
+                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
+                .Select(tr => tr.StudentId)
+                .ToListAsync();
+
+            var marks = await _context.Marks
+                .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId
+                    && studentIds.Contains(m.StudentId) && m.AmendmentRequested)
+                .ToListAsync();
+
+            foreach (var mark in marks)
+            {
+                mark.AmendmentRequested = false;
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Amendment request rejected" });
         }
 
         // STUDENT MARKS — all marks for a student in a term, grouped by subject
