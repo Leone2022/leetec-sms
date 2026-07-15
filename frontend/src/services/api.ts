@@ -223,6 +223,12 @@ export const announcementsAPI = {
   delete: (id: number) => api.delete(`/announcements/${id}`),
 };
 
+export const versesAPI = {
+  getCurrent: (schoolId = 1) => api.get(`/verses/current?schoolId=${schoolId}`),
+  create: (data: { schoolId?: number; type: string; text: string; reference: string; postedBy: string }) =>
+    api.post('/verses', data),
+};
+
 export const bulkReportsAPI = {
   getCompletionStatus: (termId: number, schoolId = 1) =>
     api.get(`/reports/completion-status?termId=${termId}&schoolId=${schoolId}`),

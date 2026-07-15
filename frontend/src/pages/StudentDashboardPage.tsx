@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI, subjectsAPI } from '../services/api';
+import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI, subjectsAPI, versesAPI } from '../services/api';
 import { generateStatementPdf, buildStatementRows } from '../utils/statement';
 import { generateReportCard, type ReportCardData } from '../utils/reportCard';
 import { GRADE_REFERENCE_TABLES } from '../utils/grading';
@@ -8,6 +8,7 @@ import {
   LogOut, GraduationCap, LayoutDashboard, DollarSign,
   FileText, Bell, User, Menu, X, FileDown, BookOpen,
 } from 'lucide-react';
+import VerseCard, { type VerseData } from '../components/VerseCard';
 
 const SUBJECT_CHANGE_ELIGIBLE_FORMS = ['Form 5', 'Lower 6', 'Upper 6'];
 
@@ -63,6 +64,7 @@ export default function StudentDashboardPage() {
   const [changeMessage, setChangeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [loadError, setLoadError] = useState(false);
+  const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
 
   const studentInfo = JSON.parse(localStorage.getItem('student_info') || '{}');
   const studentId: number | undefined = studentInfo?.id ?? studentInfo?.studentId;
@@ -77,6 +79,10 @@ export default function StudentDashboardPage() {
   }, []);
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    versesAPI.getCurrent(1).then((res) => setCurrentVerse(res.data || null)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     feesAPI.getTerms(1).then(res => {
@@ -314,6 +320,11 @@ export default function StudentDashboardPage() {
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0 }}>{greeting}, {firstName}!</h1>
         <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0' }}>Here's a summary of your account.</p>
       </div>
+      {currentVerse && (
+        <div style={{ marginBottom: 24 }}>
+          <VerseCard verse={currentVerse} greetingName={firstName} fontSize={18} animate />
+        </div>
+      )}
       {invoice && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
           {[

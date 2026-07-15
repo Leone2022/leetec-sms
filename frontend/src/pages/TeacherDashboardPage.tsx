@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { marksAPI, feesAPI, authAPI } from '../services/api';
+import { marksAPI, feesAPI, authAPI, versesAPI } from '../services/api';
 import { teacherAssignmentsAPI } from '../services/api';
 import {
   GraduationCap, LogOut, BookOpen, User, Menu, X,
   ClipboardList, ChevronLeft,
 } from 'lucide-react';
+import VerseCard, { type VerseData } from '../components/VerseCard';
 
 interface MarkRow {
   studentId: number;
@@ -66,6 +67,7 @@ export default function TeacherDashboardPage() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
 
   const showMsg = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
@@ -78,6 +80,10 @@ export default function TeacherDashboardPage() {
       .then(res => setAssignments(res.data || []))
       .catch(() => showMsg('Failed to load assignments', 'error'));
   }, [teacherInfo?.id]);
+
+  useEffect(() => {
+    versesAPI.getCurrent(1).then((res) => setCurrentVerse(res.data || null)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     feesAPI.getTerms(1).then(res => {
@@ -458,6 +464,12 @@ export default function TeacherDashboardPage() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: 0 }}>My Classes</h1>
         <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>Select a class to enter marks</p>
       </div>
+
+      {currentVerse && (
+        <div style={{ marginBottom: 20 }}>
+          <VerseCard verse={currentVerse} greetingName={firstName} fontSize={18} animate />
+        </div>
+      )}
 
       {assignments.length === 0 ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '60px 40px', textAlign: 'center', border: '1px solid #f1f5f9' }}>

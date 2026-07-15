@@ -54,6 +54,9 @@ namespace LeeTec.API.Data
         // Announcements
         public DbSet<Announcement> Announcements { get; set; }
 
+        // Daily Verse / Quote of the Day
+        public DbSet<DailyVerse> DailyVerses { get; set; }
+
         // Teacher Assignments
         public DbSet<TeacherSubjectAssignment> TeacherSubjectAssignments { get; set; }
 
