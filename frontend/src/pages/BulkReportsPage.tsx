@@ -5,6 +5,16 @@ import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } 
 import AdminLayout from '../components/AdminLayout';
 import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
 
+const calculateGrade = (total: number) => {
+  if (total >= 90) return 'A*';
+  if (total >= 80) return 'A';
+  if (total >= 70) return 'B';
+  if (total >= 60) return 'C';
+  if (total >= 50) return 'D';
+  if (total >= 40) return 'E';
+  return 'U';
+};
+
 const PUBLISH_FORM_OPTIONS = [
   'All',
   'Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7',
@@ -53,6 +63,11 @@ export default function BulkReportsPage() {
   const [loadingApprovals, setLoadingApprovals] = useState(false);
   const [actioningKey, setActioningKey] = useState<string | null>(null);
 
+  // View Marks modal
+  const [viewingGroup, setViewingGroup] = useState<any>(null);
+  const [viewMarksRows, setViewMarksRows] = useState<any[]>([]);
+  const [viewMarksLoading, setViewMarksLoading] = useState(false);
+
   const showMsg = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 5000);
@@ -84,6 +99,7 @@ export default function BulkReportsPage() {
         subjectId: g.subjectId, termId: g.termId, campus: g.campus, form: g.form, approvedBy: 'Admin',
       });
       showMsg(`Approved ${res.data?.approved ?? 0} marks for ${g.subjectName} — ${g.form}`, 'success');
+      setViewingGroup(null);
       await loadPendingApprovals();
     } catch {
       showMsg('Failed to approve marks', 'error');
@@ -93,19 +109,55 @@ export default function BulkReportsPage() {
   };
 
   const handleSendBack = async (g: any) => {
-    const comment = window.prompt(`Send ${g.subjectName} — ${g.form} marks back to Draft. Optional comment for the teacher:`) ?? undefined;
+    const comment = window.prompt(`Send ${g.subjectName} — ${g.form} marks back to Draft. Optional comment for the teacher:`);
+    if (comment === null) return;
     const key = approvalKey(g);
     setActioningKey(key);
     try {
       const res = await marksAPI.sendBackMarks({
-        subjectId: g.subjectId, termId: g.termId, campus: g.campus, form: g.form, comment,
+        subjectId: g.subjectId, termId: g.termId, campus: g.campus, form: g.form, comment: comment || undefined,
       });
       showMsg(`Sent ${res.data?.sentBack ?? 0} marks back to Draft`, 'success');
+      setViewingGroup(null);
       await loadPendingApprovals();
     } catch {
       showMsg('Failed to send marks back', 'error');
     } finally {
       setActioningKey(null);
+    }
+  };
+
+  const openViewMarks = async (g: any) => {
+    setViewingGroup(g);
+    setViewMarksLoading(true);
+    try {
+      const [midRes, endRes] = await Promise.all([
+        marksAPI.getEntrySheet({ termId: g.termId, campus: g.campus, form: g.form, subjectId: g.subjectId, assessmentType: 'Mid-term Test' }),
+        marksAPI.getEntrySheet({ termId: g.termId, campus: g.campus, form: g.form, subjectId: g.subjectId, assessmentType: 'End of Term Exam' }),
+      ]);
+      const midData: any[] = midRes.data || [];
+      const endData: any[] = endRes.data || [];
+      const endByStudent = new Map(endData.map((d: any) => [d.studentId, d]));
+      setViewMarksRows(midData.map((d: any) => {
+        const endD = endByStudent.get(d.studentId);
+        const paper1 = d.score;
+        const paper2 = endD?.score;
+        const total = paper1 != null && paper2 != null
+          ? Math.round((Number(paper1) + Number(paper2)) / 2)
+          : paper1 != null ? Number(paper1) : paper2 != null ? Number(paper2) : null;
+        return {
+          studentId: d.studentId,
+          studentName: d.studentName,
+          studentNumber: d.studentNumber,
+          paper1, paper2, total,
+          grade: total != null ? calculateGrade(total) : '',
+          comments: d.comments || endD?.comments || '',
+        };
+      }));
+    } catch {
+      showMsg('Failed to load marks', 'error');
+    } finally {
+      setViewMarksLoading(false);
     }
   };
 
@@ -351,6 +403,10 @@ export default function BulkReportsPage() {
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn btn-secondary" style={{ fontSize: 11, padding: '6px 10px' }}
+                              onClick={() => openViewMarks(g)} disabled={busy}>
+                              👁 View Marks
+                            </button>
                             <button className="btn btn-primary" style={{ fontSize: 11, padding: '6px 10px' }}
                               onClick={() => handleApproveAll(g)} disabled={busy}>
                               ✅ Approve All
@@ -593,6 +649,74 @@ export default function BulkReportsPage() {
           )}
         </div>
       </div>
+      )}
+
+      {/* View Marks modal */}
+      {viewingGroup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}
+          onClick={() => setViewingGroup(null)}>
+          <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', width: '100%', maxWidth: 760, maxHeight: '85vh', overflow: 'auto' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white' }}>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{viewingGroup.subjectName}</h2>
+                <p style={{ fontSize: 12, color: '#64748b', margin: '3px 0 0' }}>{viewingGroup.campus} · {viewingGroup.form} · {viewMarksRows.length} student{viewMarksRows.length !== 1 ? 's' : ''}</p>
+              </div>
+              <button onClick={() => setViewingGroup(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '0 0 8px' }}>
+              {viewMarksLoading ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#475569', fontSize: 13 }}>Loading...</div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Student Name</th>
+                        <th>Student No.</th>
+                        <th style={{ textAlign: 'center' }}>Paper 1</th>
+                        <th style={{ textAlign: 'center' }}>Paper 2</th>
+                        <th style={{ textAlign: 'center' }}>Total</th>
+                        <th style={{ textAlign: 'center' }}>Grade</th>
+                        <th>Comments</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewMarksRows.map((r) => (
+                        <tr key={r.studentId}>
+                          <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{r.studentName}</td>
+                          <td style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>{r.studentNumber}</td>
+                          <td style={{ textAlign: 'center' }}>{r.paper1 ?? '—'}</td>
+                          <td style={{ textAlign: 'center' }}>{r.paper2 ?? '—'}</td>
+                          <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{r.total ?? '—'}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            {r.grade && (
+                              <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
+                                {r.grade}
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ fontSize: 12, color: '#64748b' }}>{r.comments || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 8, position: 'sticky', bottom: 0, background: 'white' }}>
+              <button className="btn btn-secondary" onClick={() => setViewingGroup(null)}>Close</button>
+              <button className="btn btn-secondary" onClick={() => handleSendBack(viewingGroup)} disabled={actioningKey === approvalKey(viewingGroup)}>
+                ↩ Send Back
+              </button>
+              <button className="btn btn-primary" onClick={() => handleApproveAll(viewingGroup)} disabled={actioningKey === approvalKey(viewingGroup)}>
+                ✅ Approve All
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AdminLayout>
   );

@@ -76,6 +76,7 @@ namespace LeeTec.API.Controllers
                     Score = mark?.Score,
                     Comments = mark?.Comments,
                     Status = mark?.Status ?? "Draft",
+                    SendBackComment = mark?.SendBackComment,
                 };
             }).ToList();
 
@@ -174,16 +175,26 @@ namespace LeeTec.API.Controllers
                 .Select(tr => tr.StudentId)
                 .ToListAsync();
 
-            var marks = await _context.Marks
-                .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId
-                    && studentIds.Contains(m.StudentId) && m.Status == "Draft")
+            var allMarksForSubject = await _context.Marks
+                .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId && studentIds.Contains(m.StudentId))
                 .ToListAsync();
+
+            var studentsWithMarks = allMarksForSubject
+                .Where(m => m.Score != null || m.Paper1Score != null || m.Paper2Score != null)
+                .Select(m => m.StudentId)
+                .ToHashSet();
+
+            if (studentIds.Any(id => !studentsWithMarks.Contains(id)))
+                return BadRequest(new { message = "All students must have marks before submitting" });
+
+            var marks = allMarksForSubject.Where(m => m.Status == "Draft").ToList();
 
             foreach (var mark in marks)
             {
                 mark.Status = "Submitted";
                 mark.SubmittedBy = dto.SubmittedBy;
                 mark.SubmittedAt = DateTime.UtcNow;
+                mark.SendBackComment = null;
             }
 
             await _context.SaveChangesAsync();
@@ -236,6 +247,7 @@ namespace LeeTec.API.Controllers
                 mark.Status = "Draft";
                 mark.SubmittedBy = null;
                 mark.SubmittedAt = null;
+                mark.SendBackComment = dto.Comment;
             }
 
             await _context.SaveChangesAsync();

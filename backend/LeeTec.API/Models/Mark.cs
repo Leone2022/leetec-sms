@@ -28,6 +28,7 @@ namespace LeeTec.API.Models
         public DateTime? SubmittedAt { get; set; }
         public string? ApprovedBy { get; set; }
         public DateTime? ApprovedAt { get; set; }
+        public string? SendBackComment { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

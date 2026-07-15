@@ -15,6 +15,7 @@ interface MarkRow {
   endOfTermScore: string;
   comments: string;
   status: string;
+  sendBackComment: string | null;
 }
 
 const STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
@@ -131,6 +132,7 @@ export default function TeacherDashboardPage() {
           endOfTermScore: endD?.score != null ? String(endD.score) : '',
           comments: d.comments || endD?.comments || '',
           status,
+          sendBackComment: d.sendBackComment || endD?.sendBackComment || null,
         };
       }));
     } catch (err: any) {
@@ -199,6 +201,13 @@ export default function TeacherDashboardPage() {
 
   const handleSubmitForReview = async () => {
     if (!termId || !selectedAssignment || !teacherInfo?.id) return;
+
+    const missing = rows.filter(r => r.midtermScore === '' && r.endOfTermScore === '');
+    if (missing.length > 0) {
+      showMsg(`⚠️ Cannot submit — the following students have no marks entered: ${missing.map(r => r.studentName).join(', ')}`, 'error');
+      return;
+    }
+
     if (!window.confirm('Once submitted, marks cannot be edited without admin approval. Proceed?')) return;
     setSubmitting(true);
     try {
@@ -211,8 +220,8 @@ export default function TeacherDashboardPage() {
       });
       showMsg('✅ Marks submitted successfully', 'success');
       await loadEntrySheet();
-    } catch {
-      showMsg('Failed to submit marks', 'error');
+    } catch (err: any) {
+      showMsg(err?.response?.data?.message || 'Failed to submit marks', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -350,6 +359,13 @@ export default function TeacherDashboardPage() {
             </button>
           </div>
         </div>
+
+        {rows.some(r => r.status === 'Draft' && r.sendBackComment) && (
+          <div style={{ margin: '14px 18px 0', padding: '12px 16px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: 13, fontWeight: 600 }}>
+            ⚠️ Marks sent back by admin: {rows.find(r => r.status === 'Draft' && r.sendBackComment)?.sendBackComment}
+            <div style={{ fontWeight: 400, marginTop: 2 }}>Please review and resubmit.</div>
+          </div>
+        )}
 
         {!termId ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#64748b', fontSize: 13 }}>Select a term above to load the entry sheet.</div>

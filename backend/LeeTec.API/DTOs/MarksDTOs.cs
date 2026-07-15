@@ -65,6 +65,7 @@ namespace LeeTec.API.DTOs
         public decimal? Score { get; set; }
         public string? Comments { get; set; }
         public string? Status { get; set; }
+        public string? SendBackComment { get; set; }
     }
 
     public class SubmitMarksDTO
