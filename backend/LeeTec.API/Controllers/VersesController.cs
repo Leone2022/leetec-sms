@@ -41,6 +41,9 @@ namespace LeeTec.API.Controllers
                 PostedBy = request.PostedBy,
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true,
+                Definition = request.Definition?.Trim(),
+                UsageExample = request.UsageExample?.Trim(),
+                PartOfSpeech = request.PartOfSpeech,
             };
 
             _context.DailyVerses.Add(verse);
@@ -57,5 +60,8 @@ namespace LeeTec.API.Controllers
         public string Text { get; set; } = string.Empty;
         public string Reference { get; set; } = string.Empty;
         public string PostedBy { get; set; } = string.Empty;
+        public string? Definition { get; set; }
+        public string? UsageExample { get; set; }
+        public string? PartOfSpeech { get; set; }
     }
 }

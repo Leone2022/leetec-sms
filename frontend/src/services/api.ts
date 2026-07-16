@@ -225,8 +225,16 @@ export const announcementsAPI = {
 
 export const versesAPI = {
   getCurrent: (schoolId = 1) => api.get(`/verses/current?schoolId=${schoolId}`),
-  create: (data: { schoolId?: number; type: string; text: string; reference: string; postedBy: string }) =>
-    api.post('/verses', data),
+  create: (data: {
+    schoolId?: number;
+    type: string;
+    text: string;
+    reference: string;
+    postedBy: string;
+    definition?: string;
+    usageExample?: string;
+    partOfSpeech?: string;
+  }) => api.post('/verses', data),
 };
 
 export const bulkReportsAPI = {

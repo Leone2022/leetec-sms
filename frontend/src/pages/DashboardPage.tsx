@@ -18,10 +18,20 @@ export default function DashboardPage() {
   const [activeTerm, setActiveTerm] = useState<any>(null);
 
   // ── Verse / Quote of the Day ────────────────────────────────────────────
+  const blankVerseForm = () => ({
+    type: 'Bible Verse',
+    text: '',
+    reference: '',
+    definition: '',
+    usageExample: '',
+    partOfSpeech: 'Noun',
+  });
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
-  const [verseForm, setVerseForm] = useState({ type: 'Bible Verse', text: '', reference: '' });
+  const [verseForm, setVerseForm] = useState(blankVerseForm());
   const [postingVerse, setPostingVerse] = useState(false);
   const [verseMessage, setVerseMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const isWordForm = verseForm.type === 'Word';
 
   const loadVerse = () => {
     versesAPI.getCurrent(1).then((res) => setCurrentVerse(res.data || null)).catch(() => {});
@@ -33,7 +43,12 @@ export default function DashboardPage() {
 
   const handlePostVerse = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verseForm.text.trim() || !verseForm.reference.trim()) {
+    if (isWordForm) {
+      if (!verseForm.text.trim() || !verseForm.definition.trim()) {
+        setVerseMessage({ type: 'error', text: 'Please fill in the word and its definition.' });
+        return;
+      }
+    } else if (!verseForm.text.trim() || !verseForm.reference.trim()) {
       setVerseMessage({ type: 'error', text: 'Please fill in both the verse/quote and the reference.' });
       return;
     }
@@ -44,10 +59,15 @@ export default function DashboardPage() {
         type: verseForm.type,
         text: verseForm.text.trim(),
         reference: verseForm.reference.trim(),
-        postedBy: `${user?.firstName ?? 'Admin'} ${user?.lastName ?? ''}`.trim(),
+        postedBy: isWordForm ? 'English Dept.' : `${user?.firstName ?? 'Admin'} ${user?.lastName ?? ''}`.trim(),
+        ...(isWordForm && {
+          definition: verseForm.definition.trim(),
+          usageExample: verseForm.usageExample.trim(),
+          partOfSpeech: verseForm.partOfSpeech,
+        }),
       });
       setVerseMessage({ type: 'success', text: 'Posted to all portals.' });
-      setVerseForm({ type: 'Bible Verse', text: '', reference: '' });
+      setVerseForm(blankVerseForm());
       loadVerse();
     } catch {
       setVerseMessage({ type: 'error', text: 'Failed to post. Please try again.' });
@@ -62,7 +82,10 @@ export default function DashboardPage() {
         type: verseForm.type,
         text: verseForm.text,
         reference: verseForm.reference || 'Reference',
-        postedBy: `${user?.firstName ?? 'Admin'} ${user?.lastName ?? ''}`.trim(),
+        postedBy: isWordForm ? 'English Dept.' : `${user?.firstName ?? 'Admin'} ${user?.lastName ?? ''}`.trim(),
+        definition: verseForm.definition,
+        usageExample: verseForm.usageExample,
+        partOfSpeech: verseForm.partOfSpeech,
       }
     : null;
 
@@ -159,7 +182,7 @@ export default function DashboardPage() {
           }}
         >
           <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
-            Post a Verse or Quote of the Day
+            Post a Verse, Quote, or Word of the Day
           </h3>
           <p style={{ margin: '0 0 16px', fontSize: 12.5, color: '#64748b' }}>
             This will be shown to Admins, Teachers, and Students across all portals.
@@ -167,7 +190,7 @@ export default function DashboardPage() {
 
           <form onSubmit={handlePostVerse}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              {(['Bible Verse', 'Quote of the Day'] as const).map((t) => (
+              {(['Bible Verse', 'Quote of the Day', 'Word'] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -184,28 +207,72 @@ export default function DashboardPage() {
                     color: verseForm.type === t ? '#1a237e' : '#64748b',
                   }}
                 >
-                  {t === 'Bible Verse' ? '📖 Bible Verse' : '💬 Quote of the Day'}
+                  {t === 'Bible Verse' ? '📖 Bible Verse' : t === 'Quote of the Day' ? '💬 Quote of the Day' : '📚 Word of the Day'}
                 </button>
               ))}
             </div>
 
-            <textarea
-              className="text-field"
-              placeholder="Enter Bible verse or inspirational quote..."
-              value={verseForm.text}
-              onChange={(e) => setVerseForm((f) => ({ ...f, text: e.target.value }))}
-              rows={4}
-              style={{ width: '100%', resize: 'vertical', marginBottom: 12, fontFamily: 'inherit' }}
-            />
+            {isWordForm ? (
+              <>
+                <input
+                  className="text-field"
+                  type="text"
+                  placeholder="Word"
+                  value={verseForm.text}
+                  onChange={(e) => setVerseForm((f) => ({ ...f, text: e.target.value }))}
+                  style={{ width: '100%', marginBottom: 12 }}
+                />
 
-            <input
-              className="text-field"
-              type="text"
-              placeholder="e.g. John 3:16 or — Author Name"
-              value={verseForm.reference}
-              onChange={(e) => setVerseForm((f) => ({ ...f, reference: e.target.value }))}
-              style={{ width: '100%', marginBottom: 16 }}
-            />
+                <textarea
+                  className="text-field"
+                  placeholder="Definition"
+                  value={verseForm.definition}
+                  onChange={(e) => setVerseForm((f) => ({ ...f, definition: e.target.value }))}
+                  rows={3}
+                  style={{ width: '100%', resize: 'vertical', marginBottom: 12, fontFamily: 'inherit' }}
+                />
+
+                <input
+                  className="text-field"
+                  type="text"
+                  placeholder="Usage example, e.g. She showed great resilience after the setback."
+                  value={verseForm.usageExample}
+                  onChange={(e) => setVerseForm((f) => ({ ...f, usageExample: e.target.value }))}
+                  style={{ width: '100%', marginBottom: 12 }}
+                />
+
+                <select
+                  className="text-field"
+                  value={verseForm.partOfSpeech}
+                  onChange={(e) => setVerseForm((f) => ({ ...f, partOfSpeech: e.target.value }))}
+                  style={{ width: '100%', marginBottom: 16, appearance: 'auto' }}
+                >
+                  {['Noun', 'Verb', 'Adjective', 'Adverb', 'Other'].map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <>
+                <textarea
+                  className="text-field"
+                  placeholder="Enter Bible verse or inspirational quote..."
+                  value={verseForm.text}
+                  onChange={(e) => setVerseForm((f) => ({ ...f, text: e.target.value }))}
+                  rows={4}
+                  style={{ width: '100%', resize: 'vertical', marginBottom: 12, fontFamily: 'inherit' }}
+                />
+
+                <input
+                  className="text-field"
+                  type="text"
+                  placeholder="e.g. John 3:16 or — Author Name"
+                  value={verseForm.reference}
+                  onChange={(e) => setVerseForm((f) => ({ ...f, reference: e.target.value }))}
+                  style={{ width: '100%', marginBottom: 16 }}
+                />
+              </>
+            )}
 
             {previewVerse && (
               <div style={{ marginBottom: 16 }}>
