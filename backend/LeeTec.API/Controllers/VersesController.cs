@@ -31,6 +31,18 @@ namespace LeeTec.API.Controllers
             return Ok(verse);
         }
 
+        // GET /api/verses?schoolId={}
+        [HttpGet]
+        public async Task<IActionResult> GetAll([FromQuery] int schoolId = 1)
+        {
+            var verses = await _context.DailyVerses
+                .Where(v => v.SchoolId == schoolId)
+                .OrderByDescending(v => v.CreatedAt)
+                .ToListAsync();
+
+            return Ok(verses);
+        }
+
         // POST /api/verses
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateVerseRequest request)
@@ -43,7 +55,7 @@ namespace LeeTec.API.Controllers
                 Reference = request.Reference.Trim(),
                 PostedBy = request.PostedBy,
                 CreatedAt = DateTime.UtcNow,
-                IsActive = true,
+                IsActive = request.IsActive,
                 Definition = request.Definition?.Trim(),
                 UsageExample = request.UsageExample?.Trim(),
                 PartOfSpeech = request.PartOfSpeech,
@@ -54,6 +66,20 @@ namespace LeeTec.API.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(verse);
+        }
+
+        // PUT /api/verses/{id}/toggle
+        [HttpPut("{id}/toggle")]
+        public async Task<IActionResult> ToggleActive(int id)
+        {
+            var verse = await _context.DailyVerses.FindAsync(id);
+            if (verse == null)
+                return NotFound(new { message = "Verse not found." });
+
+            verse.IsActive = !verse.IsActive;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { isActive = verse.IsActive });
         }
     }
 
@@ -68,5 +94,6 @@ namespace LeeTec.API.Controllers
         public string? UsageExample { get; set; }
         public string? PartOfSpeech { get; set; }
         public DateTime? DisplayUntil { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

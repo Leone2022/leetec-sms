@@ -225,6 +225,7 @@ export const announcementsAPI = {
 
 export const versesAPI = {
   getCurrent: (schoolId = 1) => api.get(`/verses/current?schoolId=${schoolId}`),
+  getAll: (schoolId = 1) => api.get(`/verses?schoolId=${schoolId}`),
   create: (data: {
     schoolId?: number;
     type: string;
@@ -235,7 +236,9 @@ export const versesAPI = {
     usageExample?: string;
     partOfSpeech?: string;
     displayUntil?: string;
+    isActive?: boolean;
   }) => api.post('/verses', data),
+  toggle: (id: number) => api.put(`/verses/${id}/toggle`),
 };
 
 export const bulkReportsAPI = {

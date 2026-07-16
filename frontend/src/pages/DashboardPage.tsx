@@ -6,6 +6,44 @@ import { Users, DollarSign, FileText, TrendingUp, ArrowUpRight, Send } from 'luc
 import AdminLayout from '../components/AdminLayout';
 import VerseCard, { type VerseData } from '../components/VerseCard';
 
+function ToggleSwitch({ on, onToggle, disabled }: { on: boolean; onToggle: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={on}
+      style={{
+        width: 42,
+        height: 22,
+        borderRadius: 999,
+        border: 'none',
+        cursor: disabled ? 'default' : 'pointer',
+        background: on ? '#16a34a' : '#cbd5e1',
+        position: 'relative',
+        transition: 'background 0.15s',
+        flexShrink: 0,
+        padding: 0,
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 2,
+          left: on ? 21 : 2,
+          width: 18,
+          height: 18,
+          borderRadius: '50%',
+          background: 'white',
+          transition: 'left 0.15s',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+        }}
+      />
+    </button>
+  );
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -29,8 +67,11 @@ export default function DashboardPage() {
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
   const [verseForm, setVerseForm] = useState(blankVerseForm());
   const [displayDuration, setDisplayDuration] = useState<'today' | '3days' | '1week' | 'until-replaced'>('today');
+  const [verseIsActive, setVerseIsActive] = useState(true);
   const [postingVerse, setPostingVerse] = useState(false);
   const [verseMessage, setVerseMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [verseHistory, setVerseHistory] = useState<any[]>([]);
+  const [togglingVerseId, setTogglingVerseId] = useState<number | null>(null);
 
   const isWordForm = verseForm.type === 'Word';
 
@@ -46,9 +87,28 @@ export default function DashboardPage() {
     versesAPI.getCurrent(1).then((res) => setCurrentVerse(res.data || null)).catch(() => {});
   };
 
+  const loadVerseHistory = () => {
+    versesAPI.getAll(1).then((res) => setVerseHistory(res.data || [])).catch(() => {});
+  };
+
   useEffect(() => {
     loadVerse();
+    loadVerseHistory();
   }, []);
+
+  const handleToggleVerse = async (id: number) => {
+    setTogglingVerseId(id);
+    try {
+      await versesAPI.toggle(id);
+      loadVerseHistory();
+      loadVerse();
+    } catch {
+      setVerseMessage({ type: 'error', text: 'Failed to update visibility. Please try again.' });
+      setTimeout(() => setVerseMessage(null), 4000);
+    } finally {
+      setTogglingVerseId(null);
+    }
+  };
 
   const handlePostVerse = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,16 +130,19 @@ export default function DashboardPage() {
         reference: verseForm.reference.trim(),
         postedBy: isWordForm ? 'English Dept.' : `${user?.firstName ?? 'Admin'} ${user?.lastName ?? ''}`.trim(),
         displayUntil: computeDisplayUntil(displayDuration),
+        isActive: verseIsActive,
         ...(isWordForm && {
           definition: verseForm.definition.trim(),
           usageExample: verseForm.usageExample.trim(),
           partOfSpeech: verseForm.partOfSpeech,
         }),
       });
-      setVerseMessage({ type: 'success', text: 'Posted to all portals.' });
+      setVerseMessage({ type: 'success', text: verseIsActive ? 'Posted to all portals.' : 'Saved (hidden from portals).' });
       setVerseForm(blankVerseForm());
       setDisplayDuration('today');
+      setVerseIsActive(true);
       loadVerse();
+      loadVerseHistory();
     } catch {
       setVerseMessage({ type: 'error', text: 'Failed to post. Please try again.' });
     } finally {
@@ -327,18 +390,103 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={postingVerse}
-              style={{
-                background: 'linear-gradient(135deg, #1a237e, #3949ab)',
-                border: 'none',
-              }}
-            >
-              <Send size={14} /> {postingVerse ? 'Posting...' : '📤 Post to All Portals'}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={postingVerse}
+                style={{
+                  background: 'linear-gradient(135deg, #1a237e, #3949ab)',
+                  border: 'none',
+                }}
+              >
+                <Send size={14} /> {postingVerse ? 'Posting...' : '📤 Post to All Portals'}
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <ToggleSwitch on={verseIsActive} onToggle={() => setVerseIsActive((v) => !v)} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: verseIsActive ? '#16a34a' : '#64748b' }}>
+                  {verseIsActive ? 'ON' : 'OFF'}
+                </span>
+              </div>
+            </div>
           </form>
+        </section>
+
+        <section
+          style={{
+            background: 'white',
+            borderRadius: 16,
+            padding: '20px 24px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}
+        >
+          <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 700, color: '#0f172a' }}>
+            Posting History
+          </h3>
+          <p style={{ margin: '0 0 16px', fontSize: 12.5, color: '#64748b' }}>
+            Toggle a post on to show it on all portals, or off to hide it while keeping it saved.
+          </p>
+
+          {verseHistory.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8', fontSize: 13 }}>
+              No verses, quotes, or words posted yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {verseHistory.map((v: any) => {
+                const badgeIcon = v.type === 'Bible Verse' ? '📖' : v.type === 'Word' ? '📚' : '💬';
+                const dateLabel = v.createdAt
+                  ? new Date(v.createdAt).toLocaleDateString('en-ZW', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })
+                  : '';
+                return (
+                  <div
+                    key={v.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: '1px solid #f1f5f9',
+                      background: v.isActive ? '#f8fafc' : '#fafafa',
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>{badgeIcon}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: '#0f172a',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {v.text}
+                      </p>
+                      <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94a3b8' }}>
+                        {dateLabel} · {v.postedBy}
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      on={v.isActive}
+                      onToggle={() => handleToggleVerse(v.id)}
+                      disabled={togglingVerseId === v.id}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         <section className="stat-grid">
