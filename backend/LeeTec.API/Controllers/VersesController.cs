@@ -22,8 +22,9 @@ namespace LeeTec.API.Controllers
         [HttpGet("current")]
         public async Task<IActionResult> GetCurrent([FromQuery] int schoolId = 1)
         {
+            var now = DateTime.UtcNow;
             var verse = await _context.DailyVerses
-                .Where(v => v.SchoolId == schoolId && v.IsActive)
+                .Where(v => v.SchoolId == schoolId && v.IsActive && (v.DisplayUntil == null || v.DisplayUntil >= now))
                 .OrderByDescending(v => v.CreatedAt)
                 .FirstOrDefaultAsync();
 
@@ -46,6 +47,7 @@ namespace LeeTec.API.Controllers
                 Definition = request.Definition?.Trim(),
                 UsageExample = request.UsageExample?.Trim(),
                 PartOfSpeech = request.PartOfSpeech,
+                DisplayUntil = request.DisplayUntil,
             };
 
             _context.DailyVerses.Add(verse);
@@ -65,5 +67,6 @@ namespace LeeTec.API.Controllers
         public string? Definition { get; set; }
         public string? UsageExample { get; set; }
         public string? PartOfSpeech { get; set; }
+        public DateTime? DisplayUntil { get; set; }
     }
 }

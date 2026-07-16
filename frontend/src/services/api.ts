@@ -234,6 +234,7 @@ export const versesAPI = {
     definition?: string;
     usageExample?: string;
     partOfSpeech?: string;
+    displayUntil?: string;
   }) => api.post('/verses', data),
 };
 

@@ -28,10 +28,19 @@ export default function DashboardPage() {
   });
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
   const [verseForm, setVerseForm] = useState(blankVerseForm());
+  const [displayDuration, setDisplayDuration] = useState<'today' | '3days' | '1week' | 'until-replaced'>('today');
   const [postingVerse, setPostingVerse] = useState(false);
   const [verseMessage, setVerseMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const isWordForm = verseForm.type === 'Word';
+
+  const computeDisplayUntil = (duration: typeof displayDuration): string | undefined => {
+    const d = new Date();
+    if (duration === 'today') { d.setHours(23, 59, 59, 999); return d.toISOString(); }
+    if (duration === '3days') { d.setDate(d.getDate() + 3); return d.toISOString(); }
+    if (duration === '1week') { d.setDate(d.getDate() + 7); return d.toISOString(); }
+    return undefined; // until replaced
+  };
 
   const loadVerse = () => {
     versesAPI.getCurrent(1).then((res) => setCurrentVerse(res.data || null)).catch(() => {});
@@ -60,6 +69,7 @@ export default function DashboardPage() {
         text: verseForm.text.trim(),
         reference: verseForm.reference.trim(),
         postedBy: isWordForm ? 'English Dept.' : `${user?.firstName ?? 'Admin'} ${user?.lastName ?? ''}`.trim(),
+        displayUntil: computeDisplayUntil(displayDuration),
         ...(isWordForm && {
           definition: verseForm.definition.trim(),
           usageExample: verseForm.usageExample.trim(),
@@ -68,6 +78,7 @@ export default function DashboardPage() {
       });
       setVerseMessage({ type: 'success', text: 'Posted to all portals.' });
       setVerseForm(blankVerseForm());
+      setDisplayDuration('today');
       loadVerse();
     } catch {
       setVerseMessage({ type: 'error', text: 'Failed to post. Please try again.' });
@@ -273,6 +284,23 @@ export default function DashboardPage() {
                 />
               </>
             )}
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>
+                Show for
+              </label>
+              <select
+                className="text-field"
+                value={displayDuration}
+                onChange={(e) => setDisplayDuration(e.target.value as typeof displayDuration)}
+                style={{ width: '100%', appearance: 'auto' }}
+              >
+                <option value="today">Today only</option>
+                <option value="3days">3 days</option>
+                <option value="1week">1 week</option>
+                <option value="until-replaced">Until replaced</option>
+              </select>
+            </div>
 
             {previewVerse && (
               <div style={{ marginBottom: 16 }}>

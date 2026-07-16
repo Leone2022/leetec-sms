@@ -12,6 +12,7 @@ namespace LeeTec.API.Models
         public string PostedBy { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public bool IsActive { get; set; } = true;
+        public DateTime? DisplayUntil { get; set; } // null = until replaced
 
         // Word of the Day
         public string? Definition { get; set; } // the word's definition

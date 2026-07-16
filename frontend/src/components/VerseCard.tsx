@@ -24,6 +24,14 @@ export default function VerseCard({ verse, greetingName, fontSize = 20, animate 
   const isBible = verse.type === 'Bible Verse';
   const isWord = verse.type === 'Word';
 
+  const postedDate = verse.createdAt ? new Date(verse.createdAt) : new Date();
+  const postedOnLabel = `Posted on ${postedDate.toLocaleDateString('en-ZW', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })}`;
+
   const fadeInStyle = animate && (
     <style>{`@keyframes verseCardFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}</style>
   );
@@ -89,6 +97,9 @@ export default function VerseCard({ verse, greetingName, fontSize = 20, animate 
           </p>
         )}
 
+        <p style={{ margin: '0 0 4px', color: 'rgba(255,255,255,0.5)', fontSize: 11, textAlign: 'right' }}>
+          {postedOnLabel}
+        </p>
         <p style={{ margin: 0, color: 'rgba(255,255,255,0.55)', fontSize: 11, textAlign: 'right' }}>
           Posted by {verse.postedBy}
         </p>
@@ -169,6 +180,9 @@ export default function VerseCard({ verse, greetingName, fontSize = 20, animate 
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
           <p style={{ margin: 0, color: '#90caf9', fontSize: 14, fontWeight: 600, textAlign: 'right' }}>
             — {verse.reference}
+          </p>
+          <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: 11, textAlign: 'right' }}>
+            {postedOnLabel}
           </p>
           <p style={{ margin: 0, color: 'rgba(255,255,255,0.5)', fontSize: 11, textAlign: 'right' }}>
             Posted by {verse.postedBy}
