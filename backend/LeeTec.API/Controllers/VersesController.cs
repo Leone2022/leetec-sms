@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
@@ -17,6 +18,7 @@ namespace LeeTec.API.Controllers
         }
 
         // GET /api/verses/current?schoolId={}
+        [AllowAnonymous]
         [HttpGet("current")]
         public async Task<IActionResult> GetCurrent([FromQuery] int schoolId = 1)
         {
