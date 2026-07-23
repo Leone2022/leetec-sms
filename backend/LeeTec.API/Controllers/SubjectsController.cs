@@ -207,13 +207,13 @@ namespace LeeTec.API.Controllers
             var studentSubjects = await _context.StudentSubjects.Where(ss => ss.SubjectId == id).ToListAsync();
             _context.StudentSubjects.RemoveRange(studentSubjects);
 
-            var teacherAssignments = await _context.TeacherSubjectAssignments.Where(a => a.SubjectId == id).ToListAsync();
+            var teacherAssignments = await _context.TeacherSubjectAssignments.Where(ta => ta.SubjectId == id).ToListAsync();
             _context.TeacherSubjectAssignments.RemoveRange(teacherAssignments);
 
             var marks = await _context.Marks.Where(m => m.SubjectId == id).ToListAsync();
             _context.Marks.RemoveRange(marks);
 
-            subject.IsActive = false;
+            _context.Subjects.Remove(subject);
             await _context.SaveChangesAsync();
             return Ok(new { message = "Subject removed" });
         }
