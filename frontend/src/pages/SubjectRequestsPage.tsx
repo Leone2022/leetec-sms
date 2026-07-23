@@ -8,10 +8,12 @@ interface SubjectChangeRequest {
   studentId: number;
   studentName: string;
   studentNumber: string;
+  campus: string;
   form: string;
   subjectId: number;
   subjectName: string;
   action: 'Add' | 'Drop';
+  reason: string;
   date: string;
 }
 
@@ -54,9 +56,11 @@ export default function SubjectRequestsPage() {
   };
 
   const handleReject = async (id: number) => {
+    const reason = window.prompt('Reason for rejection (optional):');
+    if (reason === null) return;
     setActingId(id);
     try {
-      await adminAPI.rejectSubjectRequest(id);
+      await adminAPI.rejectSubjectRequest(id, reason || undefined);
       showMsg('Request rejected', 'success');
       await loadRequests();
     } catch {
@@ -92,9 +96,11 @@ export default function SubjectRequestsPage() {
               <thead>
                 <tr>
                   <th>Student</th>
-                  <th>Current Form</th>
-                  <th>Subject</th>
+                  <th>Campus</th>
+                  <th>Form</th>
                   <th style={{ textAlign: 'center' }}>Action</th>
+                  <th>Subject</th>
+                  <th>Reason</th>
                   <th>Date</th>
                   <th style={{ textAlign: 'center' }}>Approve</th>
                   <th style={{ textAlign: 'center' }}>Reject</th>
@@ -107,13 +113,15 @@ export default function SubjectRequestsPage() {
                       <strong>{r.studentName}</strong>
                       <p style={{ margin: '2px 0 0', fontSize: 11, color: '#94a3b8', fontFamily: 'ui-monospace, monospace' }}>{r.studentNumber}</p>
                     </td>
+                    <td style={{ fontSize: 12 }}>{r.campus}</td>
                     <td style={{ fontSize: 12 }}>{r.form}</td>
-                    <td style={{ fontSize: 13 }}>{r.subjectName}</td>
                     <td style={{ textAlign: 'center' }}>
                       <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600, background: r.action === 'Add' ? '#dcfce7' : '#fee2e2', color: r.action === 'Add' ? '#166534' : '#991b1b' }}>
                         {r.action}
                       </span>
                     </td>
+                    <td style={{ fontSize: 13 }}>{r.subjectName}</td>
+                    <td style={{ fontSize: 12, color: '#475569', maxWidth: 220 }}>{r.reason || '—'}</td>
                     <td style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap' }}>
                       {r.date ? new Date(r.date).toLocaleDateString('en-GB') : '—'}
                     </td>

@@ -67,7 +67,7 @@ export const studentsAPI = {
     api.post(`/students/${studentId}/subjects`, { subjectId, termId }),
   removeStudentSubject: (studentId: number, subjectId: number) =>
     api.delete(`/students/${studentId}/subjects/${subjectId}`),
-  requestSubjectChange: (id: number, data: { subjectId: number; action: 'Add' | 'Drop' }) =>
+  requestSubjectChange: (id: number, data: { subjectId: number; action: 'Add' | 'Drop'; reason: string }) =>
     api.post(`/students/${id}/subjects/request-change`, data),
 };
 
@@ -282,8 +282,8 @@ export const adminAPI = {
   getSubjectChangeRequests: () => api.get('/admin/subject-change-requests'),
   approveSubjectRequest: (id: number) =>
     api.put(`/admin/subject-change-requests/${id}/approve`),
-  rejectSubjectRequest: (id: number) =>
-    api.put(`/admin/subject-change-requests/${id}/reject`),
+  rejectSubjectRequest: (id: number, reason?: string) =>
+    api.put(`/admin/subject-change-requests/${id}/reject`, { reason }),
   getAdmins: () => api.get('/admin/admins'),
   createAdmin: (data: {
     firstName: string;

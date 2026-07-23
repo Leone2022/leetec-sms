@@ -41,6 +41,7 @@ namespace LeeTec.API.Data
         // Subjects
         public DbSet<Subject> Subjects { get; set; }
         public DbSet<StudentSubject> StudentSubjects { get; set; }
+        public DbSet<SubjectChangeRequest> SubjectChangeRequests { get; set; }
 
         // Term Registrations
         public DbSet<TermRegistration> TermRegistrations { get; set; }

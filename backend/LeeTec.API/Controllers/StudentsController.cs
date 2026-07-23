@@ -602,62 +602,39 @@ namespace LeeTec.API.Controllers
             return Ok(result);
         }
 
-        // REQUEST SUBJECT CHANGE (Form 5/6, Lower 6, Upper 6 only)
-        private static readonly HashSet<string> SubjectChangeEligibleForms = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "Form 5", "Lower 6", "Upper 6"
-        };
-
+        // REQUEST SUBJECT CHANGE (available to all students, all campuses, all forms)
         [HttpPost("{id}/subjects/request-change")]
         public async Task<IActionResult> RequestSubjectChange(int id, [FromBody] RequestSubjectChangeDTO dto)
         {
             var student = await _context.Students.FindAsync(id);
             if (student == null) return NotFound(new { message = "Student not found" });
 
-            if (!SubjectChangeEligibleForms.Contains(student.Form))
-                return StatusCode(403, new { message = "Subject changes not allowed for this form" });
-
             var subject = await _context.Subjects.FindAsync(dto.SubjectId);
             if (subject == null) return NotFound(new { message = "Subject not found" });
 
-            var activeTerm = await _context.Terms
-                .FirstOrDefaultAsync(t => t.IsActive && t.SchoolId == student.SchoolId);
-            if (activeTerm == null) return BadRequest(new { message = "No active term" });
-
             var isAdd = string.Equals(dto.Action, "Add", StringComparison.OrdinalIgnoreCase);
 
-            var existing = await _context.StudentSubjects
-                .FirstOrDefaultAsync(ss => ss.StudentId == id && ss.SubjectId == dto.SubjectId && ss.TermId == activeTerm.Id);
-
-            if (isAdd)
+            if (!isAdd)
             {
-                if (existing != null)
-                {
-                    existing.Status = "Pending";
-                    existing.IsActive = true;
-                }
-                else
-                {
-                    _context.StudentSubjects.Add(new StudentSubject
-                    {
-                        StudentId = id,
-                        SubjectId = dto.SubjectId,
-                        TermId = activeTerm.Id,
-                        SchoolId = student.SchoolId,
-                        IsActive = true,
-                        Status = "Pending",
-                        CreatedAt = DateTime.UtcNow,
-                    });
-                }
-            }
-            else
-            {
+                var activeTerm = await _context.Terms
+                    .FirstOrDefaultAsync(t => t.IsActive && t.SchoolId == student.SchoolId);
+                var existing = activeTerm == null
+                    ? null
+                    : await _context.StudentSubjects.FirstOrDefaultAsync(ss =>
+                        ss.StudentId == id && ss.SubjectId == dto.SubjectId && ss.TermId == activeTerm.Id && ss.IsActive);
                 if (existing == null)
                     return NotFound(new { message = "Subject registration not found" });
-
-                existing.Status = "Pending";
-                existing.IsActive = false;
             }
+
+            _context.SubjectChangeRequests.Add(new SubjectChangeRequest
+            {
+                StudentId = id,
+                SubjectId = dto.SubjectId,
+                Action = isAdd ? "Add" : "Drop",
+                Reason = dto.Reason?.Trim() ?? string.Empty,
+                Status = "Pending",
+                RequestedAt = DateTime.UtcNow,
+            });
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Request submitted for admin approval" });

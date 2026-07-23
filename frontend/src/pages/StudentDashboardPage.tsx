@@ -6,16 +6,41 @@ import { generateReportCard, type ReportCardData } from '../utils/reportCard';
 import { GRADE_REFERENCE_TABLES } from '../utils/grading';
 import {
   LogOut, GraduationCap, LayoutDashboard, DollarSign,
-  FileText, Bell, User, Menu, X, FileDown, BookOpen,
+  FileText, Bell, User, Menu, X, FileDown, BookOpen, Clock, Sparkles,
 } from 'lucide-react';
 import VerseCard, { type VerseData } from '../components/VerseCard';
-
-const SUBJECT_CHANGE_ELIGIBLE_FORMS = ['Form 5', 'Lower 6', 'Upper 6'];
 
 const CAMPUS_FULL_NAMES: Record<string, string> = {
   AHJ: 'ADVENT HOPE JUNIOR SCHOOL',
   AHA: 'ADVENT HOPE ACADEMY',
   AHS: 'ADVENT HOPE HIGH SCHOOL',
+};
+
+const getCampusBadge = (campus: string) => {
+  if (campus === 'AHJ') return { bg: '#dbeafe', color: '#1d4ed8' };
+  if (campus === 'AHA') return { bg: '#dcfce7', color: '#15803d' };
+  if (campus === 'AHS') return { bg: '#fef9c3', color: '#854d0e' };
+  return { bg: '#f1f5f9', color: '#475569' };
+};
+
+const STUDENT_QUOTES = [
+  'Success is the sum of small efforts, repeated day in and day out.',
+  "Believe you can and you're halfway there.",
+  'The future belongs to those who prepare for it today.',
+  'Push yourself, because no one else is going to do it for you.',
+  'Great things never come from comfort zones.',
+  'Dream big. Start small. Act now.',
+  'Your only limit is you.',
+  'Every expert was once a beginner.',
+  'Discipline is the bridge between goals and accomplishment.',
+  "Don't watch the clock; do what it does. Keep going.",
+];
+
+const getQuoteOfTheDay = () => {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0).getTime();
+  const dayOfYear = Math.floor((now.getTime() - startOfYear) / 86400000);
+  return STUDENT_QUOTES[dayOfYear % STUDENT_QUOTES.length];
 };
 
 type View = 'dashboard' | 'reportCard' | 'subjects' | 'fees' | 'announcements' | 'profile';
@@ -65,6 +90,7 @@ export default function StudentDashboardPage() {
 
   const [loadError, setLoadError] = useState(false);
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
+  const [myMarksCount, setMyMarksCount] = useState(0);
 
   const studentInfo = JSON.parse(localStorage.getItem('student_info') || '{}');
   const studentId: number | undefined = studentInfo?.id ?? studentInfo?.studentId;
@@ -100,19 +126,25 @@ export default function StudentDashboardPage() {
   }, [reportTermId, studentId]);
 
   useEffect(() => {
-    if (view !== 'announcements') return;
     setAnnouncementsLoading(true);
     announcementsAPI.getAll(1, studentCampus || undefined)
       .then(res => setAnnouncements(res.data || []))
       .catch(() => {})
       .finally(() => setAnnouncementsLoading(false));
-  }, [view]);
+  }, [studentCampus]);
 
   useEffect(() => {
-    if (view !== 'subjects' || !studentId) return;
+    if (!studentId) return;
     loadMySubjects();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, studentId]);
+  }, [studentId]);
+
+  useEffect(() => {
+    if (!studentId || !reportTermId) return;
+    marksAPI.getStudentMarks(studentId, reportTermId as number)
+      .then(res => setMyMarksCount((res.data || []).length))
+      .catch(() => setMyMarksCount(0));
+  }, [studentId, reportTermId]);
 
   const loadMySubjects = async () => {
     if (!studentId) return;
@@ -152,7 +184,7 @@ export default function StudentDashboardPage() {
     setSubmittingChange(true);
     setChangeMessage(null);
     try {
-      await studentsAPI.requestSubjectChange(studentId, { subjectId: changeSubjectId as number, action: changeAction });
+      await studentsAPI.requestSubjectChange(studentId, { subjectId: changeSubjectId as number, action: changeAction, reason: changeReason.trim() });
       setShowChangeModal(false);
       setChangeMessage({ type: 'success', text: 'Request submitted for admin approval' });
       await loadMySubjects();
@@ -203,7 +235,13 @@ export default function StudentDashboardPage() {
     navigate('/student-login');
   };
 
-  const handleNav = (v: View) => { setView(v); setSidebarOpen(false); };
+  const handleNav = (v: View) => {
+    setView(v);
+    setSidebarOpen(false);
+    if (v === 'announcements' && studentId) {
+      localStorage.setItem(`student_announcements_seen_${studentId}`, new Date().toISOString());
+    }
+  };
 
   const student = dashboard?.student ?? studentInfo;
   const invoice = dashboard?.latestInvoice;
@@ -212,12 +250,31 @@ export default function StudentDashboardPage() {
   const initials = `${firstName[0] ?? ''}${surname[0] ?? ''}`.toUpperCase();
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const greetingInfo =
+    hour >= 5 && hour < 12 ? { emoji: '🌅', text: 'Good morning' } :
+    hour >= 12 && hour < 17 ? { emoji: '☀️', text: 'Good afternoon' } :
+    hour >= 17 && hour < 21 ? { emoji: '🌆', text: 'Good evening' } :
+    { emoji: '🌙', text: 'Good night' };
 
   const statusPill = (status: string) =>
     status === 'Paid' ? 'pill-success' : status === 'PartiallyPaid' ? 'pill-warning' : 'pill-danger';
 
   const selectedReportTerm = terms.find(t => t.id === reportTermId);
+
+  // ── Hoisted for the dashboard quick-stats / recent-activity widgets ────
+  const activeTermForSubjects = terms.find(t => t.isActive) ?? terms[0];
+  const totalCharged = allInvoices.reduce((s, inv) => s + Number(inv.totalAmount ?? 0), 0);
+  const totalPaid = allInvoices.reduce((s, inv) => s + Number(inv.amountPaid ?? 0), 0);
+  const totalOutstanding = allInvoices.reduce((s, inv) => s + Number(inv.balance ?? 0), 0);
+  const statementRows = buildStatementRows(allInvoices);
+  const announcementsSeenAt = studentId ? localStorage.getItem(`student_announcements_seen_${studentId}`) : null;
+  const unreadAnnouncementsCount = announcements.filter(
+    (a: any) => !announcementsSeenAt || new Date(a.createdAt) > new Date(announcementsSeenAt)
+  ).length;
+  const latestPayment = statementRows
+    .filter(r => Number(r.payment) > 0)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+  const latestAnnouncement = announcements[0];
 
   const handleDownloadReportCardPdf = async () => {
     if (!reportCard) return;
@@ -314,34 +371,84 @@ export default function StudentDashboardPage() {
   );
 
   // ── Dashboard view ────────────────────────────────────────────
+  const campusBadge = getCampusBadge(student?.campus || studentCampus);
+
   const DashboardView = (
     <div style={{ padding: '28px 32px', maxWidth: 900 }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0 }}>{greeting}, {firstName}!</h1>
-        <p style={{ color: '#64748b', fontSize: 13, margin: '4px 0 0' }}>Here's a summary of your account.</p>
+        <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          {greetingInfo.emoji} {greetingInfo.text}, {firstName}!
+        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+          <span style={{ color: '#64748b', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>{student?.studentNumber ?? '—'}</span>
+          <span style={{ color: '#cbd5e1' }}>·</span>
+          <span style={{ color: '#64748b', fontSize: 13 }}>{student?.form ?? '—'}</span>
+          {(student?.campus || studentCampus) && (
+            <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 20, fontWeight: 700, background: campusBadge.bg, color: campusBadge.color }}>
+              {student?.campus || studentCampus}
+            </span>
+          )}
+        </div>
       </div>
+
       {currentVerse && (
         <div style={{ marginBottom: 24 }}>
           <VerseCard verse={currentVerse} greetingName={firstName} fontSize={18} animate />
         </div>
       )}
-      {invoice && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
-          {[
-            { label: 'Balance Due', value: fmtAmt(invoice.balance), color: Number(invoice.balance) > 0 ? '#dc2626' : '#15803d', bg: Number(invoice.balance) > 0 ? '#fef2f2' : '#f0fdf4' },
-            { label: 'Amount Paid', value: fmtAmt(invoice.amountPaid), color: '#15803d', bg: '#f0fdf4' },
-            { label: 'Total Invoiced', value: fmtAmt(invoice.totalAmount), color: '#1a237e', bg: '#eef2ff' },
-          ].map(({ label, value, color, bg }) => (
-            <div key={label} style={{ background: 'white', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-                <DollarSign size={15} color={color} />
-              </div>
-              <p style={{ fontSize: 22, fontWeight: 700, color, margin: 0 }}>{value}</p>
-              <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>{label}</p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
+        {[
+          { label: '📚 My Subjects', value: String(mySubjects.length), icon: BookOpen, color: '#1a237e', bg: '#eef2ff', onClick: () => handleNav('subjects') },
+          { label: '💰 Balance Due', value: fmtAmt(invoice?.balance ?? 0), icon: DollarSign, color: Number(invoice?.balance ?? 0) > 0 ? '#dc2626' : '#15803d', bg: Number(invoice?.balance ?? 0) > 0 ? '#fef2f2' : '#f0fdf4', onClick: () => handleNav('fees') },
+          { label: '📝 My Results', value: String(myMarksCount), icon: FileText, color: '#7c3aed', bg: '#f5f3ff', onClick: () => handleNav('reportCard') },
+          { label: '📢 Announcements', value: String(unreadAnnouncementsCount), icon: Bell, color: '#0891b2', bg: '#ecfeff', onClick: () => handleNav('announcements') },
+        ].map(({ label, value, icon: Icon, color, bg, onClick }) => (
+          <button
+            key={label}
+            onClick={onClick}
+            style={{ textAlign: 'left', cursor: 'pointer', background: 'white', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}
+          >
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+              <Icon size={15} color={color} />
             </div>
-          ))}
+            <p style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: 0 }}>{value}</p>
+            <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>{label}</p>
+          </button>
+        ))}
+      </div>
+
+      {(latestPayment || reportCard || latestAnnouncement) && (
+        <div style={{ background: 'white', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Clock size={15} color="#64748b" />
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>Recent Activity</h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {latestPayment && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+                <span style={{ color: '#475569' }}>💳 Latest fee payment</span>
+                <span style={{ fontWeight: 600, color: '#0f172a', textAlign: 'right' }}>
+                  {new Date(latestPayment.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </span>
+              </div>
+            )}
+            {reportCard && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+                <span style={{ color: '#475569' }}>📝 Latest results</span>
+                <span style={{ fontWeight: 600, color: '#0f172a', textAlign: 'right' }}>{reportCard.term.name} {reportCard.term.year}</span>
+              </div>
+            )}
+            {latestAnnouncement && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
+                <span style={{ color: '#475569' }}>📢 Latest announcement</span>
+                <span style={{ fontWeight: 600, color: '#0f172a', textAlign: 'right' }}>{latestAnnouncement.title}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
+
       {invoice ? (
         <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -383,6 +490,11 @@ export default function StudentDashboardPage() {
       ) : (
         <div style={{ background: 'white', borderRadius: 12, padding: '40px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>No invoice found for the current term.</div>
       )}
+
+      <div style={{ background: 'linear-gradient(135deg, #1a237e, #3949ab)', borderRadius: 12, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 12, color: 'white', marginTop: 24 }}>
+        <Sparkles size={18} style={{ flexShrink: 0 }} />
+        <p style={{ margin: 0, fontSize: 13, fontStyle: 'italic', lineHeight: 1.5 }}>{getQuoteOfTheDay()}</p>
+      </div>
     </div>
   );
 
@@ -541,9 +653,6 @@ export default function StudentDashboardPage() {
   );
 
   // ── My Subjects view ────────────────────────────────────────────
-  const activeTermForSubjects = terms.find(t => t.isActive) ?? terms[0];
-  const subjectChangeEligible = SUBJECT_CHANGE_ELIGIBLE_FORMS.includes(student?.form);
-
   const statusBadge = (status: string) => {
     if (status === 'Confirmed') return { bg: '#dcfce7', color: '#166534', icon: '✅', label: 'Confirmed' };
     if (status === 'Pending') return { bg: '#ffedd5', color: '#9a3412', icon: '⏳', label: 'Pending Approval' };
@@ -590,16 +699,14 @@ export default function StudentDashboardPage() {
         </div>
       )}
 
-      {subjectChangeEligible && (
-        <div style={{ marginTop: 20, textAlign: 'center' }}>
-          <button
-            onClick={() => openChangeModal('Add')}
-            style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-          >
-            Request Subject Change
-          </button>
-        </div>
-      )}
+      <div style={{ marginTop: 20, textAlign: 'center' }}>
+        <button
+          onClick={() => openChangeModal('Add')}
+          style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+        >
+          ➕ Request Subject Change
+        </button>
+      </div>
 
       {showChangeModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
@@ -653,7 +760,7 @@ export default function StudentDashboardPage() {
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, minHeight: 70, resize: 'vertical', fontFamily: 'inherit' }}
                   value={changeReason}
                   onChange={e => setChangeReason(e.target.value)}
-                  placeholder="Briefly explain why you're requesting this change"
+                  placeholder="Please explain why..."
                 />
               </div>
             </div>
@@ -667,8 +774,8 @@ export default function StudentDashboardPage() {
               </button>
               <button
                 onClick={handleSubmitChange}
-                disabled={!changeSubjectId || submittingChange}
-                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!changeSubjectId || submittingChange) ? 0.6 : 1 }}
+                disabled={!changeSubjectId || !changeReason.trim() || submittingChange}
+                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!changeSubjectId || !changeReason.trim() || submittingChange) ? 0.6 : 1 }}
               >
                 {submittingChange ? 'Submitting...' : 'Submit'}
               </button>
@@ -680,11 +787,6 @@ export default function StudentDashboardPage() {
   );
 
   // ── Financial Statement view ──────────────────────────────────
-  const totalCharged = allInvoices.reduce((s, inv) => s + Number(inv.totalAmount ?? 0), 0);
-  const totalPaid = allInvoices.reduce((s, inv) => s + Number(inv.amountPaid ?? 0), 0);
-  const totalOutstanding = allInvoices.reduce((s, inv) => s + Number(inv.balance ?? 0), 0);
-  const statementRows = buildStatementRows(allInvoices);
-
   const handleDownloadStatement = () => {
     const s = fullProfile || student;
     if (!s) return;
@@ -755,13 +857,6 @@ export default function StudentDashboardPage() {
     </div>
   );
 
-  const getAnnouncementBadge = (campus: string) => {
-    if (campus === 'AHJ') return { bg: '#dbeafe', color: '#1d4ed8' };
-    if (campus === 'AHA') return { bg: '#dcfce7', color: '#15803d' };
-    if (campus === 'AHS') return { bg: '#fef9c3', color: '#854d0e' };
-    return { bg: '#f1f5f9', color: '#475569' };
-  };
-
   const AnnouncementsView = (
     <div style={{ padding: '28px 32px', maxWidth: 860 }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: '0 0 20px' }}>Announcements</h1>
@@ -778,7 +873,7 @@ export default function StudentDashboardPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {announcements.map((a: any) => {
-            const badge = getAnnouncementBadge(a.targetCampus);
+            const badge = getCampusBadge(a.targetCampus);
             return (
               <div key={a.id} style={{ background: 'white', borderRadius: 12, padding: '18px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>

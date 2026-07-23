@@ -540,24 +540,26 @@ namespace LeeTec.API.Controllers
         [HttpGet("subject-change-requests")]
         public async Task<IActionResult> GetSubjectChangeRequests()
         {
-            var pending = await _context.StudentSubjects
-                .Where(ss => ss.Status == "Pending")
-                .Include(ss => ss.Student)
-                .Include(ss => ss.Subject)
-                .OrderByDescending(ss => ss.CreatedAt)
+            var pending = await _context.SubjectChangeRequests
+                .Where(r => r.Status == "Pending")
+                .Include(r => r.Student)
+                .Include(r => r.Subject)
+                .OrderByDescending(r => r.RequestedAt)
                 .ToListAsync();
 
-            var result = pending.Select(ss => new
+            var result = pending.Select(r => new
             {
-                ss.Id,
-                studentId = ss.StudentId,
-                studentName = ss.Student != null ? $"{ss.Student.FirstName} {ss.Student.Surname}" : "",
-                studentNumber = ss.Student != null ? ss.Student.StudentNumber : "",
-                form = ss.Student != null ? ss.Student.Form : "",
-                subjectId = ss.SubjectId,
-                subjectName = ss.Subject != null ? ss.Subject.Name : "",
-                action = ss.IsActive ? "Add" : "Drop",
-                date = ss.CreatedAt,
+                r.Id,
+                studentId = r.StudentId,
+                studentName = r.Student != null ? $"{r.Student.FirstName} {r.Student.Surname}" : "",
+                studentNumber = r.Student != null ? r.Student.StudentNumber : "",
+                campus = r.Student != null ? r.Student.Campus : "",
+                form = r.Student != null ? r.Student.Form : "",
+                subjectId = r.SubjectId,
+                subjectName = r.Subject != null ? r.Subject.Name : "",
+                action = r.Action,
+                reason = r.Reason,
+                date = r.RequestedAt,
             }).ToList();
 
             return Ok(result);
@@ -567,10 +569,49 @@ namespace LeeTec.API.Controllers
         [HttpPut("subject-change-requests/{id}/approve")]
         public async Task<IActionResult> ApproveSubjectRequest(int id)
         {
-            var request = await _context.StudentSubjects.FindAsync(id);
+            var request = await _context.SubjectChangeRequests.FindAsync(id);
             if (request == null) return NotFound(new { message = "Request not found" });
 
-            request.Status = "Confirmed";
+            var student = await _context.Students.FindAsync(request.StudentId);
+            if (student == null) return NotFound(new { message = "Student not found" });
+
+            var activeTerm = await _context.Terms
+                .FirstOrDefaultAsync(t => t.IsActive && t.SchoolId == student.SchoolId);
+            if (activeTerm == null) return BadRequest(new { message = "No active term" });
+
+            var isAdd = string.Equals(request.Action, "Add", StringComparison.OrdinalIgnoreCase);
+            var existing = await _context.StudentSubjects.FirstOrDefaultAsync(ss =>
+                ss.StudentId == request.StudentId && ss.SubjectId == request.SubjectId && ss.TermId == activeTerm.Id);
+
+            if (isAdd)
+            {
+                if (existing != null)
+                {
+                    existing.IsActive = true;
+                    existing.Status = "Confirmed";
+                }
+                else
+                {
+                    _context.StudentSubjects.Add(new StudentSubject
+                    {
+                        StudentId = request.StudentId,
+                        SubjectId = request.SubjectId,
+                        TermId = activeTerm.Id,
+                        SchoolId = student.SchoolId,
+                        IsActive = true,
+                        Status = "Confirmed",
+                        CreatedAt = DateTime.UtcNow,
+                    });
+                }
+            }
+            else if (existing != null)
+            {
+                existing.IsActive = false;
+            }
+
+            request.Status = "Approved";
+            request.ReviewedAt = DateTime.UtcNow;
+            request.ReviewedBy = "Admin";
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Request approved" });
@@ -578,12 +619,15 @@ namespace LeeTec.API.Controllers
 
         // PUT /api/admin/subject-change-requests/{id}/reject
         [HttpPut("subject-change-requests/{id}/reject")]
-        public async Task<IActionResult> RejectSubjectRequest(int id)
+        public async Task<IActionResult> RejectSubjectRequest(int id, [FromBody] RejectSubjectRequestDTO dto)
         {
-            var request = await _context.StudentSubjects.FindAsync(id);
+            var request = await _context.SubjectChangeRequests.FindAsync(id);
             if (request == null) return NotFound(new { message = "Request not found" });
 
-            request.Status = "Dropped";
+            request.Status = "Rejected";
+            request.RejectionReason = dto?.Reason;
+            request.ReviewedAt = DateTime.UtcNow;
+            request.ReviewedBy = "Admin";
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Request rejected" });
@@ -593,5 +637,10 @@ namespace LeeTec.API.Controllers
     public class AdminResetPasswordRequest
     {
         public string NewPassword { get; set; } = string.Empty;
+    }
+
+    public class RejectSubjectRequestDTO
+    {
+        public string? Reason { get; set; }
     }
 }

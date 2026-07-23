@@ -97,5 +97,6 @@ namespace LeeTec.API.DTOs
     {
         public int SubjectId { get; set; }
         public string Action { get; set; } = string.Empty; // "Add" | "Drop"
+        public string Reason { get; set; } = string.Empty;
     }
 }
