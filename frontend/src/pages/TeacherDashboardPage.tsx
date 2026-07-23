@@ -4,7 +4,8 @@ import { marksAPI, feesAPI, authAPI, versesAPI } from '../services/api';
 import { teacherAssignmentsAPI } from '../services/api';
 import {
   GraduationCap, LogOut, BookOpen, User, Menu, X,
-  ClipboardList, ChevronLeft,
+  ClipboardList, ChevronLeft, Save, Send, AlertTriangle,
+  CheckCircle, Users, Clock, Bell, Phone, Mail,
 } from 'lucide-react';
 import VerseCard, { type VerseData } from '../components/VerseCard';
 
@@ -20,10 +21,18 @@ interface MarkRow {
   amendmentRequestedAt: string | null;
 }
 
+interface TeacherNotification {
+  type: 'sendback' | 'approved';
+  subjectName: string;
+  campus: string;
+  form: string;
+  comment?: string | null;
+}
+
 const STATUS_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   Draft: { label: 'Draft', bg: '#f1f5f9', color: '#475569' },
   Submitted: { label: 'Submitted', bg: '#fff7ed', color: '#c2410c' },
-  Approved: { label: 'Approved ✅', bg: '#f0fdf4', color: '#15803d' },
+  Approved: { label: 'Approved', bg: '#f0fdf4', color: '#15803d' },
 };
 
 const calculateGrade = (total: number) => {
@@ -69,6 +78,11 @@ export default function TeacherDashboardPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
 
+  // Overview stats + notifications (My Classes landing view)
+  const [teacherStats, setTeacherStats] = useState({ totalStudents: 0, pendingDrafts: 0, approvedCount: 0 });
+  const [notifications, setNotifications] = useState<TeacherNotification[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+
   const showMsg = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
     setTimeout(() => setMessage(null), 4000);
@@ -84,6 +98,70 @@ export default function TeacherDashboardPage() {
   useEffect(() => {
     versesAPI.getCurrent(1).then((res) => setCurrentVerse(res.data || null)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!teacherInfo?.id || !termId || assignments.length === 0) {
+      setTeacherStats({ totalStudents: 0, pendingDrafts: 0, approvedCount: 0 });
+      setNotifications([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setStatsLoading(true);
+      let totalStudents = 0;
+      let pendingDrafts = 0;
+      let approvedCount = 0;
+      const notifs: TeacherNotification[] = [];
+      const statusRank: Record<string, number> = { Draft: 0, Submitted: 1, Approved: 2 };
+
+      for (const a of assignments) {
+        try {
+          const [midRes, endRes] = await Promise.all([
+            marksAPI.getEntrySheet({
+              termId: termId as number, campus: a.campus, form: a.form,
+              subjectId: a.subjectId, assessmentType: 'Mid-term Test', teacherId: teacherInfo.id,
+            }),
+            marksAPI.getEntrySheet({
+              termId: termId as number, campus: a.campus, form: a.form,
+              subjectId: a.subjectId, assessmentType: 'End of Term Exam', teacherId: teacherInfo.id,
+            }),
+          ]);
+          const midData: any[] = midRes.data || [];
+          const endData: any[] = endRes.data || [];
+          const endByStudent = new Map(endData.map((d: any) => [d.studentId, d]));
+          const combined = midData.map((d: any) => {
+            const endD = endByStudent.get(d.studentId);
+            const midStatus = d.status || 'Draft';
+            const endStatus = endD?.status || 'Draft';
+            const status = statusRank[midStatus] >= statusRank[endStatus] ? midStatus : endStatus;
+            const sendBackComment = d.sendBackComment || endD?.sendBackComment || null;
+            return { status, sendBackComment };
+          });
+
+          totalStudents += combined.length;
+          pendingDrafts += combined.filter(r => r.status === 'Draft').length;
+          approvedCount += combined.filter(r => r.status === 'Approved').length;
+
+          const sendBack = combined.find(r => r.status === 'Draft' && r.sendBackComment);
+          if (sendBack) {
+            notifs.push({ type: 'sendback', subjectName: a.subjectName, campus: a.campus, form: a.form, comment: sendBack.sendBackComment });
+          }
+          if (combined.some(r => r.status === 'Approved')) {
+            notifs.push({ type: 'approved', subjectName: a.subjectName, campus: a.campus, form: a.form });
+          }
+        } catch {
+          // skip this assignment's contribution on error
+        }
+      }
+
+      if (!cancelled) {
+        setTeacherStats({ totalStudents, pendingDrafts, approvedCount });
+        setNotifications(notifs);
+        setStatsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [assignments, termId, teacherInfo?.id]);
 
   useEffect(() => {
     feesAPI.getTerms(1).then(res => {
@@ -212,7 +290,7 @@ export default function TeacherDashboardPage() {
 
     const missing = rows.filter(r => r.midtermScore === '' && r.endOfTermScore === '');
     if (missing.length > 0) {
-      showMsg(`⚠️ Cannot submit — the following students have no marks entered: ${missing.map(r => r.studentName).join(', ')}`, 'error');
+      showMsg(`Cannot submit — the following students have no marks entered: ${missing.map(r => r.studentName).join(', ')}`, 'error');
       return;
     }
 
@@ -226,7 +304,7 @@ export default function TeacherDashboardPage() {
         form: selectedAssignment.form,
         submittedBy: `${firstName} ${surname}`.trim() || teacherInfo.email,
       });
-      showMsg('✅ Marks submitted successfully', 'success');
+      showMsg('Marks submitted successfully', 'success');
       await loadEntrySheet();
     } catch (err: any) {
       showMsg(err?.response?.data?.message || 'Failed to submit marks', 'error');
@@ -363,22 +441,28 @@ export default function TeacherDashboardPage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <ClipboardList size={17} style={{ color: '#94a3b8' }} />
             <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleSaveAll} disabled={saving || rows.length === 0 || !rows.some(r => r.status === 'Draft')}>
-              💾 {saving ? 'Saving...' : 'Save All'}
+              <Save size={13} /> {saving ? 'Saving...' : 'Save All'}
             </button>
           </div>
         </div>
 
         {rows.some(r => r.status === 'Draft' && r.sendBackComment) && (
-          <div style={{ margin: '14px 18px 0', padding: '12px 16px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: 13, fontWeight: 600 }}>
-            ⚠️ Marks sent back by admin: {rows.find(r => r.status === 'Draft' && r.sendBackComment)?.sendBackComment}
-            <div style={{ fontWeight: 400, marginTop: 2 }}>Please review and resubmit.</div>
+          <div style={{ margin: '14px 18px 0', padding: '12px 16px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: 13, fontWeight: 600, display: 'flex', gap: 8 }}>
+            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              Marks sent back by admin: {rows.find(r => r.status === 'Draft' && r.sendBackComment)?.sendBackComment}
+              <div style={{ fontWeight: 400, marginTop: 2 }}>Please review and resubmit.</div>
+            </div>
           </div>
         )}
 
         {rows.some(r => r.status === 'Draft' && r.amendmentRequestedAt) && (
-          <div style={{ margin: '14px 18px 0', padding: '12px 16px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', fontSize: 13, fontWeight: 600 }}>
-            ✅ Amendment approved! You can now re-enter the corrected marks.
-            <div style={{ fontWeight: 400, marginTop: 2 }}>Remember to save and resubmit for approval.</div>
+          <div style={{ margin: '14px 18px 0', padding: '12px 16px', borderRadius: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', fontSize: 13, fontWeight: 600, display: 'flex', gap: 8 }}>
+            <CheckCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              Amendment approved! You can now re-enter the corrected marks.
+              <div style={{ fontWeight: 400, marginTop: 2 }}>Remember to save and resubmit for approval.</div>
+            </div>
           </div>
         )}
 
@@ -436,7 +520,8 @@ export default function TeacherDashboardPage() {
                           placeholder="Optional comments" />
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <span style={{ padding: '2px 10px', borderRadius: 12, background: badge.bg, color: badge.color, fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 10px', borderRadius: 12, background: badge.bg, color: badge.color, fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
+                          {row.status === 'Approved' && <CheckCircle size={11} />}
                           {badge.label}
                         </span>
                       </td>
@@ -451,7 +536,7 @@ export default function TeacherDashboardPage() {
         {rows.some(r => r.status === 'Draft') && (
           <div style={{ padding: '14px 18px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end' }}>
             <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleSubmitForReview} disabled={submitting}>
-              📤 {submitting ? 'Submitting...' : 'Submit for Review'}
+              <Send size={13} /> {submitting ? 'Submitting...' : 'Submit for Review'}
             </button>
           </div>
         )}
@@ -468,6 +553,57 @@ export default function TeacherDashboardPage() {
       {currentVerse && (
         <div style={{ marginBottom: 20 }}>
           <VerseCard verse={currentVerse} greetingName={firstName} fontSize={18} animate />
+        </div>
+      )}
+
+      {assignments.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+          {[
+            { label: 'Subjects Assigned', value: new Set(assignments.map((a: any) => a.subjectId)).size, icon: BookOpen, color: '#1a237e', bg: '#eef2ff' },
+            { label: 'Total Students', value: teacherStats.totalStudents, icon: Users, color: '#0891b2', bg: '#ecfeff' },
+            { label: 'Pending Submissions', value: teacherStats.pendingDrafts, icon: Clock, color: '#c2410c', bg: '#fff7ed' },
+            { label: 'Marks Approved', value: teacherStats.approvedCount, icon: CheckCircle, color: '#15803d', bg: '#f0fdf4' },
+          ].map(({ label, value, icon: Icon, color, bg }) => (
+            <div key={label} style={{ background: 'white', borderRadius: 12, padding: '14px 16px', border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <Icon size={14} color={color} />
+              </div>
+              <p style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>{statsLoading ? '—' : value}</p>
+              <p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {notifications.length > 0 && (
+        <div style={{ background: 'white', borderRadius: 12, padding: '16px 18px', border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Bell size={15} color="#64748b" />
+            <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>Notifications</h3>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {notifications.map((n, i) => (
+              <div
+                key={`${n.type}-${n.subjectName}-${n.campus}-${n.form}-${i}`}
+                style={{
+                  display: 'flex', gap: 8, padding: '10px 12px', borderRadius: 8, fontSize: 13,
+                  background: n.type === 'sendback' ? '#fef2f2' : '#f0fdf4',
+                  border: `1px solid ${n.type === 'sendback' ? '#fecaca' : '#bbf7d0'}`,
+                  color: n.type === 'sendback' ? '#991b1b' : '#15803d',
+                }}
+              >
+                {n.type === 'sendback'
+                  ? <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                  : <CheckCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />}
+                <div>
+                  <strong>{n.subjectName}</strong> ({n.campus} · {n.form}) —{' '}
+                  {n.type === 'sendback'
+                    ? `sent back by admin: ${n.comment}`
+                    : 'marks approved'}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -532,19 +668,46 @@ export default function TeacherDashboardPage() {
         <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 16px' }}>Account Details</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
           {([
-            ['First Name', firstName],
-            ['Surname', surname],
-            ['Email', teacherInfo?.email],
-            ['Phone Number', teacherInfo?.phoneNumber || null],
-            ['Role', 'Teacher'],
-            ['School', 'Advent Hope Academy'],
-          ] as [string, string | null][]).filter(([, v]) => v !== null).map(([label, value]) => (
+            ['First Name', firstName, null],
+            ['Surname', surname, null],
+            ['Email', teacherInfo?.email, Mail],
+            ['Phone Number', teacherInfo?.phoneNumber || null, Phone],
+            ['Role', 'Teacher', null],
+            ['School', 'Advent Hope Academy', null],
+          ] as [string, string | null, React.ComponentType<{ size?: number }> | null][]).filter(([, v]) => v !== null).map(([label, value, Icon]) => (
             <div key={label}>
               <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>{label}</p>
-              <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 }}>{value || '—'}</p>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {Icon && <Icon size={13} />}
+                {value || '—'}
+              </p>
             </div>
           ))}
         </div>
+      </div>
+
+      <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '20px 24px', marginTop: 16 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 16px' }}>Assigned Subjects</p>
+        {assignments.length === 0 ? (
+          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>No subjects assigned yet.</p>
+        ) : (
+          <>
+            <p style={{ fontSize: 13, color: '#475569', margin: '0 0 14px' }}>
+              {new Set(assignments.map((a: any) => a.subjectId)).size} subject{new Set(assignments.map((a: any) => a.subjectId)).size !== 1 ? 's' : ''} across {assignments.length} class{assignments.length !== 1 ? 'es' : ''}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {assignments.map((a: any) => (
+                <div key={a.assignmentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: '#f8fafc', fontSize: 13 }}>
+                  <span style={{ fontWeight: 600, color: '#0f172a' }}>{a.subjectName}</span>
+                  <span style={{ display: 'flex', gap: 6 }}>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: '#dbeafe', color: '#1d4ed8', fontWeight: 600 }}>{a.campus}</span>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 12, background: '#f1f5f9', color: '#475569', fontWeight: 600 }}>{a.form}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '20px 24px', marginTop: 16 }}>
