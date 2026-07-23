@@ -97,6 +97,7 @@ export default function TeacherDashboardPage() {
   const [hwDescription, setHwDescription] = useState('');
   const [hwDueDate, setHwDueDate] = useState('');
   const [hwSubmitting, setHwSubmitting] = useState(false);
+  const [viewingHomework, setViewingHomework] = useState<any>(null);
 
   const showMsg = (text: string, type: 'success' | 'error') => {
     setMessage({ type, text });
@@ -891,13 +892,22 @@ export default function TeacherDashboardPage() {
                       <span style={{ fontSize: 11, padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700 }}>{h.status}</span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <button
-                        onClick={() => handleDeleteHomework(h.id)}
-                        title="Delete"
-                        style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, cursor: 'pointer', background: 'white', color: '#dc2626', border: '1.5px solid #dc2626', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                      >
-                        <Trash2 size={12} /> Delete
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                        <button
+                          onClick={() => setViewingHomework(h)}
+                          title="View"
+                          style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, cursor: 'pointer', background: 'white', color: '#1a237e', border: '1.5px solid #1a237e' }}
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={() => handleDeleteHomework(h.id)}
+                          title="Delete"
+                          style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, cursor: 'pointer', background: 'white', color: '#dc2626', border: '1.5px solid #dc2626', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Trash2 size={12} /> Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -906,6 +916,51 @@ export default function TeacherDashboardPage() {
           </div>
         )}
       </div>
+
+      {viewingHomework && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 480, maxWidth: '95vw', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
+              <h2 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: '#0f172a' }}>{viewingHomework.title}</h2>
+              <button onClick={() => setViewingHomework(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4, flexShrink: 0 }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 600 }}>{viewingHomework.subjectName}</span>
+              <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, background: '#f1f5f9', color: '#475569', fontWeight: 700 }}>{formsForSubject(viewingHomework.subjectId)}</span>
+              <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700 }}>{viewingHomework.status}</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>Due Date</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 }}>
+                  {viewingHomework.dueDate
+                    ? new Date(viewingHomework.dueDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+                    : '—'}
+                </p>
+              </div>
+              <div>
+                <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>Description / Instructions</p>
+                <p style={{ fontSize: 13, color: '#334155', margin: 0, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                  {viewingHomework.description || 'No additional instructions provided.'}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 22 }}>
+              <button
+                onClick={() => setViewingHomework(null)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showHomeworkModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>

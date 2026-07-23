@@ -96,6 +96,7 @@ export default function StudentDashboardPage() {
   // Homework tab state
   const [homeworkList, setHomeworkList] = useState<any[]>([]);
   const [homeworkLoading, setHomeworkLoading] = useState(false);
+  const [viewingHomework, setViewingHomework] = useState<any>(null);
 
   const studentInfo = JSON.parse(localStorage.getItem('student_info') || '{}');
   const studentId: number | undefined = studentInfo?.id ?? studentInfo?.studentId;
@@ -926,8 +927,8 @@ export default function StudentDashboardPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#1a237e' }}>
-                {['Subject', 'Title', 'Due Date', 'Status'].map(h => (
-                  <th key={h} style={{ padding: '11px 12px', textAlign: h === 'Status' ? 'center' : 'left', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                {['Subject', 'Title', 'Due Date', 'Status', 'Actions'].map(h => (
+                  <th key={h} style={{ padding: '11px 12px', textAlign: (h === 'Status' || h === 'Actions') ? 'center' : 'left', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -951,6 +952,14 @@ export default function StudentDashboardPage() {
                         {isOverdue ? 'Overdue' : 'Due'}
                       </span>
                     </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => setViewingHomework(h)}
+                        style={{ padding: '5px 10px', fontSize: 11, fontWeight: 600, borderRadius: 6, cursor: 'pointer', background: 'white', color: '#1a237e', border: '1.5px solid #1a237e' }}
+                      >
+                        View
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -958,6 +967,62 @@ export default function StudentDashboardPage() {
           </table>
         </div>
       )}
+
+      {viewingHomework && (() => {
+        const due = viewingHomework.dueDate ? new Date(viewingHomework.dueDate) : null;
+        const isOverdue = due ? due.getTime() < new Date().setHours(0, 0, 0, 0) : false;
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
+            <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 480, maxWidth: '95vw', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
+                <h2 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: '#0f172a' }}>{viewingHomework.title}</h2>
+                <button onClick={() => setViewingHomework(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4, flexShrink: 0 }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, padding: '3px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 600 }}>{viewingHomework.subjectName}</span>
+                <span style={{
+                  fontSize: 11, padding: '3px 10px', borderRadius: 12, fontWeight: 700,
+                  background: isOverdue ? '#fee2e2' : '#dcfce7',
+                  color: isOverdue ? '#991b1b' : '#166534',
+                }}>
+                  {isOverdue ? 'Overdue' : 'Due'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>Due Date</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 }}>
+                    {due ? due.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>Teacher</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 }}>{viewingHomework.teacherName || '—'}</p>
+                </div>
+                <div>
+                  <p style={{ fontSize: 11, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 3px' }}>Description / Instructions</p>
+                  <p style={{ fontSize: 13, color: '#334155', margin: 0, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {viewingHomework.description || 'No additional instructions provided.'}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 22 }}>
+                <button
+                  onClick={() => setViewingHomework(null)}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 

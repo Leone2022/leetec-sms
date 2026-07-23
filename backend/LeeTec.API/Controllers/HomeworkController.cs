@@ -61,6 +61,7 @@ namespace LeeTec.API.Controllers
             var homework = await _context.Homeworks
                 .Where(h => subjectIds.Contains(h.SubjectId))
                 .Include(h => h.Subject)
+                .Include(h => h.Teacher)
                 .OrderByDescending(h => h.DueDate)
                 .ToListAsync();
 
@@ -76,6 +77,7 @@ namespace LeeTec.API.Controllers
                     h.Description,
                     dueDate = h.DueDate,
                     h.Status,
+                    teacherName = h.Teacher != null ? $"{h.Teacher.FirstName} {h.Teacher.LastName}".Trim() : "",
                 });
 
             return Ok(result);
