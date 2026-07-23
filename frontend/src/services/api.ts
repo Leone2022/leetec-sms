@@ -318,4 +318,12 @@ export const teacherAssignmentsAPI = {
   delete: (id: number) => api.delete(`/teacher-assignments/${id}`),
 };
 
+export const homeworkAPI = {
+  getForTeacher: (teacherId: number) => api.get(`/homework/teacher/${teacherId}`),
+  getForStudent: (studentId: number) => api.get(`/homework/student/${studentId}`),
+  create: (data: { subjectId: number; teacherId: number; schoolId?: number; termId: number; title: string; description?: string; dueDate: string }) =>
+    api.post('/homework', data),
+  delete: (id: number) => api.delete(`/homework/${id}`),
+};
+
 export default api;

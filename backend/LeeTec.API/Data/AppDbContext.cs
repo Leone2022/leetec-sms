@@ -61,6 +61,9 @@ namespace LeeTec.API.Data
         // Teacher Assignments
         public DbSet<TeacherSubjectAssignment> TeacherSubjectAssignments { get; set; }
 
+        // Homework
+        public DbSet<Homework> Homeworks { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -246,6 +249,19 @@ namespace LeeTec.API.Data
                 .HasOne(ss => ss.Term)
                 .WithMany()
                 .HasForeignKey(ss => ss.TermId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Homework
+            modelBuilder.Entity<Homework>()
+                .HasOne(h => h.Subject)
+                .WithMany()
+                .HasForeignKey(h => h.SubjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Homework>()
+                .HasOne(h => h.Teacher)
+                .WithMany()
+                .HasForeignKey(h => h.TeacherId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

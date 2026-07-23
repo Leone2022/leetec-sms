@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI, subjectsAPI, versesAPI } from '../services/api';
+import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI, subjectsAPI, versesAPI, homeworkAPI } from '../services/api';
 import { generateStatementPdf, buildStatementRows } from '../utils/statement';
 import { generateReportCard, type ReportCardData } from '../utils/reportCard';
 import { GRADE_REFERENCE_TABLES } from '../utils/grading';
@@ -43,7 +43,7 @@ const getQuoteOfTheDay = () => {
   return STUDENT_QUOTES[dayOfYear % STUDENT_QUOTES.length];
 };
 
-type View = 'dashboard' | 'reportCard' | 'subjects' | 'fees' | 'announcements' | 'profile';
+type View = 'dashboard' | 'reportCard' | 'subjects' | 'fees' | 'announcements' | 'homework' | 'profile';
 
 const NAV: { id: View; label: string; Icon: React.ComponentType<{ size?: number }> }[] = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
@@ -51,6 +51,7 @@ const NAV: { id: View; label: string; Icon: React.ComponentType<{ size?: number 
   { id: 'subjects', label: 'My Subjects', Icon: BookOpen },
   { id: 'fees', label: 'Financial Statement', Icon: DollarSign },
   { id: 'announcements', label: 'Announcements', Icon: Bell },
+  { id: 'homework', label: 'Homework', Icon: BookOpen },
   { id: 'profile', label: 'My Profile', Icon: User },
 ];
 
@@ -91,6 +92,10 @@ export default function StudentDashboardPage() {
   const [loadError, setLoadError] = useState(false);
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
   const [myMarksCount, setMyMarksCount] = useState(0);
+
+  // Homework tab state
+  const [homeworkList, setHomeworkList] = useState<any[]>([]);
+  const [homeworkLoading, setHomeworkLoading] = useState(false);
 
   const studentInfo = JSON.parse(localStorage.getItem('student_info') || '{}');
   const studentId: number | undefined = studentInfo?.id ?? studentInfo?.studentId;
@@ -145,6 +150,15 @@ export default function StudentDashboardPage() {
       .then(res => setMyMarksCount((res.data || []).length))
       .catch(() => setMyMarksCount(0));
   }, [studentId, reportTermId]);
+
+  useEffect(() => {
+    if (!studentId) return;
+    setHomeworkLoading(true);
+    homeworkAPI.getForStudent(studentId)
+      .then(res => setHomeworkList(res.data || []))
+      .catch(() => setHomeworkList([]))
+      .finally(() => setHomeworkLoading(false));
+  }, [studentId]);
 
   const loadMySubjects = async () => {
     if (!studentId) return;
@@ -894,6 +908,59 @@ export default function StudentDashboardPage() {
     </div>
   );
 
+  const HomeworkView = (
+    <div style={{ padding: '28px 32px', maxWidth: 860 }}>
+      <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: '0 0 20px' }}>Homework</h1>
+      {homeworkLoading ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: 40, textAlign: 'center', color: '#64748b', fontSize: 13 }}>Loading homework...</div>
+      ) : homeworkList.length === 0 ? (
+        <div style={{ background: 'white', borderRadius: 12, padding: '60px 40px', textAlign: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+          <div style={{ width: 56, height: 56, background: '#eef2ff', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <BookOpen size={24} color="#1a237e" />
+          </div>
+          <h3 style={{ fontWeight: 700, fontSize: 16, margin: '0 0 8px' }}>No Homework</h3>
+          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Nothing assigned right now.</p>
+        </div>
+      ) : (
+        <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#1a237e' }}>
+                {['Subject', 'Title', 'Due Date', 'Status'].map(h => (
+                  <th key={h} style={{ padding: '11px 12px', textAlign: h === 'Status' ? 'center' : 'left', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {homeworkList.map((h: any, i: number) => {
+                const due = h.dueDate ? new Date(h.dueDate) : null;
+                const isOverdue = due ? due.getTime() < new Date().setHours(0, 0, 0, 0) : false;
+                return (
+                  <tr key={h.id} style={{ background: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{h.subjectName}</td>
+                    <td style={{ padding: '10px 12px', color: '#0f172a' }}>{h.title}</td>
+                    <td style={{ padding: '10px 12px', color: '#475569', whiteSpace: 'nowrap' }}>
+                      {due ? due.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                      <span style={{
+                        fontSize: 11, padding: '2px 10px', borderRadius: 12, fontWeight: 700,
+                        background: isOverdue ? '#fee2e2' : '#dcfce7',
+                        color: isOverdue ? '#991b1b' : '#166534',
+                      }}>
+                        {isOverdue ? 'Overdue' : 'Due'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+
   const p = fullProfile || student;
 
   const ProfileField = ({ label, value }: { label: string; value?: string | null }) => (
@@ -1028,6 +1095,7 @@ export default function StudentDashboardPage() {
           {view === 'subjects' && SubjectsView}
           {view === 'fees' && FeesView}
           {view === 'announcements' && AnnouncementsView}
+          {view === 'homework' && HomeworkView}
           {view === 'profile' && ProfileView}
         </div>
       </div>
