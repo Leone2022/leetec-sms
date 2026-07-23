@@ -203,6 +203,16 @@ namespace LeeTec.API.Controllers
         {
             var subject = await _context.Subjects.FindAsync(id);
             if (subject == null) return NotFound(new { message = "Subject not found" });
+
+            var studentSubjects = await _context.StudentSubjects.Where(ss => ss.SubjectId == id).ToListAsync();
+            _context.StudentSubjects.RemoveRange(studentSubjects);
+
+            var teacherAssignments = await _context.TeacherSubjectAssignments.Where(a => a.SubjectId == id).ToListAsync();
+            _context.TeacherSubjectAssignments.RemoveRange(teacherAssignments);
+
+            var marks = await _context.Marks.Where(m => m.SubjectId == id).ToListAsync();
+            _context.Marks.RemoveRange(marks);
+
             subject.IsActive = false;
             await _context.SaveChangesAsync();
             return Ok(new { message = "Subject removed" });
