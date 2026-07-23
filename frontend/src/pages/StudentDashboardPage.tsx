@@ -251,10 +251,10 @@ export default function StudentDashboardPage() {
 
   const hour = new Date().getHours();
   const greetingInfo =
-    hour >= 5 && hour < 12 ? { emoji: '🌅', text: 'Good morning' } :
-    hour >= 12 && hour < 17 ? { emoji: '☀️', text: 'Good afternoon' } :
-    hour >= 17 && hour < 21 ? { emoji: '🌆', text: 'Good evening' } :
-    { emoji: '🌙', text: 'Good night' };
+    hour >= 5 && hour < 12 ? { text: 'Good morning' } :
+    hour >= 12 && hour < 17 ? { text: 'Good afternoon' } :
+    hour >= 17 && hour < 21 ? { text: 'Good evening' } :
+    { text: 'Good night' };
 
   const statusPill = (status: string) =>
     status === 'Paid' ? 'pill-success' : status === 'PartiallyPaid' ? 'pill-warning' : 'pill-danger';
@@ -377,7 +377,7 @@ export default function StudentDashboardPage() {
     <div style={{ padding: '28px 32px', maxWidth: 900 }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#0f172a', margin: 0 }}>
-          {greetingInfo.emoji} {greetingInfo.text}, {firstName}!
+          {greetingInfo.text}, {firstName}!
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
           <span style={{ color: '#64748b', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>{student?.studentNumber ?? '—'}</span>
@@ -399,10 +399,10 @@ export default function StudentDashboardPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[
-          { label: '📚 My Subjects', value: String(mySubjects.length), icon: BookOpen, color: '#1a237e', bg: '#eef2ff', onClick: () => handleNav('subjects') },
-          { label: '💰 Balance Due', value: fmtAmt(invoice?.balance ?? 0), icon: DollarSign, color: Number(invoice?.balance ?? 0) > 0 ? '#dc2626' : '#15803d', bg: Number(invoice?.balance ?? 0) > 0 ? '#fef2f2' : '#f0fdf4', onClick: () => handleNav('fees') },
-          { label: '📝 My Results', value: String(myMarksCount), icon: FileText, color: '#7c3aed', bg: '#f5f3ff', onClick: () => handleNav('reportCard') },
-          { label: '📢 Announcements', value: String(unreadAnnouncementsCount), icon: Bell, color: '#0891b2', bg: '#ecfeff', onClick: () => handleNav('announcements') },
+          { label: 'My Subjects', value: String(mySubjects.length), icon: BookOpen, color: '#1a237e', bg: '#eef2ff', onClick: () => handleNav('subjects') },
+          { label: 'Balance Due', value: fmtAmt(invoice?.balance ?? 0), icon: DollarSign, color: Number(invoice?.balance ?? 0) > 0 ? '#dc2626' : '#15803d', bg: Number(invoice?.balance ?? 0) > 0 ? '#fef2f2' : '#f0fdf4', onClick: () => handleNav('fees') },
+          { label: 'My Results', value: String(myMarksCount), icon: FileText, color: '#7c3aed', bg: '#f5f3ff', onClick: () => handleNav('reportCard') },
+          { label: 'Announcements', value: String(unreadAnnouncementsCount), icon: Bell, color: '#0891b2', bg: '#ecfeff', onClick: () => handleNav('announcements') },
         ].map(({ label, value, icon: Icon, color, bg, onClick }) => (
           <button
             key={label}
@@ -427,7 +427,7 @@ export default function StudentDashboardPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {latestPayment && (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
-                <span style={{ color: '#475569' }}>💳 Latest fee payment</span>
+                <span style={{ color: '#475569' }}>Latest fee payment</span>
                 <span style={{ fontWeight: 600, color: '#0f172a', textAlign: 'right' }}>
                   {new Date(latestPayment.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </span>
@@ -435,13 +435,13 @@ export default function StudentDashboardPage() {
             )}
             {reportCard && (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
-                <span style={{ color: '#475569' }}>📝 Latest results</span>
+                <span style={{ color: '#475569' }}>Latest results</span>
                 <span style={{ fontWeight: 600, color: '#0f172a', textAlign: 'right' }}>{reportCard.term.name} {reportCard.term.year}</span>
               </div>
             )}
             {latestAnnouncement && (
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 13 }}>
-                <span style={{ color: '#475569' }}>📢 Latest announcement</span>
+                <span style={{ color: '#475569' }}>Latest announcement</span>
                 <span style={{ fontWeight: 600, color: '#0f172a', textAlign: 'right' }}>{latestAnnouncement.title}</span>
               </div>
             )}
