@@ -91,7 +91,6 @@ export default function StudentDashboardPage() {
   const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
   const [changeMessage, setChangeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [myChangeRequests, setMyChangeRequests] = useState<any[]>([]);
-  const [loadingChangeRequests, setLoadingChangeRequests] = useState(false);
 
   const [loadError, setLoadError] = useState(false);
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
@@ -180,14 +179,11 @@ export default function StudentDashboardPage() {
 
   const loadMyChangeRequests = async () => {
     if (!studentId) return;
-    setLoadingChangeRequests(true);
     try {
       const res = await studentsAPI.getMySubjectChangeRequests(studentId);
       setMyChangeRequests(res.data || []);
     } catch {
       setMyChangeRequests([]);
-    } finally {
-      setLoadingChangeRequests(false);
     }
   };
 
@@ -710,11 +706,7 @@ export default function StudentDashboardPage() {
   );
 
   // ── My Subjects view ────────────────────────────────────────────
-  const statusBadge = (status: string) => {
-    if (status === 'Confirmed') return { bg: '#dcfce7', color: '#166534', icon: '✅', label: 'Confirmed' };
-    if (status === 'Pending') return { bg: '#ffedd5', color: '#9a3412', icon: '⏳', label: 'Pending Approval' };
-    return { bg: '#fee2e2', color: '#991b1b', icon: '❌', label: 'Dropped' };
-  };
+  const confirmedBadge = { bg: '#dcfce7', color: '#166534', icon: '✅', label: 'Confirmed' };
 
   const getCurriculumBadge = (curriculumType: string) => {
     const c = (curriculumType || '').toUpperCase();
@@ -723,11 +715,10 @@ export default function StudentDashboardPage() {
     return null;
   };
 
-  const requestStatusBadge = (status: string) => {
-    if (status === 'Approved') return { bg: '#dcfce7', color: '#166534' };
-    if (status === 'Rejected') return { bg: '#fee2e2', color: '#991b1b' };
-    return { bg: '#ffedd5', color: '#9a3412' };
-  };
+  const requestStatusBadge = { bg: '#ffedd5', color: '#9a3412' };
+
+  const activeSubjects = mySubjects.filter((sub: any) => sub.status === 'Confirmed' && sub.isActive === true);
+  const pendingRequests = myChangeRequests.filter((r: any) => r.status === 'Pending');
 
   const SubjectsView = (
     <div style={{ padding: '28px 32px', maxWidth: 900 }}>
@@ -746,17 +737,16 @@ export default function StudentDashboardPage() {
 
       {subjectsLoading ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center', color: '#475569', fontSize: 13 }}>Loading subjects...</div>
-      ) : mySubjects.length === 0 ? (
+      ) : activeSubjects.length === 0 ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>
           No subjects registered yet.
         </div>
       ) : (
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          {mySubjects.map((sub: any, i: number) => {
-            const badge = statusBadge(sub.status);
+          {activeSubjects.map((sub: any, i: number) => {
             const curriculumBadge = getCurriculumBadge(sub.curriculumType);
             return (
-              <div key={sub.id ?? i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: i < mySubjects.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+              <div key={sub.id ?? i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: i < activeSubjects.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                 <div>
                   <p style={{ fontWeight: 600, fontSize: 14, color: '#0f172a', margin: 0 }}>{sub.subjectName}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
@@ -768,8 +758,8 @@ export default function StudentDashboardPage() {
                     )}
                   </div>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: badge.bg, color: badge.color }}>
-                  {badge.icon} {badge.label}
+                <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: confirmedBadge.bg, color: confirmedBadge.color }}>
+                  {confirmedBadge.icon} {confirmedBadge.label}
                 </span>
               </div>
             );
@@ -777,37 +767,25 @@ export default function StudentDashboardPage() {
         </div>
       )}
 
-      <div style={{ marginTop: 24 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 10px' }}>Pending Requests</h2>
-        {loadingChangeRequests ? (
-          <div style={{ background: 'white', borderRadius: 12, padding: '24px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>Loading...</div>
-        ) : myChangeRequests.length === 0 ? (
-          <div style={{ background: 'white', borderRadius: 12, padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-            You have no subject change requests.
-          </div>
-        ) : (
+      {pendingRequests.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 10px' }}>Pending Requests</h2>
           <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            {myChangeRequests.map((r: any, i: number) => {
-              const badge = requestStatusBadge(r.status);
-              return (
-                <div key={r.id} style={{ padding: '12px 20px', borderBottom: i < myChangeRequests.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: 13, color: '#0f172a' }}>
-                      <strong>{r.subjectName}</strong> — {r.action}
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 12, background: badge.bg, color: badge.color }}>
-                      {r.status}
-                    </span>
-                  </div>
-                  {r.status === 'Rejected' && r.rejectionReason && (
-                    <p style={{ fontSize: 12, color: '#991b1b', margin: '6px 0 0' }}>Reason: {r.rejectionReason}</p>
-                  )}
+            {pendingRequests.map((r: any, i: number) => (
+              <div key={r.id} style={{ padding: '12px 20px', borderBottom: i < pendingRequests.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: 13, color: '#0f172a' }}>
+                    <strong>{r.subjectName}</strong> — {r.action}
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 12, background: requestStatusBadge.bg, color: requestStatusBadge.color }}>
+                    {r.status}
+                  </span>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div style={{ marginTop: 20, textAlign: 'center' }}>
         <button

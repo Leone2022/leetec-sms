@@ -1351,7 +1351,7 @@ export default function StudentsPage() {
       {/* ─── PROFILE PANEL ─── */}
       {isProfileOpen && selectedStudent && (() => {
         const s = profileStudent || selectedStudent;
-        const visibleSubjects = subjects.filter((sub: any) => sub.isActive === true || sub.status !== 'Dropped');
+        const visibleSubjects = subjects.filter((sub: any) => sub.isActive === true);
         const TABS = ['Personal', 'Medical', 'Family', 'Guardians', 'Emergency', 'Fees', '📚 Subjects'];
         const tabBtn = (label: string) => (
           <button
@@ -1632,7 +1632,7 @@ export default function StudentsPage() {
                           >
                             <option value="">Select subject</option>
                             {availableSubjects
-                              .filter((av: any) => !subjects.some((s: any) => s.subjectId === av.id && (s.isActive === true || s.status !== 'Dropped')))
+                              .filter((av: any) => !subjects.some((s: any) => s.subjectId === av.id && s.isActive === true))
                               .map((av: any) => (
                                 <option key={av.id} value={av.id}>{av.name} ({av.code})</option>
                               ))}
