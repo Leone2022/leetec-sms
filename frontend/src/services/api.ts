@@ -69,6 +69,8 @@ export const studentsAPI = {
     api.delete(`/students/${studentId}/subjects/${subjectId}`),
   requestSubjectChange: (id: number, data: { subjectId: number; action: 'Add' | 'Drop'; reason: string }) =>
     api.post(`/students/${id}/subjects/request-change`, data),
+  getMySubjectChangeRequests: (id: number) =>
+    api.get(`/students/${id}/subjects/change-requests`),
 };
 
 export const feesAPI = {

@@ -82,12 +82,16 @@ export default function StudentDashboardPage() {
   const [mySubjects, setMySubjects] = useState<any[]>([]);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
   const [showChangeModal, setShowChangeModal] = useState(false);
+  const [modalStep, setModalStep] = useState<1 | 2>(1);
   const [changeAction, setChangeAction] = useState<'Add' | 'Drop'>('Add');
   const [changeSubjectId, setChangeSubjectId] = useState<number | ''>('');
   const [changeReason, setChangeReason] = useState('');
+  const [confirmChecked, setConfirmChecked] = useState(false);
   const [submittingChange, setSubmittingChange] = useState(false);
   const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
   const [changeMessage, setChangeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [myChangeRequests, setMyChangeRequests] = useState<any[]>([]);
+  const [loadingChangeRequests, setLoadingChangeRequests] = useState(false);
 
   const [loadError, setLoadError] = useState(false);
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
@@ -174,12 +178,42 @@ export default function StudentDashboardPage() {
     }
   };
 
-  const openChangeModal = async (action: 'Add' | 'Drop') => {
-    setChangeAction(action);
+  const loadMyChangeRequests = async () => {
+    if (!studentId) return;
+    setLoadingChangeRequests(true);
+    try {
+      const res = await studentsAPI.getMySubjectChangeRequests(studentId);
+      setMyChangeRequests(res.data || []);
+    } catch {
+      setMyChangeRequests([]);
+    } finally {
+      setLoadingChangeRequests(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!studentId) return;
+    loadMyChangeRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId]);
+
+  // STEP 1 — open the modal at the "choose action" screen
+  const openChangeModal = () => {
+    setChangeAction('Add');
     setChangeSubjectId('');
     setChangeReason('');
     setChangeMessage(null);
+    setConfirmChecked(false);
+    setModalStep(1);
     setShowChangeModal(true);
+  };
+
+  // STEP 1 → STEP 2 — action chosen, load subjects for that action
+  const chooseAction = async (action: 'Add' | 'Drop') => {
+    setChangeAction(action);
+    setChangeSubjectId('');
+    setConfirmChecked(false);
+    setModalStep(2);
 
     if (action === 'Add') {
       const s = dashboard?.student ?? studentInfo;
@@ -194,15 +228,19 @@ export default function StudentDashboardPage() {
     }
   };
 
+  const selectedSubjectName = changeAction === 'Add'
+    ? availableSubjects.find((s: any) => s.id === changeSubjectId)?.name
+    : mySubjects.find((s: any) => s.subjectId === changeSubjectId)?.subjectName;
+
   const handleSubmitChange = async () => {
-    if (!studentId || !changeSubjectId) return;
+    if (!studentId || !changeSubjectId || !confirmChecked) return;
     setSubmittingChange(true);
     setChangeMessage(null);
     try {
       await studentsAPI.requestSubjectChange(studentId, { subjectId: changeSubjectId as number, action: changeAction, reason: changeReason.trim() });
       setShowChangeModal(false);
-      setChangeMessage({ type: 'success', text: 'Request submitted for admin approval' });
-      await loadMySubjects();
+      setChangeMessage({ type: 'success', text: 'Your request has been submitted. Admin will review and notify you.' });
+      await Promise.all([loadMySubjects(), loadMyChangeRequests()]);
     } catch (err: any) {
       setChangeMessage({ type: 'error', text: err?.response?.data?.message || 'Failed to submit request' });
     } finally {
@@ -674,6 +712,19 @@ export default function StudentDashboardPage() {
     return { bg: '#fee2e2', color: '#991b1b', icon: '❌', label: 'Dropped' };
   };
 
+  const getCurriculumBadge = (curriculumType: string) => {
+    const c = (curriculumType || '').toUpperCase();
+    if (c.includes('CAMBRIDGE')) return { bg: '#dbeafe', color: '#1d4ed8', label: 'Cambridge' };
+    if (c.includes('ZIMSEC')) return { bg: '#dcfce7', color: '#15803d', label: 'ZIMSEC' };
+    return null;
+  };
+
+  const requestStatusBadge = (status: string) => {
+    if (status === 'Approved') return { bg: '#dcfce7', color: '#166534' };
+    if (status === 'Rejected') return { bg: '#fee2e2', color: '#991b1b' };
+    return { bg: '#ffedd5', color: '#9a3412' };
+  };
+
   const SubjectsView = (
     <div style={{ padding: '28px 32px', maxWidth: 900 }}>
       <div style={{ marginBottom: 20 }}>
@@ -699,11 +750,19 @@ export default function StudentDashboardPage() {
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
           {mySubjects.map((sub: any, i: number) => {
             const badge = statusBadge(sub.status);
+            const curriculumBadge = getCurriculumBadge(sub.curriculumType);
             return (
               <div key={sub.id ?? i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: i < mySubjects.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                 <div>
                   <p style={{ fontWeight: 600, fontSize: 14, color: '#0f172a', margin: 0 }}>{sub.subjectName}</p>
-                  {sub.subjectCode && <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>{sub.subjectCode}</p>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    {sub.subjectCode && <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{sub.subjectCode}</p>}
+                    {curriculumBadge && (
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 8px', borderRadius: 10, background: curriculumBadge.bg, color: curriculumBadge.color }}>
+                        {curriculumBadge.label}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 20, background: badge.bg, color: badge.color }}>
                   {badge.icon} {badge.label}
@@ -714,18 +773,50 @@ export default function StudentDashboardPage() {
         </div>
       )}
 
+      <div style={{ marginTop: 24 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 10px' }}>Pending Requests</h2>
+        {loadingChangeRequests ? (
+          <div style={{ background: 'white', borderRadius: 12, padding: '24px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>Loading...</div>
+        ) : myChangeRequests.length === 0 ? (
+          <div style={{ background: 'white', borderRadius: 12, padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+            You have no subject change requests.
+          </div>
+        ) : (
+          <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            {myChangeRequests.map((r: any, i: number) => {
+              const badge = requestStatusBadge(r.status);
+              return (
+                <div key={r.id} style={{ padding: '12px 20px', borderBottom: i < myChangeRequests.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 13, color: '#0f172a' }}>
+                      <strong>{r.subjectName}</strong> — {r.action}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 12, background: badge.bg, color: badge.color }}>
+                      {r.status}
+                    </span>
+                  </div>
+                  {r.status === 'Rejected' && r.rejectionReason && (
+                    <p style={{ fontSize: 12, color: '#991b1b', margin: '6px 0 0' }}>Reason: {r.rejectionReason}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div style={{ marginTop: 20, textAlign: 'center' }}>
         <button
-          onClick={() => openChangeModal('Add')}
+          onClick={openChangeModal}
           style={{ padding: '10px 20px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
-          ➕ Request Subject Change
+          + Request Subject Change
         </button>
       </div>
 
       {showChangeModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9000 }}>
-          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 420, maxWidth: '95vw', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+          <div style={{ background: 'white', borderRadius: 16, padding: 28, width: 440, maxWidth: '95vw', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Request Subject Change</h2>
               <button onClick={() => setShowChangeModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4 }}>
@@ -733,68 +824,109 @@ export default function StudentDashboardPage() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {modalStep === 1 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 4px' }}>What would you like to do?</p>
+                <button
+                  type="button"
+                  onClick={() => chooseAction('Add')}
+                  style={{ padding: '18px 16px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: 'white', color: '#0f172a', fontSize: 15, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  ➕ Add a Subject
+                  <p style={{ margin: '4px 0 0', fontSize: 12, fontWeight: 400, color: '#64748b' }}>Register for a new subject</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseAction('Drop')}
+                  style={{ padding: '18px 16px', borderRadius: 10, border: '1.5px solid #e2e8f0', background: 'white', color: '#0f172a', fontSize: 15, fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  ➖ Drop a Subject
+                  <p style={{ margin: '4px 0 0', fontSize: 12, fontWeight: 400, color: '#64748b' }}>Remove a subject you're registered for</p>
+                </button>
+              </div>
+            ) : (
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>Action</label>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setModalStep(1)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1a237e', fontWeight: 600, fontSize: 12, padding: 0, marginBottom: 16 }}
+                >
+                  ← Back
+                </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>Subject</label>
+                    <select
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, appearance: 'auto' }}
+                      value={changeSubjectId}
+                      onChange={e => { setChangeSubjectId(e.target.value ? Number(e.target.value) : ''); setConfirmChecked(false); }}
+                    >
+                      <option value="">Select subject</option>
+                      {changeAction === 'Add'
+                        ? availableSubjects.map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))
+                        : mySubjects.filter((s: any) => s.status === 'Confirmed').map((s: any) => (
+                            <option key={s.subjectId} value={s.subjectId}>{s.subjectName}</option>
+                          ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>Reason</label>
+                    <textarea
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, minHeight: 70, resize: 'vertical', fontFamily: 'inherit' }}
+                      value={changeReason}
+                      onChange={e => setChangeReason(e.target.value)}
+                      placeholder={changeAction === 'Add' ? 'Why do you want to add this subject?' : 'Why do you want to drop this subject?'}
+                    />
+                  </div>
+
+                  {selectedSubjectName && changeAction === 'Add' && (
+                    <div style={{ padding: '10px 14px', borderRadius: 8, background: '#eef2ff', color: '#1a237e', fontSize: 13, fontWeight: 600 }}>
+                      You are requesting to ADD {selectedSubjectName}
+                    </div>
+                  )}
+
+                  {selectedSubjectName && changeAction === 'Drop' && (
+                    <div style={{ padding: '12px 14px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: 13, fontWeight: 600 }}>
+                      ⚠️ Warning: Dropping a subject means it will be removed from your timetable and report card. This cannot be undone without admin approval.
+                    </div>
+                  )}
+
+                  {selectedSubjectName && (
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: '#334155', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={confirmChecked}
+                        onChange={e => setConfirmChecked(e.target.checked)}
+                        style={{ marginTop: 2 }}
+                      />
+                      {changeAction === 'Add'
+                        ? `I confirm I want to add ${selectedSubjectName} to my registered subjects`
+                        : `I understand and confirm I want to drop ${selectedSubjectName}`}
+                    </label>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
                   <button
-                    type="button"
-                    onClick={() => openChangeModal('Add')}
-                    style={{ flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: changeAction === 'Add' ? '#1a237e' : '#f1f5f9', color: changeAction === 'Add' ? 'white' : '#475569' }}
+                    onClick={() => setShowChangeModal(false)}
+                    style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                   >
-                    Add Subject
+                    Cancel
                   </button>
                   <button
-                    type="button"
-                    onClick={() => openChangeModal('Drop')}
-                    style={{ flex: 1, padding: '8px 6px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: changeAction === 'Drop' ? '#1a237e' : '#f1f5f9', color: changeAction === 'Drop' ? 'white' : '#475569' }}
+                    onClick={handleSubmitChange}
+                    disabled={!changeSubjectId || !changeReason.trim() || !confirmChecked || submittingChange}
+                    style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!changeSubjectId || !changeReason.trim() || !confirmChecked || submittingChange) ? 0.6 : 1 }}
                   >
-                    Drop Subject
+                    {submittingChange ? 'Submitting...' : 'Submit'}
                   </button>
                 </div>
               </div>
-
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>Subject</label>
-                <select
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, appearance: 'auto' }}
-                  value={changeSubjectId}
-                  onChange={e => setChangeSubjectId(e.target.value ? Number(e.target.value) : '')}
-                >
-                  <option value="">Select subject</option>
-                  {(changeAction === 'Add' ? availableSubjects : mySubjects.filter((s: any) => s.status === 'Confirmed'))
-                    .map((s: any) => (
-                      <option key={s.id ?? s.subjectId} value={s.id ?? s.subjectId}>{s.name ?? s.subjectName}</option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' }}>Reason</label>
-                <textarea
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, minHeight: 70, resize: 'vertical', fontFamily: 'inherit' }}
-                  value={changeReason}
-                  onChange={e => setChangeReason(e.target.value)}
-                  placeholder="Please explain why..."
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
-              <button
-                onClick={() => setShowChangeModal(false)}
-                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitChange}
-                disabled={!changeSubjectId || !changeReason.trim() || submittingChange}
-                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#1a237e', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!changeSubjectId || !changeReason.trim() || submittingChange) ? 0.6 : 1 }}
-              >
-                {submittingChange ? 'Submitting...' : 'Submit'}
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}

@@ -595,9 +595,35 @@ namespace LeeTec.API.Controllers
                 subjectName = ss.Subject != null ? ss.Subject.Name : "",
                 subjectCode = ss.Subject != null ? ss.Subject.Code : "",
                 campus = ss.Subject != null ? ss.Subject.Campus : "",
+                curriculumType = ss.Subject != null ? ss.Subject.CurriculumType : "",
                 form = student.Form,
                 status = string.IsNullOrEmpty(ss.Status) ? "Confirmed" : ss.Status,
             }).ToList();
+
+            return Ok(result);
+        }
+
+        // GET STUDENT'S OWN SUBJECT CHANGE REQUESTS (all statuses)
+        [HttpGet("{id}/subjects/change-requests")]
+        public async Task<IActionResult> GetMySubjectChangeRequests(int id)
+        {
+            var requests = await _context.SubjectChangeRequests
+                .Where(r => r.StudentId == id)
+                .Include(r => r.Subject)
+                .OrderByDescending(r => r.RequestedAt)
+                .ToListAsync();
+
+            var result = requests.Select(r => new
+            {
+                r.Id,
+                subjectId = r.SubjectId,
+                subjectName = r.Subject != null ? r.Subject.Name : "",
+                action = r.Action,
+                reason = r.Reason,
+                status = r.Status,
+                rejectionReason = r.RejectionReason,
+                requestedAt = r.RequestedAt,
+            });
 
             return Ok(result);
         }
@@ -626,6 +652,11 @@ namespace LeeTec.API.Controllers
                     return NotFound(new { message = "Subject registration not found" });
             }
 
+            var alreadyPending = await _context.SubjectChangeRequests.AnyAsync(r =>
+                r.StudentId == id && r.SubjectId == dto.SubjectId && r.Status == "Pending");
+            if (alreadyPending)
+                return BadRequest(new { message = "You already have a pending request for this subject" });
+
             _context.SubjectChangeRequests.Add(new SubjectChangeRequest
             {
                 StudentId = id,
@@ -637,7 +668,7 @@ namespace LeeTec.API.Controllers
             });
 
             await _context.SaveChangesAsync();
-            return Ok(new { message = "Request submitted for admin approval" });
+            return StatusCode(201, new { message = "Request submitted for admin approval" });
         }
 
         // ADD SUBJECT TO STUDENT

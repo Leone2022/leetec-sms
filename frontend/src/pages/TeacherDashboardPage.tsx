@@ -9,6 +9,7 @@ import {
   FileText, Plus, Trash2, ArrowRight,
 } from 'lucide-react';
 import VerseCard, { type VerseData } from '../components/VerseCard';
+import { calculateGrade } from '../utils/reportCard';
 
 interface MarkRow {
   studentId: number;
@@ -34,16 +35,6 @@ const STATUS_BADGE: Record<string, { label: string; bg: string; color: string }>
   Draft: { label: 'Draft', bg: '#f1f5f9', color: '#475569' },
   Submitted: { label: 'Submitted', bg: '#fff7ed', color: '#c2410c' },
   Approved: { label: 'Approved', bg: '#f0fdf4', color: '#15803d' },
-};
-
-const calculateGrade = (total: number) => {
-  if (total >= 90) return 'A*';
-  if (total >= 80) return 'A';
-  if (total >= 70) return 'B';
-  if (total >= 60) return 'C';
-  if (total >= 50) return 'D';
-  if (total >= 40) return 'E';
-  return 'U';
 };
 
 type View = 'dashboard' | 'classes' | 'notifications' | 'homework' | 'profile';
@@ -355,7 +346,7 @@ export default function TeacherDashboardPage() {
 
   const grade = (row: MarkRow) => {
     const t = total(row);
-    return t === '' ? '' : calculateGrade(Number(t));
+    return t === '' ? '' : calculateGrade(Number(t), selectedAssignment?.curriculumType || '');
   };
 
   const handleSaveAll = async () => {

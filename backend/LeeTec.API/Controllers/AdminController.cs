@@ -540,14 +540,13 @@ namespace LeeTec.API.Controllers
         [HttpGet("subject-change-requests")]
         public async Task<IActionResult> GetSubjectChangeRequests()
         {
-            var pending = await _context.SubjectChangeRequests
-                .Where(r => r.Status == "Pending")
+            var all = await _context.SubjectChangeRequests
                 .Include(r => r.Student)
                 .Include(r => r.Subject)
                 .OrderByDescending(r => r.RequestedAt)
                 .ToListAsync();
 
-            var result = pending.Select(r => new
+            var result = all.Select(r => new
             {
                 r.Id,
                 studentId = r.StudentId,
@@ -560,6 +559,9 @@ namespace LeeTec.API.Controllers
                 action = r.Action,
                 reason = r.Reason,
                 date = r.RequestedAt,
+                status = r.Status,
+                rejectionReason = r.RejectionReason,
+                reviewedAt = r.ReviewedAt,
             }).ToList();
 
             return Ok(result);
@@ -571,6 +573,7 @@ namespace LeeTec.API.Controllers
         {
             var request = await _context.SubjectChangeRequests.FindAsync(id);
             if (request == null) return NotFound(new { message = "Request not found" });
+            if (request.Status != "Pending") return BadRequest(new { message = "This request has already been reviewed" });
 
             var student = await _context.Students.FindAsync(request.StudentId);
             if (student == null) return NotFound(new { message = "Student not found" });
@@ -614,7 +617,8 @@ namespace LeeTec.API.Controllers
             request.ReviewedBy = "Admin";
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Request approved" });
+            var actionLabel = isAdd ? "added" : "removed";
+            return Ok(new { message = $"Subject {actionLabel} for {student.FirstName} {student.Surname}" });
         }
 
         // PUT /api/admin/subject-change-requests/{id}/reject
@@ -623,6 +627,7 @@ namespace LeeTec.API.Controllers
         {
             var request = await _context.SubjectChangeRequests.FindAsync(id);
             if (request == null) return NotFound(new { message = "Request not found" });
+            if (request.Status != "Pending") return BadRequest(new { message = "This request has already been reviewed" });
 
             request.Status = "Rejected";
             request.RejectionReason = dto?.Reason;

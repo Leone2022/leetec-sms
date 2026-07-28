@@ -2,6 +2,38 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { GRADE_REFERENCE_TABLES, type CurriculumType } from './grading';
 
+// Curriculum-aware grade calculation, kept in sync with the backend's
+// ReportCardService.GetGrade. Cambridge (any level) uses a single A*-U scale;
+// ZIMSEC A-Level uses A-F; everything else falls back to ZIMSEC O-Level (A-U).
+export function calculateGrade(score: number, curriculum: string): string {
+  const c = curriculum.toUpperCase();
+  if (c.includes('CAMBRIDGE')) {
+    if (score >= 90) return 'A*';
+    if (score >= 80) return 'A';
+    if (score >= 70) return 'B';
+    if (score >= 60) return 'C';
+    if (score >= 50) return 'D';
+    if (score >= 40) return 'E';
+    return 'U';
+  }
+  if (c.includes('A-LEVEL') || c.includes('A LEVEL')) {
+    if (score >= 70) return 'A';
+    if (score >= 60) return 'B';
+    if (score >= 50) return 'C';
+    if (score >= 45) return 'D';
+    if (score >= 40) return 'E';
+    if (score >= 35) return 'O';
+    return 'F';
+  }
+  // ZIMSEC O-Level default
+  if (score >= 70) return 'A';
+  if (score >= 60) return 'B';
+  if (score >= 50) return 'C';
+  if (score >= 45) return 'D';
+  if (score >= 40) return 'E';
+  return 'U';
+}
+
 interface ReportCardScoreBlock {
   paper1: number | null;
   paper2: number | null;

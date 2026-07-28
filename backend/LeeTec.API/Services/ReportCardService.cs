@@ -35,48 +35,43 @@ namespace LeeTec.API.Services
             return "Outstanding";
         }
 
+        // Unified curriculum-aware grading: any curriculum string containing
+        // "CAMBRIDGE" uses the single Cambridge scale (A*-U) regardless of level;
+        // "A-LEVEL" (checked after Cambridge) uses the ZIMSEC A-Level scale (A-F);
+        // everything else falls back to the ZIMSEC O-Level scale (A-U).
         public static string GetGrade(decimal score, string curriculumType)
         {
-            switch (curriculumType)
+            var c = (curriculumType ?? "").ToUpperInvariant();
+
+            if (c.Contains("CAMBRIDGE"))
             {
-                case "Cambridge Checkpoint":
-                    return GetBand((int)Math.Round(score, MidpointRounding.AwayFromZero));
-                case "ZIMSEC O-Level":
-                    if (score >= 75) return "A";
-                    if (score >= 60) return "B";
-                    if (score >= 50) return "C";
-                    if (score >= 45) return "D";
-                    if (score >= 35) return "E";
-                    return "U";
-                case "ZIMSEC A-Level":
-                    if (score >= 75) return "A";
-                    if (score >= 60) return "B";
-                    if (score >= 50) return "C";
-                    if (score >= 45) return "D";
-                    if (score >= 40) return "E";
-                    if (score >= 35) return "O";
-                    return "F";
-                case "Cambridge IGCSE":
-                    if (score >= 90) return "A*";
-                    if (score >= 80) return "A";
-                    if (score >= 70) return "B";
-                    if (score >= 60) return "C";
-                    if (score >= 50) return "D";
-                    if (score >= 40) return "E";
-                    if (score >= 30) return "F";
-                    if (score >= 20) return "G";
-                    return "U";
-                case "Cambridge A-Level":
-                    if (score >= 90) return "A*";
-                    if (score >= 80) return "A";
-                    if (score >= 70) return "B";
-                    if (score >= 60) return "C";
-                    if (score >= 50) return "D";
-                    if (score >= 40) return "E";
-                    return "U";
-                default:
-                    return "";
+                if (score >= 90) return "A*";
+                if (score >= 80) return "A";
+                if (score >= 70) return "B";
+                if (score >= 60) return "C";
+                if (score >= 50) return "D";
+                if (score >= 40) return "E";
+                return "U";
             }
+
+            if (c.Contains("A-LEVEL") || c.Contains("A LEVEL"))
+            {
+                if (score >= 70) return "A";
+                if (score >= 60) return "B";
+                if (score >= 50) return "C";
+                if (score >= 45) return "D";
+                if (score >= 40) return "E";
+                if (score >= 35) return "O";
+                return "F";
+            }
+
+            // ZIMSEC O-Level default
+            if (score >= 70) return "A";
+            if (score >= 60) return "B";
+            if (score >= 50) return "C";
+            if (score >= 45) return "D";
+            if (score >= 40) return "E";
+            return "U";
         }
 
         public async Task<object?> BuildReportCardDataAsync(int studentId, int termId)
