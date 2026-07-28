@@ -220,8 +220,12 @@ export default function StudentDashboardPage() {
       const curriculumType = (s?.curriculum || '').toUpperCase().startsWith('ZIMSEC') ? 'ZIMSEC' : 'Cambridge';
       try {
         const res = await subjectsAPI.getAll(1, studentCampus || undefined, curriculumType);
-        const registeredIds = new Set(mySubjects.map((sub: any) => sub.subjectId));
-        setAvailableSubjects((res.data || []).filter((sub: any) => !registeredIds.has(sub.id)));
+        const activeConfirmedIds = new Set(
+          mySubjects
+            .filter((sub: any) => sub.isActive === true && sub.status === 'Confirmed')
+            .map((sub: any) => sub.subjectId)
+        );
+        setAvailableSubjects((res.data || []).filter((sub: any) => !activeConfirmedIds.has(sub.id)));
       } catch {
         setAvailableSubjects([]);
       }

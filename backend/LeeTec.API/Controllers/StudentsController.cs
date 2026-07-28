@@ -598,6 +598,7 @@ namespace LeeTec.API.Controllers
                 curriculumType = ss.Subject != null ? ss.Subject.CurriculumType : "",
                 form = student.Form,
                 status = string.IsNullOrEmpty(ss.Status) ? "Confirmed" : ss.Status,
+                isActive = ss.IsActive,
             }).ToList();
 
             return Ok(result);
@@ -687,8 +688,9 @@ namespace LeeTec.API.Controllers
             if (existing != null)
             {
                 if (existing.IsActive)
-                    return BadRequest(new { message = "Student is already registered for this subject" });
+                    return BadRequest(new { message = "Subject already registered" });
                 existing.IsActive = true;
+                existing.Status = "Confirmed";
             }
             else
             {
@@ -699,6 +701,7 @@ namespace LeeTec.API.Controllers
                     TermId = dto.TermId,
                     SchoolId = student.SchoolId,
                     IsActive = true,
+                    Status = "Confirmed",
                     CreatedAt = DateTime.UtcNow,
                 });
             }
@@ -719,7 +722,10 @@ namespace LeeTec.API.Controllers
                 return NotFound(new { message = "Subject registration not found" });
 
             foreach (var record in records)
+            {
                 record.IsActive = false;
+                record.Status = "Dropped";
+            }
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Subject removed" });

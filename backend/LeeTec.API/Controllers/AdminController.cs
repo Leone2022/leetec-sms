@@ -610,6 +610,7 @@ namespace LeeTec.API.Controllers
             else if (existing != null)
             {
                 existing.IsActive = false;
+                existing.Status = "Dropped";
             }
 
             request.Status = "Approved";

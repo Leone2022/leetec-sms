@@ -1351,6 +1351,7 @@ export default function StudentsPage() {
       {/* ─── PROFILE PANEL ─── */}
       {isProfileOpen && selectedStudent && (() => {
         const s = profileStudent || selectedStudent;
+        const visibleSubjects = subjects.filter((sub: any) => sub.isActive === true || sub.status !== 'Dropped');
         const TABS = ['Personal', 'Medical', 'Family', 'Guardians', 'Emergency', 'Fees', '📚 Subjects'];
         const tabBtn = (label: string) => (
           <button
@@ -1631,7 +1632,7 @@ export default function StudentsPage() {
                           >
                             <option value="">Select subject</option>
                             {availableSubjects
-                              .filter((av: any) => !subjects.some((s: any) => s.subjectId === av.id))
+                              .filter((av: any) => !subjects.some((s: any) => s.subjectId === av.id && (s.isActive === true || s.status !== 'Dropped')))
                               .map((av: any) => (
                                 <option key={av.id} value={av.id}>{av.name} ({av.code})</option>
                               ))}
@@ -1656,13 +1657,13 @@ export default function StudentsPage() {
 
                       {subjectsLoading ? (
                         <div style={{ textAlign: 'center', padding: '20px', color: '#475569' }}>Loading subjects...</div>
-                      ) : subjects.length === 0 ? (
+                      ) : visibleSubjects.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748b', fontSize: '13px' }}>
                           No subjects registered for this student.
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          {subjects.map((sub: any) => (
+                          {visibleSubjects.map((sub: any) => (
                             <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                               <div>
                                 <div style={{ fontWeight: 600, fontSize: '13px', color: '#0f172a' }}>{sub.subjectName}</div>
