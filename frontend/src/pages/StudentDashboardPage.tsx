@@ -849,7 +849,7 @@ export default function StudentDashboardPage() {
                         ? availableSubjects.map((s: any) => (
                             <option key={s.id} value={s.id}>{s.name}</option>
                           ))
-                        : mySubjects.filter((s: any) => s.status === 'Confirmed').map((s: any) => (
+                        : activeSubjects.map((s: any) => (
                             <option key={s.subjectId} value={s.subjectId}>{s.subjectName}</option>
                           ))}
                     </select>
