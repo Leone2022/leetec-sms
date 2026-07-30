@@ -47,27 +47,37 @@ namespace LeeTec.API.Controllers
             var subject = await _context.Subjects.FindAsync(subjectId);
             if (subject == null) return NotFound(new { message = "Subject not found" });
 
-            var registrations = await _context.TermRegistrations
-                .Where(tr => tr.TermId == termId && tr.SchoolId == schoolId && tr.Campus == campus && tr.Form == form)
-                .Include(tr => tr.Student)
-                .OrderBy(tr => tr.Student!.Surname).ThenBy(tr => tr.Student!.FirstName)
+            // Students eligible for this entry sheet must satisfy ALL THREE:
+            // (1) an active StudentSubjects record for this exact subject+term,
+            // (2) Student.Form matches the requested form/grade,
+            // (3) Student.Campus matches the requested campus.
+            // We key off Student.Form/Campus (the current, authoritative values)
+            // rather than TermRegistration.Form/Campus, which was letting
+            // students from the wrong form/grade leak into the entry sheet
+            // whenever a registration's snapshot went stale after a promotion,
+            // and which never checked subject enrolment at all.
+            var students = await _context.StudentSubjects
+                .Where(ss => ss.SubjectId == subjectId && ss.TermId == termId && ss.IsActive)
+                .Join(_context.Students, ss => ss.StudentId, s => s.Id, (ss, s) => s)
+                .Where(s => s.Form == form && s.Campus == campus && s.SchoolId == schoolId)
+                .OrderBy(s => s.Surname).ThenBy(s => s.FirstName)
                 .ToListAsync();
 
-            var studentIds = registrations.Select(r => r.StudentId).ToList();
+            var studentIds = students.Select(s => s.Id).ToList();
 
             var existingMarks = await _context.Marks
                 .Where(m => m.TermId == termId && m.SubjectId == subjectId && m.AssessmentType == assessmentType && studentIds.Contains(m.StudentId))
                 .ToListAsync();
 
-            var result = registrations.Select(tr =>
+            var result = students.Select(s =>
             {
-                var mark = existingMarks.FirstOrDefault(m => m.StudentId == tr.StudentId);
+                var mark = existingMarks.FirstOrDefault(m => m.StudentId == s.Id);
                 return new MarkResponseDTO
                 {
                     MarkId = mark?.Id,
-                    StudentId = tr.StudentId,
-                    StudentName = $"{tr.Student!.FirstName} {tr.Student.Surname}",
-                    StudentNumber = tr.Student.StudentNumber,
+                    StudentId = s.Id,
+                    StudentName = $"{s.FirstName} {s.Surname}",
+                    StudentNumber = s.StudentNumber,
                     SubjectId = subject.Id,
                     SubjectName = subject.Name,
                     AssessmentType = assessmentType,
