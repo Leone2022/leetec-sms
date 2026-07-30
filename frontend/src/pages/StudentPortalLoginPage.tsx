@@ -26,6 +26,7 @@ export default function StudentPortalLoginPage() {
 
   // Register state
   const [regStudentNumber, setRegStudentNumber] = useState('');
+  const [regSurname, setRegSurname] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
@@ -67,6 +68,7 @@ export default function StudentPortalLoginPage() {
       await portalAPI.register({
         schoolId: 1,
         studentNumber: regStudentNumber,
+        surname: regSurname,
         email: regEmail,
         password: regPassword,
       });
@@ -226,7 +228,15 @@ export default function StudentPortalLoginPage() {
                           <div className="field-wrap" style={{ marginTop: 6 }}>
                             <span className="field-icon field-icon-left"><Hash size={15} /></span>
                             <input type="text" value={regStudentNumber} onChange={(e) => setRegStudentNumber(e.target.value)}
-                              placeholder="e.g. LT2026001" required className="text-field" />
+                              placeholder="e.g. AHA/2026/0001" required className="text-field" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="auth-label">Student Surname</label>
+                          <div className="field-wrap" style={{ marginTop: 6 }}>
+                            <span className="field-icon field-icon-left"><GraduationCap size={15} /></span>
+                            <input type="text" value={regSurname} onChange={(e) => setRegSurname(e.target.value)}
+                              placeholder="As it appears on school records" required className="text-field" />
                           </div>
                         </div>
                         <div>

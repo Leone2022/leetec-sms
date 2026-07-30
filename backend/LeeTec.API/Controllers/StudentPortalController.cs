@@ -35,6 +35,13 @@ namespace LeeTec.API.Controllers
             if (student == null)
                 return NotFound(new { message = "Student number not found. Please contact your school admin." });
 
+            // Student numbers are sequential per campus (AHJ/AHA/AHS), so two students on
+            // different campuses can share the same trailing digits (e.g. AHJ/2026/0106 and
+            // AHA/2026/0106). A single mistyped campus prefix would otherwise silently link
+            // the account to the wrong (but real) student, so require the surname to match too.
+            if (!string.Equals(student.Surname.Trim(), request.Surname.Trim(), StringComparison.OrdinalIgnoreCase))
+                return BadRequest(new { message = "Student number and surname do not match our records. Please double-check the student number and try again." });
+
             // Check if account already exists
             var existing = await _context.StudentPortalAccounts
                 .FirstOrDefaultAsync(a => a.StudentId == student.Id);
@@ -355,6 +362,7 @@ namespace LeeTec.API.Controllers
     {
         public int SchoolId { get; set; }
         public string StudentNumber { get; set; } = string.Empty;
+        public string Surname { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
     }
