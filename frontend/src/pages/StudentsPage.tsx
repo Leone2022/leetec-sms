@@ -35,7 +35,7 @@ const defaultCurriculum = (campus: string) =>
 
 const FORM_OPTIONS: Record<string, string[]> = {
   AHJ: ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'],
-  AHS: ['Form 5', 'Lower 6', 'Upper 6'],
+  AHS: ['Lower 6', 'Upper 6'],
   AHA: ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'],
 };
 
