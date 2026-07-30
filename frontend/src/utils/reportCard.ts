@@ -3,8 +3,9 @@ import autoTable from 'jspdf-autotable';
 import { GRADE_REFERENCE_TABLES, type CurriculumType } from './grading';
 
 // Curriculum-aware grade calculation, kept in sync with the backend's
-// ReportCardService.GetGrade. Cambridge (any level) uses a single A*-U scale;
-// ZIMSEC A-Level uses A-F; everything else falls back to ZIMSEC O-Level (A-U).
+// ReportCardService.GetGrade. Cambridge (any level) uses a single A*-U scale
+// with 9 bands (A*,A,B,C,D,E,F,G,U); ZIMSEC A-Level uses A-F; everything else
+// falls back to ZIMSEC O-Level (A-U).
 export function calculateGrade(score: number, curriculum: string): string {
   const c = curriculum.toUpperCase();
   if (c.includes('CAMBRIDGE')) {
@@ -14,6 +15,8 @@ export function calculateGrade(score: number, curriculum: string): string {
     if (score >= 60) return 'C';
     if (score >= 50) return 'D';
     if (score >= 40) return 'E';
+    if (score >= 30) return 'F';
+    if (score >= 20) return 'G';
     return 'U';
   }
   if (c.includes('A-LEVEL') || c.includes('A LEVEL')) {

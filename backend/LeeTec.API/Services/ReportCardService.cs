@@ -51,6 +51,8 @@ namespace LeeTec.API.Services
                 if (score >= 60) return "C";
                 if (score >= 50) return "D";
                 if (score >= 40) return "E";
+                if (score >= 30) return "F";
+                if (score >= 20) return "G";
                 return "U";
             }
 

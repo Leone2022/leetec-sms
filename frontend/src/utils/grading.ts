@@ -15,6 +15,8 @@ export function getGradeForScore(score: number, curriculumType: CurriculumType, 
     if (score >= 60) return 'C';
     if (score >= 50) return 'D';
     if (score >= 40) return 'E';
+    if (score >= 30) return 'F';
+    if (score >= 20) return 'G';
     return 'U';
   }
 
@@ -48,7 +50,9 @@ const CAMBRIDGE_TABLE = {
     ['60–69', 'C'],
     ['50–59', 'D'],
     ['40–49', 'E'],
-    ['0–39', 'U'],
+    ['30–39', 'F'],
+    ['20–29', 'G'],
+    ['0–19', 'U'],
   ],
 };
 
