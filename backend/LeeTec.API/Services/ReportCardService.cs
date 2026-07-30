@@ -169,6 +169,7 @@ namespace LeeTec.API.Services
                     },
                     cm = cm.HasValue ? (int?)cm.Value : null,
                     grade = cm.HasValue ? GetGrade(cm.Value, gradingCurriculum) : "",
+                    band = usesPapers && cm.HasValue ? GetBand((int)cm.Value) : null,
                 };
             }).ToList();
 

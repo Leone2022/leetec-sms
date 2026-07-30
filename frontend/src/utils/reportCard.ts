@@ -49,6 +49,7 @@ interface ReportCardSubjectResult {
   endTerm: ReportCardScoreBlock | null;
   cm: number | null;
   grade: string;
+  band: string | null;
 }
 
 export interface ReportCardData {
@@ -78,6 +79,17 @@ const SCHOOL_NAMES: Record<string, string> = {
 };
 
 const NAVY: [number, number, number] = [26, 35, 126];
+
+// Cambridge Checkpoint performance-band ranges, mirroring the backend's
+// ReportCardService.GetBand exactly. AHJ-specific — not a letter-grade scale.
+const AHJ_PERFORMANCE_BANDS: [string, string][] = [
+  ['0', 'Unclassified'],
+  ['1–10', 'Basic'],
+  ['11–20', 'Aspiring'],
+  ['21–30', 'Good'],
+  ['31–40', 'High'],
+  ['41–50', 'Outstanding'],
+];
 
 const fmt = (v: number | null | undefined) => (v === null || v === undefined ? '—' : String(v));
 
@@ -214,7 +226,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
   // PART 5 — Unified subject grid
   autoTable(doc, {
     startY: (doc as any).lastAutoTable.finalY + 8,
-    head: [['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Band', 'Comments']],
+    head: [['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Grade', 'Band', 'Comments']],
     body: subjects.map(s => {
       const block = s.noTerminalExam ? s.midterm : s.endTerm;
       const comments = (s.noTerminalExam ? s.midterm.comments : s.endTerm?.comments) || '—';
@@ -228,6 +240,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
         fmt(block?.total),
         fmt(s.cm),
         s.grade || '—',
+        s.band || '—',
         comments,
       ];
     }),
@@ -240,11 +253,11 @@ async function generateAhjReportCard(reportData: ReportCardData) {
       3: { halign: 'center' },
       4: { halign: 'center' },
       5: { halign: 'center', fontStyle: 'bold' },
+      6: { halign: 'center' },
     },
   });
 
-  // PART 6 — Grading reference table
-  const reference = GRADE_REFERENCE_TABLES['Cambridge Checkpoint'];
+  // PART 6 — Performance-band reference table
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...NAVY);
@@ -253,8 +266,8 @@ async function generateAhjReportCard(reportData: ReportCardData) {
 
   autoTable(doc, {
     startY: (doc as any).lastAutoTable.finalY + 14,
-    head: [reference.headers],
-    body: reference.rows,
+    head: [['SCORE RANGE', 'PERFORMANCE BAND']],
+    body: AHJ_PERFORMANCE_BANDS,
     theme: 'grid',
     headStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold' },
     styles: { fontSize: 9, cellPadding: 3, lineColor: [180, 180, 180], lineWidth: 0.3 },
