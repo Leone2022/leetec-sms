@@ -167,6 +167,20 @@ namespace LeeTec.API.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateSubject([FromBody] CreateSubjectDTO dto)
         {
+            // A second "same subject, different code" row is easy to create by accident
+            // (e.g. two "Combined Science" rows for AHA/O-Level/Cambridge) and silently
+            // splits student registrations and teacher assignments across two IDs, so
+            // block it up front rather than relying on someone to notice the duplicate.
+            var duplicate = await _context.Subjects.AnyAsync(s =>
+                s.SchoolId == dto.SchoolId &&
+                s.Name == dto.Name &&
+                s.Campus == dto.Campus &&
+                s.Level == dto.Level &&
+                s.CurriculumType == dto.CurriculumType &&
+                s.IsActive);
+            if (duplicate)
+                return BadRequest(new { message = $"An active \"{dto.Name}\" subject already exists for {dto.Campus} / {dto.Level} / {dto.CurriculumType}." });
+
             var subject = new Subject
             {
                 SchoolId = dto.SchoolId,
