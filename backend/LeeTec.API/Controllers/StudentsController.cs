@@ -540,6 +540,10 @@ namespace LeeTec.API.Controllers
                     .Where(ss => ss.StudentId == id).ToListAsync();
                 _context.StudentSubjects.RemoveRange(studentSubjects);
 
+                var subjectChangeRequests = await _context.SubjectChangeRequests
+                    .Where(scr => scr.StudentId == id).ToListAsync();
+                _context.SubjectChangeRequests.RemoveRange(subjectChangeRequests);
+
                 var termRegistrations = await _context.TermRegistrations
                     .Where(tr => tr.StudentId == id).ToListAsync();
                 _context.TermRegistrations.RemoveRange(termRegistrations);
