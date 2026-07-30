@@ -681,7 +681,7 @@ export default function TeacherDashboardPage() {
                         )}
                       </td>
                       <td>
-                        <input className="text-field" style={fld}
+                        <textarea className="text-field" style={{ ...fld, resize: 'vertical', minHeight: 36, fontFamily: 'inherit' }} rows={2}
                           value={row.comments} disabled={locked}
                           onChange={e => updateRow(row.studentId, 'comments', e.target.value)}
                           placeholder="Optional comments" />
