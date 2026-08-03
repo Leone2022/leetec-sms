@@ -187,9 +187,17 @@ namespace LeeTec.API.Controllers
         [HttpPost("submit")]
         public async Task<IActionResult> SubmitMarks([FromBody] SubmitMarksDTO dto)
         {
-            var studentIds = await _context.TermRegistrations
-                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
-                .Select(tr => tr.StudentId)
+            // Must match GetEntrySheet's roster exactly: students with an active
+            // StudentSubjects record for THIS subject+term, not every student in the
+            // campus/form. TermRegistrations is campus+form only, so e.g. a Form 3 AHA
+            // class of 54 students where only 22 take Business Enterprise Skills would
+            // otherwise always fail "All students must have marks" because of the other
+            // 32 who were never supposed to have marks for this subject at all.
+            var studentIds = await _context.StudentSubjects
+                .Where(ss => ss.SubjectId == dto.SubjectId && ss.TermId == dto.TermId && ss.IsActive)
+                .Join(_context.Students, ss => ss.StudentId, s => s.Id, (ss, s) => s)
+                .Where(s => s.Form == dto.Form && s.Campus == dto.Campus)
+                .Select(s => s.Id)
                 .ToListAsync();
 
             var allMarksForSubject = await _context.Marks
