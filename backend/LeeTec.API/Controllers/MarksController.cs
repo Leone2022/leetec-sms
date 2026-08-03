@@ -122,19 +122,25 @@ namespace LeeTec.API.Controllers
                         && (m.AssessmentType == "Mid-term Test" || m.AssessmentType == "End of Term Exam"))
                     .ToListAsync();
 
-                if (combinedExisting.Any(m => LockedMarkStatuses.Contains(m.Status)))
-                    return StatusCode(403, new { message = "These marks have been submitted and cannot be edited. Contact admin." });
-
+                // Midterm and end-of-term are saved and locked independently (e.g. midterm is
+                // often submitted earlier in the term while end-of-term is still being entered),
+                // so a locked midterm must not block saving a still-editable end-of-term score.
+                // UpsertAssessmentMark skips (rather than overwrites) whichever specific row is
+                // already locked instead of rejecting the whole batch.
                 int combinedSaved = 0;
+                int lockedSkipped = 0;
                 foreach (var entry in dto.Marks)
                 {
-                    UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "Mid-term Test", entry.MidtermScore, entry.Comments);
-                    UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "End of Term Exam", entry.EndOfTermScore, entry.Comments);
+                    if (!UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "Mid-term Test", entry.MidtermScore, entry.Comments)) lockedSkipped++;
+                    if (!UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "End of Term Exam", entry.EndOfTermScore, entry.Comments)) lockedSkipped++;
                     combinedSaved++;
                 }
 
                 await _context.SaveChangesAsync();
-                return Ok(new { message = $"Marks saved for {combinedSaved} students", saved = combinedSaved });
+                var message = lockedSkipped > 0
+                    ? $"Marks saved for {combinedSaved} students (some entries were already submitted and were left unchanged)"
+                    : $"Marks saved for {combinedSaved} students";
+                return Ok(new { message, saved = combinedSaved });
             }
 
             var studentIds = dto.Entries.Select(e => e.StudentId).ToList();
@@ -526,9 +532,15 @@ namespace LeeTec.API.Controllers
             return Ok(grouped);
         }
 
-        private void UpsertAssessmentMark(List<Mark> existing, BulkSaveMarksDTO dto, int studentId, string assessmentType, decimal? score, string? comments)
+        // Returns false (and leaves the row untouched) if this specific assessment mark is
+        // already locked (Submitted/Approved) — callers should not treat that as a failure,
+        // just as "nothing to save here."
+        private bool UpsertAssessmentMark(List<Mark> existing, BulkSaveMarksDTO dto, int studentId, string assessmentType, decimal? score, string? comments)
         {
             var mark = existing.FirstOrDefault(m => m.StudentId == studentId && m.AssessmentType == assessmentType);
+            if (mark != null && LockedMarkStatuses.Contains(mark.Status))
+                return false;
+
             if (mark == null)
             {
                 mark = new Mark
@@ -548,6 +560,7 @@ namespace LeeTec.API.Controllers
             mark.Score = score;
             mark.Comments = comments;
             mark.UpdatedAt = DateTime.UtcNow;
+            return true;
         }
 
         // PUBLISH REPORT CARDS — mark all students matching campus/form as published for a term
