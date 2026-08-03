@@ -46,10 +46,6 @@ namespace LeeTec.API.Controllers
 
                 var studentIds = registrations.Select(r => r.StudentId).ToList();
 
-                var subjects = await _context.Subjects
-                    .Where(s => s.SchoolId == schoolId && s.IsActive)
-                    .ToListAsync();
-
                 // Materialise flat rows first — avoids ToList() inside EF projection which
                 // MariaDB provider cannot translate to SQL.
                 var rawMarks = await _context.Marks
@@ -64,27 +60,36 @@ namespace LeeTec.API.Controllers
                         g => g.Select(m => m.SubjectId).Distinct().ToHashSet()
                     );
 
+                // The denominator must be each student's own active subject registrations,
+                // not the full catalogue of subjects the school offers for their campus —
+                // otherwise a student who has dropped down to 9 subjects still shows against
+                // the original 15/17 the campus/curriculum offers.
+                var rawStudentSubjects = await _context.StudentSubjects
+                    .Where(ss => ss.TermId == termId && ss.IsActive && studentIds.Contains(ss.StudentId))
+                    .Select(ss => new { ss.StudentId, ss.SubjectId })
+                    .ToListAsync();
+
+                var activeSubjectsByStudent = rawStudentSubjects
+                    .GroupBy(ss => ss.StudentId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(ss => ss.SubjectId).Distinct().ToHashSet()
+                    );
+
                 var result = registrations.Select(reg =>
                 {
                     var student = reg.Student!;
                     var campus = reg.Campus ?? "";
                     var curriculumStr = student.Curriculum ?? "";
 
-                    // If curriculum is blank, infer from campus:
-                    // AHJ uses Cambridge Checkpoint; AHA/AHS use ZIMSEC.
-                    var curriculumType = curriculumStr.StartsWith("ZIMSEC", StringComparison.OrdinalIgnoreCase)
-                        ? "ZIMSEC"
-                        : (curriculumStr.Length == 0 && campus != "AHJ") ? "ZIMSEC" : "Cambridge";
+                    var activeSubjectIds = activeSubjectsByStudent.TryGetValue(reg.StudentId, out var subjectIds)
+                        ? subjectIds
+                        : new HashSet<int>();
 
-                    var campusSubjectIds = subjects
-                        .Where(s => s.Campus == campus && s.CurriculumType == curriculumType)
-                        .Select(s => s.Id)
-                        .ToHashSet();
+                    var totalSubjects = activeSubjectIds.Count;
 
-                    var totalSubjects = campusSubjectIds.Count;
-
-                    var entered = enteredByStudent.TryGetValue(reg.StudentId, out var ids)
-                        ? ids.Count(id => campusSubjectIds.Contains(id))
+                    var entered = enteredByStudent.TryGetValue(reg.StudentId, out var markedIds)
+                        ? markedIds.Count(id => activeSubjectIds.Contains(id))
                         : 0;
 
                     var fullyEntered = entered >= totalSubjects && totalSubjects > 0;

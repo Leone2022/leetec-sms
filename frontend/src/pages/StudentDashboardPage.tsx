@@ -80,6 +80,7 @@ export default function StudentDashboardPage() {
 
   // My Subjects tab state
   const [mySubjects, setMySubjects] = useState<any[]>([]);
+  const activeSubjects = mySubjects.filter((sub: any) => sub.status === 'Confirmed' && sub.isActive === true);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [modalStep, setModalStep] = useState<1 | 2>(1);
@@ -452,7 +453,7 @@ export default function StudentDashboardPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[
-          { label: 'My Subjects', value: String(mySubjects.length), icon: BookOpen, color: '#1a237e', bg: '#eef2ff', onClick: () => handleNav('subjects') },
+          { label: 'My Subjects', value: String(activeSubjects.length), icon: BookOpen, color: '#1a237e', bg: '#eef2ff', onClick: () => handleNav('subjects') },
           { label: 'Balance Due', value: fmtAmt(invoice?.balance ?? 0), icon: DollarSign, color: Number(invoice?.balance ?? 0) > 0 ? '#dc2626' : '#15803d', bg: Number(invoice?.balance ?? 0) > 0 ? '#fef2f2' : '#f0fdf4', onClick: () => handleNav('fees') },
           { label: 'My Results', value: String(myMarksCount), icon: FileText, color: '#7c3aed', bg: '#f5f3ff', onClick: () => handleNav('reportCard') },
           { label: 'Announcements', value: String(unreadAnnouncementsCount), icon: Bell, color: '#0891b2', bg: '#ecfeff', onClick: () => handleNav('announcements') },
@@ -717,7 +718,6 @@ export default function StudentDashboardPage() {
 
   const requestStatusBadge = { bg: '#ffedd5', color: '#9a3412' };
 
-  const activeSubjects = mySubjects.filter((sub: any) => sub.status === 'Confirmed' && sub.isActive === true);
   const pendingRequests = myChangeRequests.filter((r: any) => r.status === 'Pending');
 
   const SubjectsView = (
