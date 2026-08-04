@@ -229,7 +229,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
   // PART 5 — Unified subject grid
   autoTable(doc, {
     startY: (doc as any).lastAutoTable.finalY + 8,
-    head: [['Subject', 'Final Mark', 'Grade', 'Band', 'Comments']],
+    head: [['Subject', 'Final Mark', 'Band', 'Comments']],
     body: subjects.map(s => {
       const comments = (s.noTerminalExam ? s.midterm.comments : s.endTerm?.comments) || '—';
       const label = s.noTerminalExam
@@ -238,7 +238,6 @@ async function generateAhjReportCard(reportData: ReportCardData) {
       return [
         label,
         fmt(s.cm),
-        s.grade || '—',
         s.band || '—',
         comments,
       ];
@@ -247,9 +246,8 @@ async function generateAhjReportCard(reportData: ReportCardData) {
     headStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold' },
     styles: { fontSize: 9, lineColor: [180, 180, 180], lineWidth: 0.3 },
     columnStyles: {
-      1: { halign: 'center' },
-      2: { halign: 'center', fontStyle: 'bold' },
-      3: { halign: 'center' },
+      1: { halign: 'center', fontStyle: 'bold' },
+      2: { halign: 'center' },
     },
   });
 

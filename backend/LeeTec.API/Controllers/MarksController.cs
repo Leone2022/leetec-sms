@@ -88,6 +88,7 @@ namespace LeeTec.API.Controllers
                     Comments = mark?.Comments,
                     Status = mark?.Status ?? "Draft",
                     SendBackComment = mark?.SendBackComment,
+                    AmendmentRequested = mark?.AmendmentRequested ?? false,
                     AmendmentRequestedAt = mark?.AmendmentRequestedAt,
                 };
             }).ToList();
@@ -377,21 +378,29 @@ namespace LeeTec.API.Controllers
             return Ok(grouped);
         }
 
-        // REQUEST AMENDMENT — admin flags Approved/Published marks for a subject/term/campus/form
-        // for Super Admin review, attaching the meeting minute that authorised the change.
-        [Authorize]
+        // REQUEST AMENDMENT — flags a subject/term/campus/form group's marks for Super
+        // Admin review, attaching the meeting minute that authorised the change. Used by
+        // admins (BulkReportsPage) for Approved/Published marks, and by teachers
+        // (TeacherDashboardPage's "Request Edit") for marks they've already Submitted but
+        // haven't been Approved yet. No [Authorize] — the teacher portal has no admin JWT
+        // to attach, same as entry-sheet/bulk-save/submit above, which are already public.
         [HttpPost("request-amendment")]
         public async Task<IActionResult> RequestAmendment([FromBody] RequestAmendmentDTO dto)
         {
-            var studentIds = await _context.TermRegistrations
-                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
-                .Select(tr => tr.StudentId)
+            // Match GetEntrySheet/SubmitMarks's roster (Students.Form/Campus), not
+            // TermRegistrations, which can go stale after a promotion and misroute a
+            // request to whichever class a student was in when the term started.
+            var studentIds = await _context.StudentSubjects
+                .Where(ss => ss.SubjectId == dto.SubjectId && ss.TermId == dto.TermId && ss.IsActive)
+                .Join(_context.Students, ss => ss.StudentId, s => s.Id, (ss, s) => s)
+                .Where(s => s.Form == dto.Form && s.Campus == dto.Campus)
+                .Select(s => s.Id)
                 .ToListAsync();
 
             var marks = await _context.Marks
                 .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId
                     && studentIds.Contains(m.StudentId)
-                    && (m.Status == "Approved" || m.Status == "Published"))
+                    && (m.Status == "Approved" || m.Status == "Published" || m.Status == "Submitted"))
                 .ToListAsync();
 
             foreach (var mark in marks)
@@ -465,9 +474,14 @@ namespace LeeTec.API.Controllers
         [HttpPost("approve-amendment")]
         public async Task<IActionResult> ApproveAmendment([FromBody] AmendmentGroupActionDTO dto)
         {
-            var studentIds = await _context.TermRegistrations
-                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
-                .Select(tr => tr.StudentId)
+            // Must match RequestAmendment's Students.Form/Campus lookup, not
+            // TermRegistrations — otherwise a request filed correctly for a student
+            // whose registration has gone stale can never be found and resolved here.
+            var studentIds = await _context.StudentSubjects
+                .Where(ss => ss.SubjectId == dto.SubjectId && ss.TermId == dto.TermId && ss.IsActive)
+                .Join(_context.Students, ss => ss.StudentId, s => s.Id, (ss, s) => s)
+                .Where(s => s.Form == dto.Form && s.Campus == dto.Campus)
+                .Select(s => s.Id)
                 .ToListAsync();
 
             var marks = await _context.Marks
@@ -493,9 +507,12 @@ namespace LeeTec.API.Controllers
         [HttpPost("reject-amendment")]
         public async Task<IActionResult> RejectAmendment([FromBody] RejectAmendmentDTO dto)
         {
-            var studentIds = await _context.TermRegistrations
-                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
-                .Select(tr => tr.StudentId)
+            // Same Students.Form/Campus lookup as RequestAmendment/ApproveAmendment.
+            var studentIds = await _context.StudentSubjects
+                .Where(ss => ss.SubjectId == dto.SubjectId && ss.TermId == dto.TermId && ss.IsActive)
+                .Join(_context.Students, ss => ss.StudentId, s => s.Id, (ss, s) => s)
+                .Where(s => s.Form == dto.Form && s.Campus == dto.Campus)
+                .Select(s => s.Id)
                 .ToListAsync();
 
             var marks = await _context.Marks

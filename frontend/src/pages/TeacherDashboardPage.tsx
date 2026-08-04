@@ -6,7 +6,7 @@ import {
   GraduationCap, LogOut, BookOpen, User, Menu, X,
   ClipboardList, ChevronLeft, Save, Send, AlertTriangle,
   CheckCircle, Users, Clock, Bell, Phone, Mail, LayoutDashboard,
-  FileText, Plus, Trash2, ArrowRight,
+  FileText, Plus, Trash2, ArrowRight, Edit3,
 } from 'lucide-react';
 import VerseCard, { type VerseData } from '../components/VerseCard';
 import { calculateGrade } from '../utils/reportCard';
@@ -21,6 +21,7 @@ interface MarkRow {
   comments: string;
   status: string;
   sendBackComment: string | null;
+  amendmentRequested: boolean;
   amendmentRequestedAt: string | null;
 }
 
@@ -36,6 +37,7 @@ const STATUS_BADGE: Record<string, { label: string; bg: string; color: string }>
   Draft: { label: 'Draft', bg: '#f1f5f9', color: '#475569' },
   Submitted: { label: 'Submitted', bg: '#fff7ed', color: '#c2410c' },
   Approved: { label: 'Approved', bg: '#f0fdf4', color: '#15803d' },
+  'Amendment Requested': { label: 'Amendment Requested', bg: '#f5f3ff', color: '#7c3aed' },
 };
 
 type View = 'dashboard' | 'classes' | 'notifications' | 'homework' | 'profile';
@@ -68,6 +70,7 @@ export default function TeacherDashboardPage() {
   const [entryLoading, setEntryLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [requestingEditFor, setRequestingEditFor] = useState<number | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [currentVerse, setCurrentVerse] = useState<VerseData | null>(null);
 
@@ -314,6 +317,7 @@ export default function TeacherDashboardPage() {
           comments: d.comments || endD?.comments || '',
           status,
           sendBackComment: d.sendBackComment || endD?.sendBackComment || null,
+          amendmentRequested: Boolean(d.amendmentRequested || endD?.amendmentRequested),
           amendmentRequestedAt: d.amendmentRequestedAt || endD?.amendmentRequestedAt || null,
         };
       }));
@@ -406,6 +410,42 @@ export default function TeacherDashboardPage() {
       showMsg(err?.response?.data?.message || 'Failed to submit marks', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Amendment requests are recorded at the subject+term+campus+form level (same
+  // granularity as Submit/Approve), not per student — so requesting one from a
+  // single row reopens the WHOLE class's submission for this subject, not just
+  // that student. The prompt below makes that explicit rather than letting the
+  // per-row button placement imply a narrower, student-only action.
+  const handleRequestEdit = async (row: MarkRow) => {
+    if (!termId || !selectedAssignment) return;
+
+    const reason = window.prompt(
+      `Request an amendment for the submitted ${selectedAssignment.subjectName} marks — ${selectedAssignment.campus} ${selectedAssignment.form}.\n\n` +
+      `Note: this reopens the whole class's submission for this subject for admin review, not just ${row.studentName}'s mark.\n\n` +
+      `Reason for the request:`
+    );
+    if (!reason || !reason.trim()) return;
+
+    setRequestingEditFor(row.studentId);
+    try {
+      await marksAPI.requestAmendment({
+        subjectId: selectedAssignment.subjectId,
+        termId: termId as number,
+        campus: selectedAssignment.campus,
+        form: selectedAssignment.form,
+        reason: `[${row.studentName}] ${reason.trim()}`,
+        meetingDate: '',
+        minuteReference: '',
+        requestedBy: `${firstName} ${surname}`.trim() || teacherInfo?.email || '',
+      });
+      showMsg('Amendment request sent to admin for review', 'success');
+      await loadEntrySheet();
+    } catch (err: any) {
+      showMsg(err?.response?.data?.message || 'Failed to request amendment', 'error');
+    } finally {
+      setRequestingEditFor(null);
     }
   };
 
@@ -659,7 +699,8 @@ export default function TeacherDashboardPage() {
               <tbody>
                 {rows.map(row => {
                   const locked = row.status !== 'Draft';
-                  const badge = STATUS_BADGE[row.status] ?? STATUS_BADGE.Draft;
+                  const displayStatus = row.status === 'Submitted' && row.amendmentRequested ? 'Amendment Requested' : row.status;
+                  const badge = STATUS_BADGE[displayStatus] ?? STATUS_BADGE.Draft;
                   return (
                     <tr key={row.studentId}>
                       <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{row.studentName}</td>
@@ -693,6 +734,13 @@ export default function TeacherDashboardPage() {
                           {row.status === 'Approved' && <CheckCircle size={11} />}
                           {badge.label}
                         </span>
+                        {row.status === 'Submitted' && !row.amendmentRequested && (
+                          <button type="button" onClick={() => handleRequestEdit(row)} disabled={requestingEditFor === row.studentId}
+                            title="Request an edit for this submitted mark"
+                            style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 8px', borderRadius: 10, border: '1px solid #cbd5e1', background: 'white', color: '#475569', fontSize: 10, fontWeight: 600, cursor: requestingEditFor === row.studentId ? 'default' : 'pointer', opacity: requestingEditFor === row.studentId ? 0.6 : 1 }}>
+                            <Edit3 size={10} /> {requestingEditFor === row.studentId ? 'Requesting...' : 'Request Edit'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

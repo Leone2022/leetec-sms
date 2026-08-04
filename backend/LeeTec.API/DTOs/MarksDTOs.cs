@@ -67,6 +67,7 @@ namespace LeeTec.API.DTOs
         public string? Comments { get; set; }
         public string? Status { get; set; }
         public string? SendBackComment { get; set; }
+        public bool AmendmentRequested { get; set; }
         public DateTime? AmendmentRequestedAt { get; set; }
     }
 
