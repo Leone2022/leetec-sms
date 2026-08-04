@@ -80,6 +80,7 @@ namespace LeeTec.API.Controllers
                     StudentNumber = s.StudentNumber,
                     SubjectId = subject.Id,
                     SubjectName = subject.Name,
+                    Curriculum = s.Curriculum,
                     AssessmentType = assessmentType,
                     Paper1Score = mark?.Paper1Score,
                     Paper2Score = mark?.Paper2Score,

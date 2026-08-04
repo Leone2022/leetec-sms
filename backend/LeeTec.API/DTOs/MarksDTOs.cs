@@ -59,6 +59,7 @@ namespace LeeTec.API.DTOs
         public string StudentNumber { get; set; } = string.Empty;
         public int SubjectId { get; set; }
         public string SubjectName { get; set; } = string.Empty;
+        public string Curriculum { get; set; } = string.Empty;
         public string AssessmentType { get; set; } = string.Empty;
         public decimal? Paper1Score { get; set; }
         public decimal? Paper2Score { get; set; }

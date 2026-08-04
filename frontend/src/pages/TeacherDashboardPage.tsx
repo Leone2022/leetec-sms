@@ -15,6 +15,7 @@ interface MarkRow {
   studentId: number;
   studentName: string;
   studentNumber: string;
+  curriculum: string;
   midtermScore: string;
   endOfTermScore: string;
   comments: string;
@@ -307,6 +308,7 @@ export default function TeacherDashboardPage() {
           studentId: d.studentId,
           studentName: d.studentName,
           studentNumber: d.studentNumber,
+          curriculum: d.curriculum || endD?.curriculum || '',
           midtermScore: d.score != null ? String(d.score) : '',
           endOfTermScore: endD?.score != null ? String(endD.score) : '',
           comments: d.comments || endD?.comments || '',
@@ -346,7 +348,7 @@ export default function TeacherDashboardPage() {
 
   const grade = (row: MarkRow) => {
     const t = total(row);
-    return t === '' ? '' : calculateGrade(Number(t), selectedAssignment?.curriculumType || '');
+    return t === '' ? '' : calculateGrade(Number(t), row.curriculum || selectedAssignment?.curriculumType || '');
   };
 
   const handleSaveAll = async () => {

@@ -1,19 +1,9 @@
 import { useState, useEffect } from 'react';
 import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI, marksAPI } from '../services/api';
-import { generateReportCard } from '../utils/reportCard';
+import { generateReportCard, calculateGrade } from '../utils/reportCard';
 import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } from '../utils/credentials';
 import AdminLayout from '../components/AdminLayout';
 import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
-
-const calculateGrade = (total: number) => {
-  if (total >= 90) return 'A*';
-  if (total >= 80) return 'A';
-  if (total >= 70) return 'B';
-  if (total >= 60) return 'C';
-  if (total >= 50) return 'D';
-  if (total >= 40) return 'E';
-  return 'U';
-};
 
 const PUBLISH_FORM_OPTIONS = [
   'All',
@@ -200,12 +190,13 @@ export default function BulkReportsPage() {
         const total = paper1 != null && paper2 != null
           ? Math.round((Number(paper1) + Number(paper2)) / 2)
           : paper1 != null ? Number(paper1) : paper2 != null ? Number(paper2) : null;
+        const curriculum = d.curriculum || endD?.curriculum || '';
         return {
           studentId: d.studentId,
           studentName: d.studentName,
           studentNumber: d.studentNumber,
           paper1, paper2, total,
-          grade: total != null ? calculateGrade(total) : '',
+          grade: total != null ? calculateGrade(total, curriculum) : '',
           comments: d.comments || endD?.comments || '',
         };
       }));

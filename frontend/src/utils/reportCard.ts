@@ -229,18 +229,14 @@ async function generateAhjReportCard(reportData: ReportCardData) {
   // PART 5 — Unified subject grid
   autoTable(doc, {
     startY: (doc as any).lastAutoTable.finalY + 8,
-    head: [['Subject', 'Paper 1', 'Paper 2', 'Total', 'CM', 'Grade', 'Band', 'Comments']],
+    head: [['Subject', 'Final Mark', 'Grade', 'Band', 'Comments']],
     body: subjects.map(s => {
-      const block = s.noTerminalExam ? s.midterm : s.endTerm;
       const comments = (s.noTerminalExam ? s.midterm.comments : s.endTerm?.comments) || '—';
       const label = s.noTerminalExam
         ? `${s.name} (No Terminal Examination)`
         : `${s.name} (Core Subject)`;
       return [
         label,
-        fmt(block?.paper1),
-        fmt(block?.paper2),
-        fmt(block?.total),
         fmt(s.cm),
         s.grade || '—',
         s.band || '—',
@@ -252,11 +248,8 @@ async function generateAhjReportCard(reportData: ReportCardData) {
     styles: { fontSize: 9, lineColor: [180, 180, 180], lineWidth: 0.3 },
     columnStyles: {
       1: { halign: 'center' },
-      2: { halign: 'center' },
+      2: { halign: 'center', fontStyle: 'bold' },
       3: { halign: 'center' },
-      4: { halign: 'center' },
-      5: { halign: 'center', fontStyle: 'bold' },
-      6: { halign: 'center' },
     },
   });
 
@@ -292,8 +285,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
 // ─── AHA / AHS report card (ZIMSEC O-Level/A-Level, and Cambridge AHA/AHS) ──
 // Mirrors generateAhjReportCard's layout exactly: watermark, dual-logo header,
 // details grid, subject grid, grading-scale reference table, footer. No CM or
-// Band columns here — CM is just the midterm/end-of-term average already shown
-// in "Total" for non-paper-based subjects, and Band is Cambridge-Checkpoint-only.
+// Band column here — Band is Cambridge-Checkpoint-only.
 
 async function generateAhaAhsReportCard(reportData: ReportCardData) {
   const { student, term, subjects, attendance, gradingCurriculum } = reportData;
@@ -308,36 +300,27 @@ async function generateAhaAhsReportCard(reportData: ReportCardData) {
     : '—';
 
   const schoolName = SCHOOL_NAMES[student.campus] || 'ADVENT HOPE SCHOOLS';
-  const isCambridge = gradingCurriculum.toUpperCase().startsWith('CAMBRIDGE');
 
   // Watermark goes first so all content renders on top of it.
   await drawWatermark(doc, pageWidth, pageHeight);
 
-  // Load logos; log which were found. AHA/AHS has no crest file yet — add
-  // aha-crest.png to src/assets/logos/ (see that folder's README) and it
-  // will start appearing automatically, same as the AHJ crest does.
+  // Load logos; log which were found. Every report — ZIMSEC or Cambridge,
+  // any campus — shows the Advent Hope crest and the Cambridge Assessment
+  // logo, same as the AHJ template. There's no separate AHA/AHS crest file,
+  // so this reuses the Advent Hope shield already used for AHJ.
   const [ahaCrest, cambridgeLogo] = await Promise.all([
-    loadLogo('aha-crest.png'),
-    isCambridge ? loadLogo('cambridge-assessment-logo.png') : Promise.resolve(null),
+    loadLogo('ahj-crest.png'),
+    loadLogo('cambridge-assessment-logo.png'),
   ]);
   console.log(
-    `[ReportCard] AHA/AHS crest: ${ahaCrest ? 'found' : 'missing'}${isCambridge ? ` | Cambridge logo: ${cambridgeLogo ? 'found' : 'missing'}` : ''}`,
+    `[ReportCard] Advent Hope crest: ${ahaCrest ? 'found' : 'missing'} | Cambridge logo: ${cambridgeLogo ? 'found' : 'missing'}`,
   );
 
   // HEADER — two-column logos, centered title below
   const LOGO_Y = 8;
   const LOGO_H = 32;
   if (ahaCrest) drawLogoLeft(doc, ahaCrest, 14, LOGO_Y, 35, LOGO_H);
-  if (cambridgeLogo) {
-    drawLogoRight(doc, cambridgeLogo, pageWidth - 14, LOGO_Y, 30, LOGO_H);
-  } else if (!isCambridge) {
-    // No ZIMSEC logo file exists — styled text at the same visual weight as
-    // the Cambridge Assessment logo it replaces.
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(...NAVY);
-    doc.text('ZIMSEC', pageWidth - 14, LOGO_Y + LOGO_H / 2 + 3, { align: 'right' });
-  }
+  if (cambridgeLogo) drawLogoRight(doc, cambridgeLogo, pageWidth - 14, LOGO_Y, 30, LOGO_H);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
@@ -367,26 +350,24 @@ async function generateAhaAhsReportCard(reportData: ReportCardData) {
   // PART 5 — Subject grid
   autoTable(doc, {
     startY: (doc as any).lastAutoTable.finalY + 8,
-    head: [['Subject', 'Paper 1', 'Paper 2', 'Total', 'Grade', 'Comments']],
+    head: [['Subject', 'Final Mark', 'Grade', 'Comments']],
     body: subjects
       .filter(s => s.midterm?.total !== null || s.endTerm?.total !== null)
       .map(s => {
         const ca = s.midterm?.total ?? null;
         const written = s.endTerm?.total ?? null;
-        const total = ca !== null && written !== null
+        const finalMark = ca !== null && written !== null
           ? Math.round((Number(ca) + Number(written)) / 2)
           : ca ?? written;
         const comments = s.endTerm?.comments || s.midterm?.comments || '—';
-        return [s.name, fmt(ca), fmt(written), fmt(total), s.grade || '—', comments];
+        return [s.name, fmt(finalMark), s.grade || '—', comments];
       }),
     theme: 'grid',
     headStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold' },
     styles: { fontSize: 9, lineColor: [180, 180, 180], lineWidth: 0.3 },
     columnStyles: {
       1: { halign: 'center' },
-      2: { halign: 'center' },
-      3: { halign: 'center' },
-      4: { halign: 'center', fontStyle: 'bold' },
+      2: { halign: 'center', fontStyle: 'bold' },
     },
   });
 
