@@ -598,9 +598,9 @@ export default function StudentDashboardPage() {
       ) : reportNotFound || !reportCard ? (
         <div style={{ background: 'white', borderRadius: 12, padding: '50px', textAlign: 'center' }}>
           <FileText size={36} style={{ color: '#94a3b8', marginBottom: 12 }} />
-          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Not Yet Published</h3>
+          <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Report Card Unavailable</h3>
           <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-            Your {selectedReportTerm ? `${selectedReportTerm.name} ${selectedReportTerm.year}` : 'selected term'} report card is being processed. Please check back soon.
+            Your report card is currently unavailable. Please see the school administrator.
           </p>
         </div>
       ) : (
