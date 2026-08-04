@@ -178,7 +178,8 @@ async function generateAhjReportCard(reportData: ReportCardData) {
   const pageHeight = doc.internal.pageSize.getHeight();
 
   const studentName = `${student.firstName} ${student.surname}`;
-  const termLabel = `${term.name} ${term.year}`.trim();
+  // term.name already includes the year (e.g. "Term 2 2026") — don't append term.year too.
+  const termLabel = term.name.trim();
   // TODO: hardcoded per director's request until the real per-term date is ready.
   const nextTerm = '8 September 2026';
 
@@ -291,7 +292,8 @@ async function generateAhaAhsReportCard(reportData: ReportCardData) {
   const pageHeight = doc.internal.pageSize.getHeight();
 
   const studentName = `${student.firstName} ${student.surname}`;
-  const termLabel = `${term.name} ${term.year}`.trim();
+  // term.name already includes the year (e.g. "Term 2 2026") — don't append term.year too.
+  const termLabel = term.name.trim();
   // TODO: hardcoded per director's request until the real per-term date is ready.
   const nextTerm = '8 September 2026';
 
