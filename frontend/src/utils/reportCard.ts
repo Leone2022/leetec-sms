@@ -300,27 +300,29 @@ async function generateAhaAhsReportCard(reportData: ReportCardData) {
     : '—';
 
   const schoolName = SCHOOL_NAMES[student.campus] || 'ADVENT HOPE SCHOOLS';
+  const isCambridge = gradingCurriculum.toUpperCase().startsWith('CAMBRIDGE');
 
   // Watermark goes first so all content renders on top of it.
   await drawWatermark(doc, pageWidth, pageHeight);
 
-  // Load logos; log which were found. Every report — ZIMSEC or Cambridge,
-  // any campus — shows the Advent Hope crest and the Cambridge Assessment
-  // logo, same as the AHJ template. There's no separate AHA/AHS crest file,
-  // so this reuses the Advent Hope shield already used for AHJ.
-  const [ahaCrest, cambridgeLogo] = await Promise.all([
+  // Load logos; log which were found. Advent Hope crest is always shown on
+  // the left (no separate AHA/AHS crest file, so this reuses the shield
+  // used for AHJ). The right-hand curriculum logo depends on the student's
+  // actual curriculum: Cambridge Assessment for Cambridge IGCSE/A-Level,
+  // or the ZIMSEC logo for ZIMSEC O-Level/A-Level.
+  const [ahaCrest, curriculumLogo] = await Promise.all([
     loadLogo('ahj-crest.png'),
-    loadLogo('cambridge-assessment-logo.png'),
+    loadLogo(isCambridge ? 'cambridge-assessment-logo.png' : 'zimsec.png'),
   ]);
   console.log(
-    `[ReportCard] Advent Hope crest: ${ahaCrest ? 'found' : 'missing'} | Cambridge logo: ${cambridgeLogo ? 'found' : 'missing'}`,
+    `[ReportCard] Advent Hope crest: ${ahaCrest ? 'found' : 'missing'} | ${isCambridge ? 'Cambridge' : 'ZIMSEC'} logo: ${curriculumLogo ? 'found' : 'missing'}`,
   );
 
   // HEADER — two-column logos, centered title below
   const LOGO_Y = 8;
   const LOGO_H = 32;
   if (ahaCrest) drawLogoLeft(doc, ahaCrest, 14, LOGO_Y, 35, LOGO_H);
-  if (cambridgeLogo) drawLogoRight(doc, cambridgeLogo, pageWidth - 14, LOGO_Y, 30, LOGO_H);
+  if (curriculumLogo) drawLogoRight(doc, curriculumLogo, pageWidth - 14, LOGO_Y, 30, LOGO_H);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15);
