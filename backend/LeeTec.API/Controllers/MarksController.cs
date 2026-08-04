@@ -422,32 +422,22 @@ namespace LeeTec.API.Controllers
         [HttpGet("amendment-requests")]
         public async Task<IActionResult> GetAmendmentRequests([FromQuery] int schoolId = 1)
         {
+            // Group/label by Students.Form/Campus (the current, authoritative values),
+            // not TermRegistrations, which can go stale after a promotion — matching
+            // the lookup RequestAmendment/ApproveAmendment/RejectAmendment already use.
+            // Otherwise a request can be filed and resolved correctly under the hood
+            // while still displaying (and being un-approvable) under a stale form here.
             var requestedMarks = await _context.Marks
                 .Where(m => m.AmendmentRequested)
                 .Include(m => m.Subject)
+                .Include(m => m.Student)
+                .Where(m => m.Student != null && m.Student.SchoolId == schoolId)
                 .ToListAsync();
 
             if (requestedMarks.Count == 0) return Ok(new List<object>());
 
-            var termIds = requestedMarks.Select(m => m.TermId).Distinct().ToList();
-            var studentIds = requestedMarks.Select(m => m.StudentId).Distinct().ToList();
-
-            var registrations = await _context.TermRegistrations
-                .Where(tr => tr.SchoolId == schoolId && termIds.Contains(tr.TermId) && studentIds.Contains(tr.StudentId))
-                .ToListAsync();
-
-            var regLookup = registrations
-                .GroupBy(r => (r.StudentId, r.TermId))
-                .ToDictionary(g => g.Key, g => g.First());
-
             var grouped = requestedMarks
-                .Select(m => new
-                {
-                    Mark = m,
-                    Reg = regLookup.TryGetValue((m.StudentId, m.TermId), out var r) ? r : null,
-                })
-                .Where(x => x.Reg != null)
-                .GroupBy(x => new { x.Mark.SubjectId, SubjectName = x.Mark.Subject != null ? x.Mark.Subject.Name : "", x.Mark.TermId, Campus = x.Reg!.Campus, Form = x.Reg!.Form })
+                .GroupBy(m => new { m.SubjectId, SubjectName = m.Subject != null ? m.Subject.Name : "", m.TermId, Campus = m.Student!.Campus, Form = m.Student!.Form })
                 .Select(g => new
                 {
                     subjectId = g.Key.SubjectId,
@@ -455,11 +445,11 @@ namespace LeeTec.API.Controllers
                     termId = g.Key.TermId,
                     campus = g.Key.Campus,
                     form = g.Key.Form,
-                    reason = g.Select(x => x.Mark.AmendmentReason).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
-                    meetingDate = g.Select(x => x.Mark.MeetingDate).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
-                    minuteReference = g.Select(x => x.Mark.MinuteReference).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
-                    requestedBy = g.Select(x => x.Mark.AmendmentRequestedBy).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "—",
-                    requestedAt = g.Min(x => x.Mark.AmendmentRequestedAt),
+                    reason = g.Select(x => x.AmendmentReason).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
+                    meetingDate = g.Select(x => x.MeetingDate).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
+                    minuteReference = g.Select(x => x.MinuteReference).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "",
+                    requestedBy = g.Select(x => x.AmendmentRequestedBy).FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? "—",
+                    requestedAt = g.Min(x => x.AmendmentRequestedAt),
                 })
                 .OrderByDescending(g => g.requestedAt)
                 .ToList();
