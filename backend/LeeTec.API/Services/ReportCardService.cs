@@ -116,10 +116,16 @@ namespace LeeTec.API.Services
 
                 var noTerminalExam = NoTerminalExamSubjects.Contains(subject.Name);
 
+                // AHJ's Paper1/Paper2 fields are only ever populated by the admin-only
+                // paper-based entry screen (MarksEntryPage.tsx); the teacher portal's
+                // actual marks-entry flow (TeacherDashboardPage.tsx) always saves a
+                // single combined score to Score, for every campus including AHJ. If
+                // neither paper is set, fall back to Score so real submitted AHJ marks
+                // don't compute to 0/blank just because they weren't entered as papers.
                 decimal? midtermTotal = null;
                 if (midterm != null)
                 {
-                    midtermTotal = usesPapers
+                    midtermTotal = usesPapers && (midterm.Paper1Score.HasValue || midterm.Paper2Score.HasValue)
                         ? Math.Min((midterm.Paper1Score ?? 0) + (midterm.Paper2Score ?? 0), 50)
                         : midterm.Score;
                 }
@@ -127,7 +133,7 @@ namespace LeeTec.API.Services
                 decimal? endTermTotal = null;
                 if (!noTerminalExam && endTerm != null)
                 {
-                    endTermTotal = usesPapers
+                    endTermTotal = usesPapers && (endTerm.Paper1Score.HasValue || endTerm.Paper2Score.HasValue)
                         ? Math.Min((endTerm.Paper1Score ?? 0) + (endTerm.Paper2Score ?? 0), 50)
                         : endTerm.Score;
                 }
@@ -171,7 +177,13 @@ namespace LeeTec.API.Services
                     },
                     cm = cm.HasValue ? (int?)cm.Value : null,
                     grade = cm.HasValue ? GetGrade(cm.Value, gradingCurriculum) : "",
-                    band = usesPapers && cm.HasValue ? GetBand((int)cm.Value) : null,
+                    // GetBand's ranges are defined on the official 0-50 combined-mark scale,
+                    // but cm here is a 0-100 percentage (same basis GetGrade uses) — halve it
+                    // to convert onto that scale before banding, so e.g. a 90% (grade A*)
+                    // lands in "Outstanding" (41-50) rather than being read as 90 raw marks.
+                    band = usesPapers && cm.HasValue
+                        ? GetBand((int)Math.Round(cm.Value / 2m, MidpointRounding.AwayFromZero))
+                        : null,
                 };
             }).ToList();
 
