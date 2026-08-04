@@ -289,11 +289,18 @@ async function generateAhjReportCard(reportData: ReportCardData) {
   doc.save(`${fileName}.pdf`);
 }
 
-// ─── AHA / AHS report card — unchanged ──────────────────────────────────────
+// ─── AHA / AHS report card (ZIMSEC O-Level/A-Level, and Cambridge AHA/AHS) ──
+// Mirrors generateAhjReportCard's layout exactly: watermark, dual-logo header,
+// details grid, subject grid, grading-scale reference table, footer. No CM or
+// Band columns here — CM is just the midterm/end-of-term average already shown
+// in "Total" for non-paper-based subjects, and Band is Cambridge-Checkpoint-only.
 
-function generateAhaAhsReportCard(reportData: ReportCardData) {
+async function generateAhaAhsReportCard(reportData: ReportCardData) {
   const { student, term, subjects, attendance, gradingCurriculum } = reportData;
   const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
   const studentName = `${student.firstName} ${student.surname}`;
   const termLabel = `${term.name} ${term.year}`.trim();
   const nextTerm = term.nextTermStartDate
@@ -301,34 +308,65 @@ function generateAhaAhsReportCard(reportData: ReportCardData) {
     : '—';
 
   const schoolName = SCHOOL_NAMES[student.campus] || 'ADVENT HOPE SCHOOLS';
+  const isCambridge = gradingCurriculum.toUpperCase().startsWith('CAMBRIDGE');
 
-  // Navy banner
-  doc.setFillColor(26, 35, 126);
-  doc.rect(0, 0, 210, 32, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18); doc.setFont('helvetica', 'bold');
-  doc.text(schoolName, 14, 16);
-  doc.setFontSize(12); doc.setFont('helvetica', 'normal');
-  doc.text('STUDENT REPORT', 14, 25);
+  // Watermark goes first so all content renders on top of it.
+  await drawWatermark(doc, pageWidth, pageHeight);
 
-  doc.setTextColor(0); doc.setFont('helvetica', 'normal');
+  // Load logos; log which were found. AHA/AHS has no crest file yet — add
+  // aha-crest.png to src/assets/logos/ (see that folder's README) and it
+  // will start appearing automatically, same as the AHJ crest does.
+  const [ahaCrest, cambridgeLogo] = await Promise.all([
+    loadLogo('aha-crest.png'),
+    isCambridge ? loadLogo('cambridge-assessment-logo.png') : Promise.resolve(null),
+  ]);
+  console.log(
+    `[ReportCard] AHA/AHS crest: ${ahaCrest ? 'found' : 'missing'}${isCambridge ? ` | Cambridge logo: ${cambridgeLogo ? 'found' : 'missing'}` : ''}`,
+  );
 
-  // Student info block
+  // HEADER — two-column logos, centered title below
+  const LOGO_Y = 8;
+  const LOGO_H = 32;
+  if (ahaCrest) drawLogoLeft(doc, ahaCrest, 14, LOGO_Y, 35, LOGO_H);
+  if (cambridgeLogo) {
+    drawLogoRight(doc, cambridgeLogo, pageWidth - 14, LOGO_Y, 30, LOGO_H);
+  } else if (!isCambridge) {
+    // No ZIMSEC logo file exists — styled text at the same visual weight as
+    // the Cambridge Assessment logo it replaces.
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(...NAVY);
+    doc.text('ZIMSEC', pageWidth - 14, LOGO_Y + LOGO_H / 2 + 3, { align: 'right' });
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(...NAVY);
+  doc.text(schoolName, pageWidth / 2, 22, { align: 'center' });
+  doc.setFontSize(12);
+  doc.text("LEARNER'S REPORT", pageWidth / 2, 30, { align: 'center' });
+
+  doc.setTextColor(0);
+  doc.setFont('helvetica', 'normal');
+
+  // PART 4 — Student info grid
   autoTable(doc, {
-    startY: 40,
-    head: [['Learner Name', 'Stage / Form', 'Term', 'Attendance', 'Next Term Begins on']],
-    body: [[studentName, student.form || '—', termLabel || '—', attendance || '—', nextTerm]],
-    theme: 'plain',
-    headStyles: { fillColor: [26, 35, 126], textColor: 255, fontStyle: 'bold' },
-    styles: { fontSize: 9, cellPadding: 4 },
+    startY: 42,
+    body: [
+      ['Learner Name:', studentName],
+      ['Stage:', student.form || '—'],
+      ['Term:', termLabel || '—'],
+      ['Attendance:', attendance || '—'],
+      ['Next Term Begins on:', nextTerm],
+    ],
+    theme: 'grid',
+    styles: { fontSize: 10, cellPadding: 3, lineColor: [180, 180, 180], lineWidth: 0.3 },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 62, textColor: [60, 60, 60] } },
   });
 
-  // Subject Results — one combined table (Mid-term + End of Term)
-  doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-  doc.text('Subject Results', 14, (doc as any).lastAutoTable.finalY + 10);
-
+  // PART 5 — Subject grid
   autoTable(doc, {
-    startY: (doc as any).lastAutoTable.finalY + 14,
+    startY: (doc as any).lastAutoTable.finalY + 8,
     head: [['Subject', 'Paper 1', 'Paper 2', 'Total', 'Grade', 'Comments']],
     body: subjects
       .filter(s => s.midterm?.total !== null || s.endTerm?.total !== null)
@@ -341,35 +379,44 @@ function generateAhaAhsReportCard(reportData: ReportCardData) {
         const comments = s.endTerm?.comments || s.midterm?.comments || '—';
         return [s.name, fmt(ca), fmt(written), fmt(total), s.grade || '—', comments];
       }),
-    theme: 'striped',
-    headStyles: { fillColor: [26, 35, 126], textColor: 255 },
-    styles: { fontSize: 9 },
-    columnStyles: { 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } },
+    theme: 'grid',
+    headStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 9, lineColor: [180, 180, 180], lineWidth: 0.3 },
+    columnStyles: {
+      1: { halign: 'center' },
+      2: { halign: 'center' },
+      3: { halign: 'center' },
+      4: { halign: 'center', fontStyle: 'bold' },
+    },
   });
 
-  // Grading scale reference
+  // PART 6 — Grading scale reference table
   const reference = GRADE_REFERENCE_TABLES[gradingCurriculum];
   if (reference) {
-    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-    doc.text(`${gradingCurriculum} Grading Scale`, 14, (doc as any).lastAutoTable.finalY + 10);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...NAVY);
+    doc.text(`${gradingCurriculum.toUpperCase()} GRADING SCALE`, 14, (doc as any).lastAutoTable.finalY + 10);
+    doc.setTextColor(0);
 
-    const isWideReference = reference.headers.length > 2;
     autoTable(doc, {
       startY: (doc as any).lastAutoTable.finalY + 14,
       head: [reference.headers],
       body: reference.rows,
-      theme: 'plain',
-      headStyles: { fillColor: [26, 35, 126], textColor: 255, fontStyle: 'bold' },
-      styles: { fontSize: 9, cellPadding: 3 },
+      theme: 'grid',
+      headStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 3, lineColor: [180, 180, 180], lineWidth: 0.3 },
       columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' } },
-      margin: { left: 14, right: isWideReference ? 90 : 120 },
+      margin: { left: 14, right: 120 },
     });
   }
 
-  // Footer
+  // PART 7 — Footer
   const footY = (doc as any).lastAutoTable.finalY + 14;
-  doc.setFontSize(8); doc.setTextColor(150);
-  doc.text('This is a computer generated report', 105, footY, { align: 'center' });
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(120);
+  doc.text('This is a computer generated report', pageWidth / 2, footY, { align: 'center' });
 
   const fileName = `ReportCard_${student.studentNumber}_${termLabel}`.replace(/\s+/g, '_');
   doc.save(`${fileName}.pdf`);
@@ -382,5 +429,5 @@ export async function generateReportCard(reportData: ReportCardData) {
     await generateAhjReportCard(reportData);
     return;
   }
-  generateAhaAhsReportCard(reportData);
+  await generateAhaAhsReportCard(reportData);
 }
