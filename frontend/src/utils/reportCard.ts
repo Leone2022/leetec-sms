@@ -98,8 +98,8 @@ const fmt = (v: number | null | undefined) => (v === null || v === undefined ? '
 
 // ─── Image loading ──────────────────────────────────────────────────────────
 
-// Vite resolves these at build time — only PNGs present in the folder are included.
-const logoAssets = import.meta.glob('../assets/logos/*.png', {
+// Vite resolves these at build time — PNGs and JPEGs present in the folder are included.
+const logoAssets = import.meta.glob('../assets/logos/*.{png,jpg,jpeg}', {
   eager: true,
   query: '?url',
   import: 'default',
@@ -151,7 +151,7 @@ function drawLogoRight(doc: jsPDF, dataUrl: string, rightEdgeX: number, y: numbe
 }
 
 async function drawWatermark(doc: jsPDF, pageWidth: number, pageHeight: number) {
-  const watermark = await loadLogo('watermark.png');
+  const watermark = await loadLogo('adventlogo.jpeg');
   if (!watermark) return;
   try {
     const props = doc.getImageProperties(watermark);
@@ -179,16 +179,15 @@ async function generateAhjReportCard(reportData: ReportCardData) {
 
   const studentName = `${student.firstName} ${student.surname}`;
   const termLabel = `${term.name} ${term.year}`.trim();
-  const nextTerm = term.nextTermStartDate
-    ? new Date(term.nextTermStartDate).toLocaleDateString('en-GB')
-    : '—';
+  // TODO: hardcoded per director's request until the real per-term date is ready.
+  const nextTerm = '8 September 2026';
 
   // Watermark goes first so all content renders on top of it.
   await drawWatermark(doc, pageWidth, pageHeight);
 
   // Load logos; log which were found.
   const [ahjCrest, cambridgeLogo] = await Promise.all([
-    loadLogo('ahj-crest.png'),
+    loadLogo('adventlogo.jpeg'),
     loadLogo('cambridge-assessment-logo.png'),
   ]);
   console.log(
@@ -293,9 +292,8 @@ async function generateAhaAhsReportCard(reportData: ReportCardData) {
 
   const studentName = `${student.firstName} ${student.surname}`;
   const termLabel = `${term.name} ${term.year}`.trim();
-  const nextTerm = term.nextTermStartDate
-    ? new Date(term.nextTermStartDate).toLocaleDateString('en-GB')
-    : '—';
+  // TODO: hardcoded per director's request until the real per-term date is ready.
+  const nextTerm = '8 September 2026';
 
   const schoolName = SCHOOL_NAMES[student.campus] || 'ADVENT HOPE SCHOOLS';
   const isCambridge = gradingCurriculum.toUpperCase().startsWith('CAMBRIDGE');
@@ -304,12 +302,12 @@ async function generateAhaAhsReportCard(reportData: ReportCardData) {
   await drawWatermark(doc, pageWidth, pageHeight);
 
   // Load logos; log which were found. Advent Hope crest is always shown on
-  // the left (no separate AHA/AHS crest file, so this reuses the shield
-  // used for AHJ). The right-hand curriculum logo depends on the student's
-  // actual curriculum: Cambridge Assessment for Cambridge IGCSE/A-Level,
-  // or the ZIMSEC logo for ZIMSEC O-Level/A-Level.
+  // the left (no separate AHA/AHS crest file, so this reuses the same Advent
+  // Hope Group of Schools logo used for AHJ). The right-hand curriculum logo
+  // depends on the student's actual curriculum: Cambridge Assessment for
+  // Cambridge IGCSE/A-Level, or the ZIMSEC logo for ZIMSEC O-Level/A-Level.
   const [ahaCrest, curriculumLogo] = await Promise.all([
-    loadLogo('ahj-crest.png'),
+    loadLogo('adventlogo.jpeg'),
     loadLogo(isCambridge ? 'cambridge-assessment-logo.png' : 'zimsec.png'),
   ]);
   console.log(
