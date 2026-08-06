@@ -703,6 +703,7 @@ export default function FeeSetupPage() {
         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 42 } },
         margin: { left: 14, right: 112 }, tableWidth: 84,
       });
+      const studentDetailsBottom = (doc as any).lastAutoTable.finalY;
 
       autoTable(doc, {
         startY: 50,
@@ -710,7 +711,6 @@ export default function FeeSetupPage() {
         body: [
           ['Invoice No.', inv.invoiceNumber || '—'],
           ['Invoice Date', inv.issuedDate ? new Date(inv.issuedDate).toLocaleDateString('en-GB') : '—'],
-          ['Due Date', inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('en-GB') : '—'],
           ['Status', inv.status || '—'],
         ],
         theme: 'plain', styles: { fontSize: 10, cellPadding: 3 },
@@ -718,8 +718,12 @@ export default function FeeSetupPage() {
         columnStyles: { 0: { fontStyle: 'bold', cellWidth: 32 } },
         margin: { left: 112, right: 14 }, tableWidth: 84,
       });
+      const invoiceDetailsBottom = (doc as any).lastAutoTable.finalY;
 
-      const detailsBottom = (doc as any).lastAutoTable.finalY + 10;
+      // These two side-by-side tables no longer have the same row count (Due
+      // Date removed from Invoice Details only) — use whichever is taller so
+      // the fee table below doesn't start before the Student Details table ends.
+      const detailsBottom = Math.max(studentDetailsBottom, invoiceDetailsBottom) + 10;
 
       // Fee breakdown
       const itemRows = (inv.items || []).map((it: any) => [it.description || '—', `$${Number(it.amount).toFixed(2)}`]);
