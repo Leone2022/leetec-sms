@@ -639,9 +639,14 @@ export default function StudentDashboardPage() {
                   {reportCard.subjects.map((s, i) => {
                     const midtermScore = s.midterm?.total ?? null;
                     const endOfTermScore = s.endTerm?.total ?? null;
-                    const total = midtermScore !== null && endOfTermScore !== null
-                      ? Math.round((Number(midtermScore) + Number(endOfTermScore)) / 2)
-                      : midtermScore ?? endOfTermScore;
+                    // AHJ's Total must match the PDF's halved "Final Mark" (s.cm, already
+                    // converted server-side to the true 0-50 Cambridge Checkpoint scale)
+                    // rather than being recomputed here from the raw 0-100 paper scores.
+                    const total = reportCard.usesPapers
+                      ? s.cm ?? null
+                      : (midtermScore !== null && endOfTermScore !== null
+                        ? Math.round((Number(midtermScore) + Number(endOfTermScore)) / 2)
+                        : midtermScore ?? endOfTermScore);
                     const comments = s.endTerm?.comments || s.midterm?.comments || '—';
                     const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
                     return (

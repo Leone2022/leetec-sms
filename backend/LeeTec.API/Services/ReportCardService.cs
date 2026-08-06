@@ -164,6 +164,21 @@ namespace LeeTec.API.Services
                     cm = Math.Round(midtermTotal.Value, 0, MidpointRounding.AwayFromZero);
                 }
 
+                // Grade thresholds are percentage-based (0-100), and teachers already
+                // enter AHJ scores doubled from the true /50 mark (e.g. 76 for a true
+                // 38/50) specifically so it reads as a percentage — that doubled value
+                // IS the mathematically correct percentage, so Grade must be computed
+                // from the raw cm before any halving below.
+                var grade = cm.HasValue ? GetGrade(cm.Value, gradingCurriculum) : "";
+
+                // AHJ/Cambridge Checkpoint's real scale is 0-50; teachers enter doubled
+                // marks so Grade above works correctly. Final Mark and Band must show
+                // the true /50 value, so halve cm for display only, after Grade has
+                // already used the raw (doubled) value.
+                var displayCm = usesPapers && cm.HasValue
+                    ? Math.Round(cm.Value / 2m, MidpointRounding.AwayFromZero)
+                    : cm;
+
                 return new
                 {
                     subjectId = subject.Id,
@@ -183,14 +198,10 @@ namespace LeeTec.API.Services
                         total = endTermTotal,
                         comments = endTerm?.Comments ?? "",
                     },
-                    cm = cm.HasValue ? (int?)cm.Value : null,
-                    grade = cm.HasValue ? GetGrade(cm.Value, gradingCurriculum) : "",
-                    // GetBand's ranges are defined on the official 0-50 combined-mark scale,
-                    // but cm here is a 0-100 percentage (same basis GetGrade uses) — halve it
-                    // to convert onto that scale before banding, so e.g. a 90% (grade A*)
-                    // lands in "Outstanding" (41-50) rather than being read as 90 raw marks.
-                    band = usesPapers && cm.HasValue
-                        ? GetBand((int)Math.Round(cm.Value / 2m, MidpointRounding.AwayFromZero))
+                    cm = displayCm.HasValue ? (int?)displayCm.Value : null,
+                    grade = grade,
+                    band = usesPapers && displayCm.HasValue
+                        ? GetBand((int)displayCm.Value)
                         : null,
                 };
             }).ToList();
