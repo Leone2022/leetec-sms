@@ -383,7 +383,7 @@ export default function FeeSetupPage() {
         await feesAPI.chargeIndividual({
           studentId: pkgStudent.id,
           schoolId: 1,
-          description: item.feeCategory?.name || 'Fee',
+          description: item.feeCategoryName || 'Fee',
           amount: Number(item.amount),
           feeCategoryId: item.feeCategoryId,
         });
@@ -2098,7 +2098,7 @@ export default function FeeSetupPage() {
                     </div>
                     {(selectedPkg.items ?? []).map((item: any, idx: number) => (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 14px', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}>
-                        <span style={{ color: '#0f172a' }}>{item.feeCategory?.name || 'Fee'}</span>
+                        <span style={{ color: '#0f172a' }}>{item.feeCategoryName || 'Fee'}</span>
                         <span style={{ fontFamily: 'ui-monospace, monospace', color: '#0f172a', fontWeight: 600 }}>${Number(item.amount).toLocaleString()}</span>
                       </div>
                     ))}
