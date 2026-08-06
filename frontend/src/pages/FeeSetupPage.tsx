@@ -660,7 +660,13 @@ export default function FeeSetupPage() {
       const invs: any[] = res.data || [];
       if (invs.length === 0) { showMsg('No invoices found for this student', 'error'); return; }
       const inv = invs[0];
-      const invBank = getBankDetails(b.studentNumber);
+      const campus = (b.studentNumber || '').split('/')[0] || b.campus || '';
+      // AHA/AHS banking details differ by curriculum; AHJ's are unaffected.
+      const student = allStudents.find((s: any) => s.id === b.studentId);
+      const isZimsec = (student?.curriculum || '').toUpperCase().includes('ZIMSEC');
+      const invBank = campus !== 'AHJ' && !isZimsec
+        ? { name: 'Advent Hope', branch: 'Msasa', nostro: '413400523382400', zwl: '' }
+        : getBankDetails(b.studentNumber);
       const doc = new jsPDF();
 
       const [invoiceLogo, invoiceStamp] = await Promise.all([
@@ -688,7 +694,6 @@ export default function FeeSetupPage() {
       doc.setTextColor(0); doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
 
       // Student + Invoice details side by side
-      const campus = (b.studentNumber || '').split('/')[0] || b.campus || '—';
       autoTable(doc, {
         startY: 50,
         head: [['Student Details', '']],
@@ -696,7 +701,7 @@ export default function FeeSetupPage() {
           ['Student Name', b.studentName || '—'],
           ['Student Number', b.studentNumber || '—'],
           ['Form / Class', b.form || '—'],
-          ['Campus', campus],
+          ['Campus', campus || '—'],
         ],
         theme: 'plain', styles: { fontSize: 10, cellPadding: 3 },
         headStyles: { fillColor: [26, 35, 126], textColor: 255, fontStyle: 'bold' },
@@ -746,17 +751,45 @@ export default function FeeSetupPage() {
       });
 
       const footY = (doc as any).lastAutoTable.finalY + 10;
+
+      // AHJ keeps its existing combined-line format untouched; AHA/AHS get a
+      // curriculum-aware, one-field-per-line box (box height grows with the
+      // extra lines — everything below it is positioned off the actual
+      // bottom of this box, not a fixed offset, so nothing overlaps).
+      let bankHeaderLabel: string;
+      let bankLines: string[];
+      let bankBoxHeight: number;
+      if (campus === 'AHJ') {
+        bankHeaderLabel = 'Banking Details:';
+        bankLines = [
+          `Bank: ZB Bank  |  Branch: ${invBank.branch}  |  Name: ${invBank.name}`,
+          `NOSTRO: ${invBank.nostro}  |  ZWL: ${invBank.zwl}`,
+        ];
+        bankBoxHeight = 26;
+      } else {
+        bankHeaderLabel = 'BANKING DETAILS';
+        bankLines = [
+          'BANK: ZB',
+          `NAME: ${invBank.name.toUpperCase()}`,
+          `BRANCH: ${invBank.branch.toUpperCase()}`,
+          `NOSTRO: ${invBank.nostro}`,
+          ...(invBank.zwl ? [`ZWL: ${invBank.zwl}`] : []),
+        ];
+        bankBoxHeight = 12 + bankLines.length * 7;
+      }
+
       doc.setFillColor(248, 250, 252);
-      doc.rect(14, footY, 182, 26, 'F');
+      doc.rect(14, footY, 182, bankBoxHeight, 'F');
       doc.setFontSize(9); doc.setTextColor(71, 85, 105);
-      doc.text('Banking Details:', 18, footY + 7);
-      doc.text(`Bank: ZB Bank  |  Branch: ${invBank.branch}  |  Name: ${invBank.name}`, 18, footY + 14);
-      doc.text(`NOSTRO: ${invBank.nostro}  |  ZWL: ${invBank.zwl}`, 18, footY + 21);
+      doc.text(bankHeaderLabel, 18, footY + 7);
+      bankLines.forEach((line, i) => doc.text(line, 18, footY + 14 + i * 7));
+
+      const bankBoxBottom = footY + bankBoxHeight;
       doc.setFontSize(8); doc.setTextColor(150);
-      doc.text('Thank you for your continued support.  This is a computer generated invoice — LeeTec SMS', 105, footY + 34, { align: 'center' });
+      doc.text('Thank you for your continued support.  This is a computer generated invoice — LeeTec SMS', 105, bankBoxBottom + 8, { align: 'center' });
 
       // Official stamp, bottom-right, below the footer text.
-      if (invoiceStamp) drawInvoiceImageRight(doc, invoiceStamp, 196, footY + 40, 42, 42);
+      if (invoiceStamp) drawInvoiceImageRight(doc, invoiceStamp, 196, bankBoxBottom + 14, 42, 42);
 
       const termLabel = (inv.term?.name || activeTerm?.name || 'Invoice').replace(/\s+/g, '_');
       doc.save(`Invoice_${b.studentNumber || 'Student'}_${termLabel}.pdf`);
