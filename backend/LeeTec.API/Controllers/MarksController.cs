@@ -247,9 +247,13 @@ namespace LeeTec.API.Controllers
         [HttpPost("approve")]
         public async Task<IActionResult> ApproveMarks([FromBody] ApproveMarksDTO dto)
         {
-            var studentIds = await _context.TermRegistrations
-                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
-                .Select(tr => tr.StudentId)
+            // Match SubmitMarks's roster (active StudentSubjects joined to Students.Form/
+            // Campus), not TermRegistrations, which can go stale after a promotion.
+            var studentIds = await _context.StudentSubjects
+                .Where(ss => ss.SubjectId == dto.SubjectId && ss.TermId == dto.TermId && ss.IsActive)
+                .Join(_context.Students, ss => ss.StudentId, s => s.Id, (ss, s) => s)
+                .Where(s => s.Form == dto.Form && s.Campus == dto.Campus)
+                .Select(s => s.Id)
                 .ToListAsync();
 
             var marks = await _context.Marks
@@ -273,9 +277,13 @@ namespace LeeTec.API.Controllers
         [HttpPost("send-back")]
         public async Task<IActionResult> SendBackMarks([FromBody] SendBackMarksDTO dto)
         {
-            var studentIds = await _context.TermRegistrations
-                .Where(tr => tr.TermId == dto.TermId && tr.Campus == dto.Campus && tr.Form == dto.Form)
-                .Select(tr => tr.StudentId)
+            // Match SubmitMarks's roster (active StudentSubjects joined to Students.Form/
+            // Campus), not TermRegistrations, which can go stale after a promotion.
+            var studentIds = await _context.StudentSubjects
+                .Where(ss => ss.SubjectId == dto.SubjectId && ss.TermId == dto.TermId && ss.IsActive)
+                .Join(_context.Students, ss => ss.StudentId, s => s.Id, (ss, s) => s)
+                .Where(s => s.Form == dto.Form && s.Campus == dto.Campus)
+                .Select(s => s.Id)
                 .ToListAsync();
 
             var marks = await _context.Marks
@@ -307,25 +315,24 @@ namespace LeeTec.API.Controllers
 
             if (submittedMarks.Count == 0) return Ok(new List<object>());
 
-            var termIds = submittedMarks.Select(m => m.TermId).Distinct().ToList();
             var studentIds = submittedMarks.Select(m => m.StudentId).Distinct().ToList();
 
-            var registrations = await _context.TermRegistrations
-                .Where(tr => tr.SchoolId == schoolId && termIds.Contains(tr.TermId) && studentIds.Contains(tr.StudentId))
-                .ToListAsync();
-
-            var regLookup = registrations
-                .GroupBy(r => (r.StudentId, r.TermId))
-                .ToDictionary(g => g.Key, g => g.First());
+            // Group by Students.Form/Campus (the current, authoritative values), not
+            // TermRegistrations — which can go stale after a promotion and, since a
+            // missing registration row was previously required for a mark to appear
+            // here at all, could silently drop a submitted mark from the queue.
+            var studentLookup = await _context.Students
+                .Where(s => s.SchoolId == schoolId && studentIds.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id);
 
             var grouped = submittedMarks
                 .Select(m => new
                 {
                     Mark = m,
-                    Reg = regLookup.TryGetValue((m.StudentId, m.TermId), out var r) ? r : null,
+                    Student = studentLookup.TryGetValue(m.StudentId, out var s) ? s : null,
                 })
-                .Where(x => x.Reg != null)
-                .GroupBy(x => new { x.Mark.SubjectId, SubjectName = x.Mark.Subject != null ? x.Mark.Subject.Name : "", x.Mark.TermId, Campus = x.Reg!.Campus, Form = x.Reg!.Form })
+                .Where(x => x.Student != null)
+                .GroupBy(x => new { x.Mark.SubjectId, SubjectName = x.Mark.Subject != null ? x.Mark.Subject.Name : "", x.Mark.TermId, Campus = x.Student!.Campus, Form = x.Student!.Form })
                 .Select(g => new
                 {
                     subjectId = g.Key.SubjectId,
@@ -356,25 +363,24 @@ namespace LeeTec.API.Controllers
 
             if (approvedMarks.Count == 0) return Ok(new List<object>());
 
-            var termIds = approvedMarks.Select(m => m.TermId).Distinct().ToList();
             var studentIds = approvedMarks.Select(m => m.StudentId).Distinct().ToList();
 
-            var registrations = await _context.TermRegistrations
-                .Where(tr => tr.SchoolId == schoolId && termIds.Contains(tr.TermId) && studentIds.Contains(tr.StudentId))
-                .ToListAsync();
-
-            var regLookup = registrations
-                .GroupBy(r => (r.StudentId, r.TermId))
-                .ToDictionary(g => g.Key, g => g.First());
+            // Group by Students.Form/Campus (the current, authoritative values), not
+            // TermRegistrations — which can go stale after a promotion and, since a
+            // missing registration row was previously required for a mark to appear
+            // here at all, could silently drop an approved mark from the list.
+            var studentLookup = await _context.Students
+                .Where(s => s.SchoolId == schoolId && studentIds.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id);
 
             var grouped = approvedMarks
                 .Select(m => new
                 {
                     Mark = m,
-                    Reg = regLookup.TryGetValue((m.StudentId, m.TermId), out var r) ? r : null,
+                    Student = studentLookup.TryGetValue(m.StudentId, out var s) ? s : null,
                 })
-                .Where(x => x.Reg != null)
-                .GroupBy(x => new { x.Mark.SubjectId, SubjectName = x.Mark.Subject != null ? x.Mark.Subject.Name : "", x.Mark.TermId, Campus = x.Reg!.Campus, Form = x.Reg!.Form })
+                .Where(x => x.Student != null)
+                .GroupBy(x => new { x.Mark.SubjectId, SubjectName = x.Mark.Subject != null ? x.Mark.Subject.Name : "", x.Mark.TermId, Campus = x.Student!.Campus, Form = x.Student!.Form })
                 .Select(g => new
                 {
                     subjectId = g.Key.SubjectId,
