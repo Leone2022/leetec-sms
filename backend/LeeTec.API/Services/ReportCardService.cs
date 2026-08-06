@@ -84,10 +84,7 @@ namespace LeeTec.API.Services
             var term = await _context.Terms.FindAsync(termId);
             if (term == null) return null;
 
-            var registration = await _context.TermRegistrations
-                .FirstOrDefaultAsync(tr => tr.StudentId == studentId && tr.TermId == termId);
-
-            var campus = registration?.Campus ?? "";
+            var campus = student.Campus ?? "";
             var usesPapers = campus == "AHJ";
             var gradingCurriculum = campus == "AHJ" ? "Cambridge Checkpoint" : student.Curriculum;
 
