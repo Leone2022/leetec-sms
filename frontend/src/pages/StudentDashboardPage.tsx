@@ -653,7 +653,6 @@ export default function StudentDashboardPage() {
                       <tr key={s.subjectId} style={{ background: rowBg }}>
                         <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>
                           {s.name}
-                          {s.noTerminalExam && <span style={{ fontSize: 10, color: '#64748b', fontWeight: 400, marginLeft: 6 }}>(No Terminal Exam)</span>}
                         </td>
                         <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(midtermScore)}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{fmt(endOfTermScore)}</td>

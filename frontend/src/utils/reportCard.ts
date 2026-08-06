@@ -233,7 +233,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
     body: subjects.map(s => {
       const comments = (s.noTerminalExam ? s.midterm.comments : s.endTerm?.comments) || '—';
       const label = s.noTerminalExam
-        ? `${s.name} (No Terminal Examination)`
+        ? s.name
         : `${s.name} (Core Subject)`;
       return [
         label,
