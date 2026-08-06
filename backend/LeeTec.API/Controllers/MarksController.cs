@@ -597,15 +597,19 @@ namespace LeeTec.API.Controllers
         [HttpPost("publish-report-cards")]
         public async Task<IActionResult> PublishReportCards([FromBody] PublishReportCardsRequest request)
         {
+            // TermRegistrations here only proves the student was registered for this
+            // term/school; the actual Campus/Form match must use Students' current
+            // values, not the registration's, which can go stale after a promotion.
             var query = _context.TermRegistrations
-                .Where(tr => tr.TermId == request.TermId && tr.SchoolId == request.SchoolId);
+                .Where(tr => tr.TermId == request.TermId && tr.SchoolId == request.SchoolId)
+                .Join(_context.Students, tr => tr.StudentId, s => s.Id, (tr, s) => s);
 
             if (!string.IsNullOrEmpty(request.Campus) && request.Campus != "All")
-                query = query.Where(tr => tr.Campus == request.Campus);
+                query = query.Where(s => s.Campus == request.Campus);
             if (!string.IsNullOrEmpty(request.Form) && request.Form != "All")
-                query = query.Where(tr => tr.Form == request.Form);
+                query = query.Where(s => s.Form == request.Form);
 
-            var studentIds = await query.Select(tr => tr.StudentId).Distinct().ToListAsync();
+            var studentIds = await query.Select(s => s.Id).Distinct().ToListAsync();
 
             var existingRecords = await _context.ReportCardRecords
                 .Where(r => r.TermId == request.TermId && studentIds.Contains(r.StudentId))
