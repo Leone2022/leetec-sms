@@ -23,6 +23,12 @@ interface MarkRow {
   paper2Score: string;
   score: string;
   comments: string;
+  // True when this AHJ row has no real Paper1/Paper2 data and paper1Score was
+  // populated from Score purely for display (see loadEntrySheet). Lets
+  // handleSaveAll tell "still showing the fallback, untouched" apart from
+  // "admin genuinely typed a paper score", so an unedited save doesn't
+  // silently convert/cap a real combined Score into a paper-based mark.
+  paperFallback: boolean;
 }
 
 export default function MarksEntryPage() {
@@ -118,16 +124,25 @@ export default function MarksEntryPage() {
         assessmentType,
       });
       const data: any[] = res.data || [];
-      setRows(data.map(d => ({
-        markId: d.markId,
-        studentId: d.studentId,
-        studentName: d.studentName,
-        studentNumber: d.studentNumber,
-        paper1Score: d.paper1Score != null ? String(d.paper1Score) : '',
-        paper2Score: d.paper2Score != null ? String(d.paper2Score) : '',
-        score: d.score != null ? String(d.score) : '',
-        comments: d.comments ?? '',
-      })));
+      setRows(data.map(d => {
+        const hasPapers = d.paper1Score != null || d.paper2Score != null;
+        // AHJ marks are always saved as a single combined Score by the teacher
+        // portal (fc0c4dc) -- Paper1/Paper2 are only ever populated by this
+        // legacy admin screen. Without this fallback the boxes show blank for
+        // real marks whenever a teacher (not this page) entered the score.
+        const paperFallback = isPaperBased && !hasPapers && d.score != null;
+        return {
+          markId: d.markId,
+          studentId: d.studentId,
+          studentName: d.studentName,
+          studentNumber: d.studentNumber,
+          paper1Score: d.paper1Score != null ? String(d.paper1Score) : (paperFallback ? String(d.score) : ''),
+          paper2Score: d.paper2Score != null ? String(d.paper2Score) : '',
+          score: d.score != null ? String(d.score) : '',
+          comments: d.comments ?? '',
+          paperFallback,
+        };
+      }));
     } catch {
       showMsg('Failed to load entry sheet', 'error');
       setRows([]);
@@ -161,13 +176,22 @@ export default function MarksEntryPage() {
     if (!termId || !subjectId) return;
     setSaving(true);
     try {
-      const entries = rows.map(r => ({
-        studentId: r.studentId,
-        paper1Score: isPaperBased && r.paper1Score !== '' ? Number(r.paper1Score) : null,
-        paper2Score: isPaperBased && r.paper2Score !== '' ? Number(r.paper2Score) : null,
-        score: !isPaperBased && r.score !== '' ? Number(r.score) : null,
-        comments: r.comments || null,
-      }));
+      const entries = rows.map(r => {
+        // If the boxes still show exactly what the Score-fallback populated
+        // them with (the admin never actually typed a paper score), keep
+        // saving it as Score -- otherwise a plain unedited save would convert
+        // a real combined mark into a paper-based one and cap/corrupt it
+        // (ReportCardService.cs's paper-sum path is capped at 50 out of a
+        // 0-100 Score scale).
+        const stillFallback = r.paperFallback && r.paper1Score === r.score && r.paper2Score === '';
+        return {
+          studentId: r.studentId,
+          paper1Score: isPaperBased && !stillFallback && r.paper1Score !== '' ? Number(r.paper1Score) : null,
+          paper2Score: isPaperBased && !stillFallback && r.paper2Score !== '' ? Number(r.paper2Score) : null,
+          score: (!isPaperBased || stillFallback) && r.score !== '' ? Number(r.score) : null,
+          comments: r.comments || null,
+        };
+      });
 
       const res = await marksAPI.bulkSave({
         schoolId: 1,
