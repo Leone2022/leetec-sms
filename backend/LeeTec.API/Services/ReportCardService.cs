@@ -93,6 +93,14 @@ namespace LeeTec.API.Services
                 .OrderBy(t => t.StartDate)
                 .FirstOrDefaultAsync();
 
+            // A subject must still be an active StudentSubjects enrollment to appear on
+            // the report card — a dropped subject (IsActive=0) shouldn't show up just
+            // because a Mark row for it lingers (e.g. Approved before it was dropped).
+            var activeSubjectIds = (await _context.StudentSubjects
+                .Where(ss => ss.StudentId == studentId && ss.TermId == termId && ss.IsActive)
+                .Select(ss => ss.SubjectId)
+                .ToListAsync()).ToHashSet();
+
             // Only subjects with at least one mark recorded for this student/term —
             // group the student's marks by subject, then join to Subjects for names.
             var marks = await _context.Marks
@@ -101,7 +109,7 @@ namespace LeeTec.API.Services
                 .ToListAsync();
 
             var subjectGroups = marks
-                .Where(m => m.Subject != null)
+                .Where(m => m.Subject != null && activeSubjectIds.Contains(m.SubjectId))
                 .GroupBy(m => m.Subject!)
                 .OrderBy(g => g.Key.Name);
 
