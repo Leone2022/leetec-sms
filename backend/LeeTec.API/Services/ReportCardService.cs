@@ -130,20 +130,28 @@ namespace LeeTec.API.Services
                         : midterm.Score;
                 }
 
+                // No Terminal Examination subjects (Music, Robotics) used to skip this
+                // entirely and read only midtermTotal below, on the assumption their one
+                // real assessment is always entered as "Mid-term Test". In practice the
+                // teacher portal's unified entry UI lets either box be used for any
+                // subject, so a No-Terminal-Exam mark saved under "End of Term Exam"
+                // (as most are, per fc0c4dc) was silently dropped, leaving Final
+                // Mark/Band blank despite a real, even Approved, Score. Compute it here
+                // like any other subject instead.
                 decimal? endTermTotal = null;
-                if (!noTerminalExam && endTerm != null)
+                if (endTerm != null)
                 {
                     endTermTotal = usesPapers && (endTerm.Paper1Score.HasValue || endTerm.Paper2Score.HasValue)
                         ? Math.Min((endTerm.Paper1Score ?? 0) + (endTerm.Paper2Score ?? 0), 50)
                         : endTerm.Score;
                 }
 
+                // No Terminal Examination subjects have a single assessment point in
+                // principle, but since it can land in either box, resolve cm the same
+                // way as regular subjects: average if both are somehow filled, otherwise
+                // whichever one actually has a value.
                 decimal? cm = null;
-                if (noTerminalExam)
-                {
-                    cm = midtermTotal;
-                }
-                else if (midtermTotal.HasValue && endTermTotal.HasValue)
+                if (midtermTotal.HasValue && endTermTotal.HasValue)
                 {
                     cm = Math.Round((midtermTotal.Value + endTermTotal.Value) / 2, 0, MidpointRounding.AwayFromZero);
                 }
