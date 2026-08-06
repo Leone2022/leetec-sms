@@ -23,11 +23,11 @@ interface MarkRow {
   paper2Score: string;
   score: string;
   comments: string;
-  // True when this AHJ row has no real Paper1/Paper2 data and paper1Score was
-  // populated from Score purely for display (see loadEntrySheet). Lets
-  // handleSaveAll tell "still showing the fallback, untouched" apart from
-  // "admin genuinely typed a paper score", so an unedited save doesn't
-  // silently convert/cap a real combined Score into a paper-based mark.
+  // True when this AHJ row has no real Paper1/Paper2 data -- paper1Score was
+  // populated from Score purely for display (see loadEntrySheet), and stays
+  // the "really editing Score" box even if the admin corrects its value.
+  // Only saving something into Paper 2 too switches the row to a genuine
+  // dual-paper entry (see handleSaveAll).
   paperFallback: boolean;
 }
 
@@ -177,18 +177,22 @@ export default function MarksEntryPage() {
     setSaving(true);
     try {
       const entries = rows.map(r => {
-        // If the boxes still show exactly what the Score-fallback populated
-        // them with (the admin never actually typed a paper score), keep
-        // saving it as Score -- otherwise a plain unedited save would convert
-        // a real combined mark into a paper-based one and cap/corrupt it
-        // (ReportCardService.cs's paper-sum path is capped at 50 out of a
-        // 0-100 Score scale).
-        const stillFallback = r.paperFallback && r.paper1Score === r.score && r.paper2Score === '';
+        // A fallback row's Paper 1 box is really editing Score (0-100), not a
+        // genuine Paper 1 (0-50) -- true whether the admin leaves it as-is or
+        // corrects the value, as long as Paper 2 stays empty. Only save it as
+        // paper1Score/paper2Score if the admin explicitly fills Paper 2 too,
+        // deliberately opting into a real dual-paper entry. Otherwise a plain
+        // corrected save (e.g. fixing 60 -> 85) would get treated as a paper
+        // score and capped/corrupted by ReportCardService.cs's paper-sum path
+        // (capped at 50, out of a 0-100 Score scale).
+        const useScoreRepresentation = r.paperFallback && r.paper2Score === '';
         return {
           studentId: r.studentId,
-          paper1Score: isPaperBased && !stillFallback && r.paper1Score !== '' ? Number(r.paper1Score) : null,
-          paper2Score: isPaperBased && !stillFallback && r.paper2Score !== '' ? Number(r.paper2Score) : null,
-          score: (!isPaperBased || stillFallback) && r.score !== '' ? Number(r.score) : null,
+          paper1Score: isPaperBased && !useScoreRepresentation && r.paper1Score !== '' ? Number(r.paper1Score) : null,
+          paper2Score: isPaperBased && !useScoreRepresentation && r.paper2Score !== '' ? Number(r.paper2Score) : null,
+          score: !isPaperBased && r.score !== '' ? Number(r.score)
+            : useScoreRepresentation && r.paper1Score !== '' ? Number(r.paper1Score)
+            : null,
           comments: r.comments || null,
         };
       });
@@ -356,9 +360,11 @@ export default function MarksEntryPage() {
                       {isPaperBased ? (
                         <>
                           <td style={{ textAlign: 'center' }}>
-                            <input className="text-field" style={scoreInput} type="number" min={0} max={50}
+                            {/* A fallback row is really editing Score (0-100), not a genuine
+                                Paper 1 (0-50) -- cap at 50 only once it's a real paper entry. */}
+                            <input className="text-field" style={scoreInput} type="number" min={0} max={row.paperFallback ? 100 : 50}
                               value={row.paper1Score}
-                              onChange={e => updateRow(row.studentId, 'paper1Score', clamp(e.target.value, 50))} />
+                              onChange={e => updateRow(row.studentId, 'paper1Score', clamp(e.target.value, row.paperFallback ? 100 : 50))} />
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <input className="text-field" style={scoreInput} type="number" min={0} max={50}

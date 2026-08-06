@@ -151,13 +151,24 @@ namespace LeeTec.API.Controllers
                 .Where(m => m.TermId == dto.TermId && m.SubjectId == dto.SubjectId && m.AssessmentType == dto.AssessmentType && studentIds.Contains(m.StudentId))
                 .ToListAsync();
 
-            if (existingMarks.Any(m => LockedMarkStatuses.Contains(m.Status)))
-                return StatusCode(403, new { message = "These marks have been submitted and cannot be edited. Contact admin." });
-
+            // Skip individual locked marks instead of rejecting the whole batch --
+            // same pattern as the Combined branch above. Rejecting outright meant a
+            // single already-Approved student (e.g. one being corrected via the
+            // Score-fallback display, per a29ee77) blocked saving every OTHER
+            // student in the same subject/term/assessment with a 403. Approved marks
+            // still can't be edited directly here -- they need the amendment-request
+            // workflow to reopen them first -- but they no longer block their peers.
             int saved = 0;
+            int entriesLockedSkipped = 0;
             foreach (var entry in dto.Entries)
             {
                 var mark = existingMarks.FirstOrDefault(m => m.StudentId == entry.StudentId);
+                if (mark != null && LockedMarkStatuses.Contains(mark.Status))
+                {
+                    entriesLockedSkipped++;
+                    continue;
+                }
+
                 if (mark == null)
                 {
                     mark = new Mark
@@ -182,7 +193,10 @@ namespace LeeTec.API.Controllers
             }
 
             await _context.SaveChangesAsync();
-            return Ok(new { message = $"Marks saved for {saved} students", saved });
+            var entriesMessage = entriesLockedSkipped > 0
+                ? $"Marks saved for {saved} students (some entries were already submitted and were left unchanged)"
+                : $"Marks saved for {saved} students";
+            return Ok(new { message = entriesMessage, saved });
         }
 
         // SUBMIT MARKS FOR REVIEW — Draft marks for this subject/term/campus/form become Submitted
