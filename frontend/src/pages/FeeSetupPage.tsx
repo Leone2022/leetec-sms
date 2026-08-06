@@ -605,6 +605,54 @@ export default function FeeSetupPage() {
     finally { setPayLoading(false); }
   };
 
+  // ── Invoice logo / stamp images ──────────────────────────────────────────────
+  // Same technique as utils/reportCard.ts's loadLogo — Vite resolves these at
+  // build time from src/assets/logos/.
+  const invoiceImageAssets = import.meta.glob('../assets/logos/*.{png,jpg,jpeg}', {
+    eager: true,
+    query: '?url',
+    import: 'default',
+  }) as Record<string, string>;
+
+  async function loadInvoiceImage(filename: string): Promise<string | null> {
+    const entry = Object.entries(invoiceImageAssets).find(([path]) => path.endsWith(`/${filename}`));
+    if (!entry) {
+      console.warn(`[Invoice] Image not found (add to src/assets/logos/): ${filename}`);
+      return null;
+    }
+    try {
+      const res = await fetch(entry[1]);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('FileReader failed'));
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn(`[Invoice] Failed to load image "${filename}":`, e);
+      return null;
+    }
+  }
+
+  // Draws an image scaled to fit within maxW×maxH (mm), preserving aspect ratio.
+  function drawInvoiceImageLeft(doc: jsPDF, dataUrl: string, x: number, y: number, maxW: number, maxH: number) {
+    const props = doc.getImageProperties(dataUrl);
+    const ratio = Math.min(maxW / props.width, maxH / props.height);
+    doc.addImage(dataUrl, props.fileType, x, y, props.width * ratio, props.height * ratio);
+    return { w: props.width * ratio, h: props.height * ratio };
+  }
+
+  function drawInvoiceImageRight(doc: jsPDF, dataUrl: string, rightEdgeX: number, y: number, maxW: number, maxH: number) {
+    const props = doc.getImageProperties(dataUrl);
+    const ratio = Math.min(maxW / props.width, maxH / props.height);
+    const w = props.width * ratio;
+    const h = props.height * ratio;
+    doc.addImage(dataUrl, props.fileType, rightEdgeX - w, y, w, h);
+    return { w, h };
+  }
+
   // ── Download Invoice PDF ─────────────────────────────────────────────────────
   const handleDownloadInvoicePDF = async (b: any) => {
     try {
@@ -615,15 +663,25 @@ export default function FeeSetupPage() {
       const invBank = getBankDetails(b.studentNumber);
       const doc = new jsPDF();
 
+      const [invoiceLogo, invoiceStamp] = await Promise.all([
+        loadInvoiceImage('adventlogo.jpeg'),
+        loadInvoiceImage('stamp.jpeg'),
+      ]);
+
       // Navy banner
       doc.setFillColor(26, 35, 126);
       doc.rect(0, 0, 210, 42, 'F');
+
+      // Logo on the left of the banner; shift the text block right to make room.
+      const textX = invoiceLogo ? 44 : 14;
+      if (invoiceLogo) drawInvoiceImageLeft(doc, invoiceLogo, 14, 5, 26, 32);
+
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(20); doc.setFont('helvetica', 'bold');
-      doc.text('Advent Hope Academy', 14, 17);
+      doc.text('Advent Hope Academy', textX, 17);
       doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-      doc.text('64 Jason Moyo Ave, Harare  |  Tel: +263 773 102 003  |  adventhope01@gmail.com', 14, 26);
-      doc.text(`Bank: ZB Bank, ${invBank.branch}  |  NOSTRO: ${invBank.nostro}`, 14, 34);
+      doc.text('64 Jason Moyo Ave, Harare  |  Tel: +263 773 102 003  |  adventhope01@gmail.com', textX, 26);
+      doc.text(`Bank: ZB Bank, ${invBank.branch}  |  NOSTRO: ${invBank.nostro}`, textX, 34);
       doc.setFontSize(22); doc.setFont('helvetica', 'bold');
       doc.text('INVOICE', 196, 28, { align: 'right' });
 
@@ -692,6 +750,9 @@ export default function FeeSetupPage() {
       doc.text(`NOSTRO: ${invBank.nostro}  |  ZWL: ${invBank.zwl}`, 18, footY + 21);
       doc.setFontSize(8); doc.setTextColor(150);
       doc.text('Thank you for your continued support.  This is a computer generated invoice — LeeTec SMS', 105, footY + 34, { align: 'center' });
+
+      // Official stamp, bottom-right, below the footer text.
+      if (invoiceStamp) drawInvoiceImageRight(doc, invoiceStamp, 196, footY + 40, 42, 42);
 
       const termLabel = (inv.term?.name || activeTerm?.name || 'Invoice').replace(/\s+/g, '_');
       doc.save(`Invoice_${b.studentNumber || 'Student'}_${termLabel}.pdf`);
