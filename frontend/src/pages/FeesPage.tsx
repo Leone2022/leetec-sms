@@ -31,15 +31,29 @@ export default function FeesPage() {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [terms, setTerms] = useState<any[]>([]);
+  const [termId, setTermId] = useState<number | ''>('');
+
   const [paymentModal, setPaymentModal] = useState<{ open: boolean; invoice: any | null }>({ open: false, invoice: null });
   const [paymentForm, setPaymentForm] = useState(blankPayment(0));
   const [paying, setPaying] = useState(false);
 
-  useEffect(() => { loadInvoices(); }, []);
+  useEffect(() => {
+    feesAPI.getTerms(1).then((res) => {
+      const data: any[] = res.data || [];
+      setTerms(data);
+      const active = data.find((t) => t.isActive) ?? data[0];
+      if (active) setTermId(active.id);
+      else setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
 
-  const loadInvoices = async () => {
+  useEffect(() => { if (termId) loadInvoices(termId); }, [termId]);
+
+  const loadInvoices = async (selectedTermId: number) => {
+    setLoading(true);
     try {
-      const res = await feesAPI.getTermInvoices(1, 1);
+      const res = await feesAPI.getTermInvoices(1, selectedTermId);
       setInvoices(res.data.invoices || []);
       setSummary(res.data.summary || null);
     } catch (err) {
@@ -84,7 +98,7 @@ export default function FeesPage() {
       const ref = res.data?.receiptNumber ?? res.data?.reference ?? res.data?.id ?? '';
       showMessage(`Payment posted successfully${ref ? ` · Ref: ${ref}` : ''}`, 'success');
       closePaymentModal();
-      loadInvoices();
+      if (termId) loadInvoices(termId);
     } catch (err: any) {
       console.error('Payment error:', err.response);
       showMessage(err.response?.data?.message || 'Failed to post payment', 'error');
@@ -125,8 +139,10 @@ export default function FeesPage() {
   const fieldStyle = { paddingLeft: '14px', paddingRight: '14px' };
   const labelStyle: React.CSSProperties = { fontSize: '12px', fontWeight: '600', color: '#0f172a', display: 'block', marginBottom: '6px' };
 
+  const selectedTerm = terms.find((t) => t.id === termId);
+
   return (
-    <AdminLayout title="Fees & Billing" subtitle="Term 1 · 2026">
+    <AdminLayout title="Fees & Billing" subtitle={selectedTerm ? selectedTerm.name : 'Select a term'}>
       {message && (
         <div style={{
           position: 'fixed', top: 80, right: 20, padding: '14px 18px', borderRadius: '10px',
@@ -136,6 +152,21 @@ export default function FeesPage() {
           {message.text}
         </div>
       )}
+
+      <div style={{ marginBottom: 16, maxWidth: 260 }}>
+        <label style={labelStyle}>Term</label>
+        <select
+          className="text-field"
+          style={{ ...fieldStyle, width: '100%', appearance: 'auto', cursor: 'pointer' }}
+          value={termId}
+          onChange={(e) => setTermId(Number(e.target.value))}
+        >
+          {terms.length === 0 && <option value="">No terms found</option>}
+          {terms.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}{t.isActive ? ' (Active)' : ''}</option>
+          ))}
+        </select>
+      </div>
 
       {summary && (
         <section className="stat-grid" style={{ marginBottom: 16 }}>
