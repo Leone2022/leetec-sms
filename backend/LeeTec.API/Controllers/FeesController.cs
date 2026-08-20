@@ -564,11 +564,43 @@ namespace LeeTec.API.Controllers
         [HttpGet("invoices/school/{schoolId}/term/{termId}")]
         public async Task<IActionResult> GetTermInvoices(int schoolId, int termId)
         {
+            // Project to a flat shape instead of returning tracked Invoice entities
+            // with .Include(i => i.Term): EF's relationship fix-up populates the
+            // inverse Term.Invoices collection with every other invoice for this
+            // term (they're all tracked from this same query), and since every one
+            // of those invoices is itself serialized with its own Term.Invoices,
+            // the response balloons to O(n^2) nested objects — 378 invoices here
+            // produced a 272MB payload and a 13s+ timeout instead of a small,
+            // fast response. A projection also avoids the extra JOIN work/columns
+            // for Student/Term fields the invoice list doesn't use.
             var invoices = await _context.Invoices
                 .Where(i => i.SchoolId == schoolId && i.TermId == termId)
-                .Include(i => i.Student)
-                .Include(i => i.Term)
                 .OrderBy(i => i.Student.Surname)
+                .Select(i => new
+                {
+                    i.Id,
+                    i.SchoolId,
+                    i.StudentId,
+                    i.TermId,
+                    i.FeePackageId,
+                    i.InvoiceNumber,
+                    i.TotalAmount,
+                    i.AmountPaid,
+                    i.Balance,
+                    i.Status,
+                    i.IssuedDate,
+                    i.DueDate,
+                    i.CreatedAt,
+                    Student = new
+                    {
+                        i.Student.Id,
+                        i.Student.FirstName,
+                        i.Student.Surname,
+                        i.Student.StudentNumber,
+                        i.Student.Campus,
+                        i.Student.Form,
+                    },
+                })
                 .ToListAsync();
 
             var summary = new
