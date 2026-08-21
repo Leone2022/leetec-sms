@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { studentsAPI, feesAPI, versesAPI } from '../services/api';
-import { Users, DollarSign, FileText, TrendingUp, ArrowUpRight, Send } from 'lucide-react';
+import { Users, ArrowUpRight, Send } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import VerseCard, { type VerseData } from '../components/VerseCard';
 
@@ -49,9 +49,6 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalStudents: 0,
-    totalBilled: 0,
-    totalCollected: 0,
-    totalOutstanding: 0,
   });
   const [activeTerm, setActiveTerm] = useState<any>(null);
 
@@ -169,16 +166,12 @@ export default function DashboardPage() {
 
   const loadStats = async () => {
     try {
-      const [studentsRes, feesRes, termsRes] = await Promise.all([
+      const [studentsRes, termsRes] = await Promise.all([
         studentsAPI.getAll(1),
-        feesAPI.getTermInvoices(1, 1),
         feesAPI.getTerms(1),
       ]);
       setStats({
         totalStudents: studentsRes.data.length,
-        totalBilled: feesRes.data.summary?.totalBilled || 0,
-        totalCollected: feesRes.data.summary?.totalCollected || 0,
-        totalOutstanding: feesRes.data.summary?.totalOutstanding || 0,
       });
       const active = (termsRes.data as any[]).find((t) => t.isActive) ?? null;
       setActiveTerm(active);
@@ -198,30 +191,6 @@ export default function DashboardPage() {
       iconBg: '#eef2ff',
       iconColor: '#1a237e',
       path: '/students',
-    },
-    {
-      label: 'Total Billed',
-      value: `$${stats.totalBilled.toLocaleString()}`,
-      icon: FileText,
-      iconBg: '#eff6ff',
-      iconColor: '#1d4ed8',
-      path: '/fees',
-    },
-    {
-      label: 'Collected',
-      value: `$${stats.totalCollected.toLocaleString()}`,
-      icon: TrendingUp,
-      iconBg: '#f0fdf4',
-      iconColor: '#15803d',
-      path: '/fees',
-    },
-    {
-      label: 'Outstanding',
-      value: `$${stats.totalOutstanding.toLocaleString()}`,
-      icon: DollarSign,
-      iconBg: '#fef2f2',
-      iconColor: '#dc2626',
-      path: '/fees',
     },
   ];
 
