@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { feesAPI } from '../services/api';
-import { DollarSign, FileText, TrendingUp, Clock, Receipt, FileDown, FileSpreadsheet, X, CreditCard } from 'lucide-react';
+import { DollarSign, FileText, TrendingUp, Clock, Receipt, FileDown, FileSpreadsheet, X, CreditCard, GraduationCap } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { exportTableToExcel, exportTableToPdf, exportTableToWord } from '../utils/exportTable';
 
@@ -34,6 +34,8 @@ export default function FeesPage() {
   const [terms, setTerms] = useState<any[]>([]);
   const [termId, setTermId] = useState<number | ''>('');
 
+  const [bursaryTotal, setBursaryTotal] = useState(0);
+
   const [paymentModal, setPaymentModal] = useState<{ open: boolean; invoice: any | null }>({ open: false, invoice: null });
   const [paymentForm, setPaymentForm] = useState(blankPayment(0));
   const [paying, setPaying] = useState(false);
@@ -48,7 +50,11 @@ export default function FeesPage() {
     }).catch(() => setLoading(false));
   }, []);
 
-  useEffect(() => { if (termId) loadInvoices(termId); }, [termId]);
+  useEffect(() => {
+    if (!termId) return;
+    loadInvoices(termId);
+    loadBursaryTotal(termId);
+  }, [termId]);
 
   const loadInvoices = async (selectedTermId: number) => {
     setLoading(true);
@@ -60,6 +66,17 @@ export default function FeesPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBursaryTotal = async (selectedTermId: number) => {
+    try {
+      const res = await feesAPI.getBursariesByTerm(selectedTermId);
+      const bursaries: any[] = res.data || [];
+      setBursaryTotal(bursaries.reduce((sum, b) => sum + Number(b.amount ?? 0), 0));
+    } catch (err) {
+      console.error(err);
+      setBursaryTotal(0);
     }
   };
 
@@ -131,6 +148,7 @@ export default function FeesPage() {
     { label: 'Collected', value: `$${Number(summary.totalCollected).toLocaleString()}`, icon: TrendingUp, iconBg: '#f0fdf4', iconColor: '#15803d' },
     { label: 'Outstanding', value: `$${Number(summary.totalOutstanding).toLocaleString()}`, icon: DollarSign, iconBg: '#fef2f2', iconColor: '#dc2626' },
     { label: 'Unpaid Invoices', value: summary.unpaid ?? '0', icon: Clock, iconBg: '#fffbeb', iconColor: '#b45309' },
+    { label: 'Total Bursaries Awarded', value: `$${bursaryTotal.toLocaleString()}`, icon: GraduationCap, iconBg: '#f5f3ff', iconColor: '#7c3aed' },
   ] : [];
 
   const statusClass = (status: string) =>
