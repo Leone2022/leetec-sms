@@ -198,6 +198,44 @@ export default function FeesPage() {
         </section>
       )}
 
+      {summary && summary.totalInvoices > 0 && (() => {
+        const total = summary.totalInvoices;
+        const segments = [
+          { key: 'Paid', label: 'Paid', count: summary.fullyPaid ?? 0, color: '#0ca30c' },
+          { key: 'Partial', label: 'Partial', count: summary.partiallyPaid ?? 0, color: '#fab219' },
+          { key: 'Unpaid', label: 'Unpaid', count: summary.unpaid ?? 0, color: '#d03b3b' },
+        ].map((s) => ({ ...s, pct: total > 0 ? Math.round((s.count / total) * 1000) / 10 : 0 }));
+
+        return (
+          <section className="table-card" style={{ marginBottom: 16, padding: '16px 24px' }}>
+            <div style={{ marginBottom: 14 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Payment Status</h3>
+              <p style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>{total} invoice{total !== 1 ? 's' : ''} for {selectedTerm ? selectedTerm.name : 'this term'}</p>
+            </div>
+
+            <div style={{ display: 'flex', height: 26, borderRadius: 6, overflow: 'hidden', gap: 2, background: '#e1e0d9' }}>
+              {segments.filter((s) => s.count > 0).map((s) => (
+                <div
+                  key={s.key}
+                  title={`${s.label}: ${s.count} (${s.pct}%)`}
+                  style={{ flex: s.count, background: s.color, minWidth: 2 }}
+                />
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 24, marginTop: 12, flexWrap: 'wrap' }}>
+              {segments.map((s) => (
+                <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, flexShrink: 0 }} />
+                  <span style={{ color: '#0f172a', fontWeight: 600 }}>{s.label}</span>
+                  <span style={{ color: '#64748b' }}>{s.count} · {s.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
+
       <section className="table-card">
         <div className="table-head">
           <div>
