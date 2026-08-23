@@ -197,7 +197,7 @@ export default function DashboardPage() {
   const quickNav = [
     { label: 'Students', desc: 'Manage enrolment and profiles', path: '/students' },
     { label: 'Fees & Billing', desc: 'Track invoices and collections', path: '/fees' },
-    { label: 'Approvals', desc: 'Review pending requests', path: '/approvals' },
+    { label: 'Approvals', desc: 'Review pending requests', path: '/portal-accounts' },
   ];
 
   return (
