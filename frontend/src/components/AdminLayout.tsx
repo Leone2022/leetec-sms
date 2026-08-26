@@ -80,7 +80,7 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
 
   useEffect(() => {
     adminAPI.getSubjectChangeRequests()
-      .then((res) => setPendingSubjectRequests((res.data || []).length))
+      .then((res) => setPendingSubjectRequests((res.data || []).filter((r: any) => r.status === 'Pending').length))
       .catch(() => {});
   }, [location.pathname]);
 
