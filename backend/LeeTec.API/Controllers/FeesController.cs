@@ -339,12 +339,18 @@ namespace LeeTec.API.Controllers
         // =====================
 
         [HttpGet("student-balances/{termId}")]
-        public async Task<IActionResult> GetStudentBalances(int termId, int schoolId = 1)
+        public async Task<IActionResult> GetStudentBalances(int termId, int schoolId = 1, [FromQuery] bool includeInactive = false)
         {
             var registrations = await _context.TermRegistrations
                 .Where(r => r.TermId == termId && r.SchoolId == schoolId)
                 .Include(r => r.Student)
                 .ToListAsync();
+
+            // A withdrawn/deactivated student's old balance shouldn't inflate what
+            // the school currently expects to collect — exclude them by default,
+            // while still letting a caller ask for everyone (e.g. an audit view).
+            if (!includeInactive)
+                registrations = registrations.Where(r => r.Student == null || r.Student.Status == "Active").ToList();
 
             var invoiceLookup = await _context.Invoices
                 .Where(i => i.SchoolId == schoolId && i.TermId == termId)
@@ -562,7 +568,7 @@ namespace LeeTec.API.Controllers
         }
 
         [HttpGet("invoices/school/{schoolId}/term/{termId}")]
-        public async Task<IActionResult> GetTermInvoices(int schoolId, int termId)
+        public async Task<IActionResult> GetTermInvoices(int schoolId, int termId, [FromQuery] bool includeInactive = false)
         {
             // Project to a flat shape instead of returning tracked Invoice entities
             // with .Include(i => i.Term): EF's relationship fix-up populates the
@@ -573,8 +579,12 @@ namespace LeeTec.API.Controllers
             // produced a 272MB payload and a 13s+ timeout instead of a small,
             // fast response. A projection also avoids the extra JOIN work/columns
             // for Student/Term fields the invoice list doesn't use.
-            var invoices = await _context.Invoices
-                .Where(i => i.SchoolId == schoolId && i.TermId == termId)
+            var invoicesQuery = _context.Invoices
+                .Where(i => i.SchoolId == schoolId && i.TermId == termId);
+            if (!includeInactive)
+                invoicesQuery = invoicesQuery.Where(i => i.Student.Status == "Active");
+
+            var invoices = await invoicesQuery
                 .OrderBy(i => i.Student.Surname)
                 .Select(i => new
                 {
