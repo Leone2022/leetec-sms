@@ -95,6 +95,15 @@ const AHJ_PERFORMANCE_BANDS: [string, string][] = [
   ['41–50', 'Outstanding'],
 ];
 
+// "Next Term Begins on" comes from the start date of the next term set up in Terms & Periods
+// (sent by the API as e.g. "2027-01-12T00:00:00"). Until that term exists: "To be advised".
+export function formatNextTermDate(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');
+  if (!m) return 'To be advised';
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${Number(m[3])} ${months[Number(m[2]) - 1]} ${m[1]}`;
+}
+
 const fmt = (v: number | null | undefined) => (v === null || v === undefined ? '—' : String(v));
 
 // ─── Image loading ──────────────────────────────────────────────────────────
@@ -181,8 +190,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
   const studentName = `${student.firstName} ${student.surname}`;
   // term.name already includes the year (e.g. "Term 2 2026") — don't append term.year too.
   const termLabel = term.name.trim();
-  // TODO: hardcoded per director's request until the real per-term date is ready.
-  const nextTerm = '8 September 2026';
+  const nextTerm = formatNextTermDate(term.nextTermStartDate);
 
   // Watermark goes first so all content renders on top of it.
   await drawWatermark(doc, pageWidth, pageHeight);
@@ -296,8 +304,7 @@ async function generateAhaAhsReportCard(reportData: ReportCardData) {
   const studentName = `${student.firstName} ${student.surname}`;
   // term.name already includes the year (e.g. "Term 2 2026") — don't append term.year too.
   const termLabel = term.name.trim();
-  // TODO: hardcoded per director's request until the real per-term date is ready.
-  const nextTerm = '8 September 2026';
+  const nextTerm = formatNextTermDate(term.nextTermStartDate);
 
   const schoolName = SCHOOL_NAMES[student.campus] || 'ADVENT HOPE SCHOOLS';
   const isCambridge = gradingCurriculum.toUpperCase().startsWith('CAMBRIDGE');
