@@ -9,8 +9,9 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  // Calls that pass their own token (teacher portal) keep it; only fill in the admin token.
   const token = localStorage.getItem('leetec_token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token && !config.headers.Authorization) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
@@ -149,6 +150,16 @@ export const termRegistrationsAPI = {
     api.put(`/termregistrations/${id}/payment-status?status=${status}`),
   remove: (id: number) =>
     api.delete(`/termregistrations/${id}`),
+};
+
+export const classRegisterAPI = {
+  classes: (termId: number, schoolId = 1) => api.get(`/class-register/classes?termId=${termId}&schoolId=${schoolId}`),
+  get: (termId: number, campus: string, form: string, schoolId = 1) =>
+    api.get(`/class-register?${new URLSearchParams({ termId: String(termId), campus, form, schoolId: String(schoolId) })}`),
+  // Teacher portal: its own token, kept under a different localStorage key.
+  forTeacher: (termId: number, campus: string, form: string, token: string) =>
+    api.get(`/class-register/teacher?${new URLSearchParams({ termId: String(termId), campus, form })}`,
+      { headers: { Authorization: `Bearer ${token}` } }),
 };
 
 export const subjectsAPI = {
