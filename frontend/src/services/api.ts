@@ -93,6 +93,8 @@ export const feesAPI = {
   sendSingleInvoiceEmail: (data: any) => api.post('/fees/invoices/send-single-email', data),
   getTermInvoices: (schoolId: number, termId: number) =>
     api.get(`/fees/invoices/school/${schoolId}/term/${termId}`),
+  getStatusBreakdown: (termId: number, schoolId = 1) =>
+    api.get(`/fees/status-breakdown/${termId}?schoolId=${schoolId}`),
   getStudentInvoices: (studentId: number) =>
     api.get(`/fees/invoices/student/${studentId}`),
   postPayment: (data: any) => api.post('/fees/payments', data),
