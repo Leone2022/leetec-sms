@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
 using LeeTec.API.Models;
 using LeeTec.API.DTOs;
+using LeeTec.API.Services;
 
 namespace LeeTec.API.Controllers
 {
@@ -11,10 +13,12 @@ namespace LeeTec.API.Controllers
     public class TermRegistrationsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly ISubjectRolloverService _subjectRollover;
 
-        public TermRegistrationsController(AppDbContext context)
+        public TermRegistrationsController(AppDbContext context, ISubjectRolloverService subjectRollover)
         {
             _context = context;
+            _subjectRollover = subjectRollover;
         }
 
         // TERM DASHBOARD — all registrations for a term
@@ -269,6 +273,26 @@ namespace LeeTec.API.Controllers
                 message = $"{promoted} students promoted",
                 promoted
             });
+        }
+
+        // COPY SUBJECTS from the previous term into this term (dry run unless DryRun=false).
+        // The school is taken from the target term, never from the request body. Admin JWTs
+        // here carry no role/school/permission claims yet, so this requires a valid admin
+        // login; switch to RequirePermission("Terms & Periods") once that system lands.
+        [Authorize]
+        [HttpPost("copy-subjects")]
+        public async Task<IActionResult> CopySubjects([FromBody] CopySubjectsDTO dto)
+        {
+            var termSchoolId = await _context.Terms
+                .Where(t => t.Id == dto.TargetTermId)
+                .Select(t => (int?)t.SchoolId)
+                .FirstOrDefaultAsync();
+            if (termSchoolId == null)
+                return NotFound(new { message = "Target term not found." });
+
+            var result = await _subjectRollover.CopyFromPreviousTermAsync(
+                dto.TargetTermId, termSchoolId.Value, dto.SourceTermId, dto.DryRun, dto.ExpectedInserts);
+            return result.Ok ? Ok(result) : BadRequest(result);
         }
 
         // UPDATE payment status

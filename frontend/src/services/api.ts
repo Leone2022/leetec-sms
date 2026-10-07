@@ -143,6 +143,8 @@ export const termRegistrationsAPI = {
     api.post('/termregistrations/promote-single', data),
   promoteBulk: (data: any) =>
     api.post('/termregistrations/promote-bulk', data),
+  copySubjects: (data: { targetTermId: number; sourceTermId?: number; dryRun: boolean; expectedInserts?: number }) =>
+    api.post('/termregistrations/copy-subjects', data),
   updatePaymentStatus: (id: number, status: string) =>
     api.put(`/termregistrations/${id}/payment-status?status=${status}`),
   remove: (id: number) =>

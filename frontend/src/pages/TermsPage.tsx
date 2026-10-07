@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { feesAPI, termRegistrationsAPI } from '../services/api';
-import { Calendar, Plus, X, Zap, AlertTriangle, Users, Trash2, TrendingUp, Search, FileDown, FileSpreadsheet, FileText } from 'lucide-react';
+import { Calendar, Plus, X, Zap, AlertTriangle, Users, Trash2, TrendingUp, Search, FileDown, FileSpreadsheet, FileText, BookCopy } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { exportTableToPdf, exportTableToExcel, exportTableToWord } from '../utils/exportTable';
 
@@ -42,6 +42,12 @@ export default function TermsPage() {
   const [isPromoteOpen, setIsPromoteOpen] = useState(false);
   const [promoteTargetId, setPromoteTargetId] = useState<number | ''>('');
   const [isPromoting, setIsPromoting] = useState(false);
+
+  // ── Copy subjects modal ────────────────────────────────────────────────────
+  const [isCopyOpen, setIsCopyOpen] = useState(false);
+  const [copyPreview, setCopyPreview] = useState<any>(null);
+  const [copyLoading, setCopyLoading] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
 
   useEffect(() => { loadTerms(); }, []);
 
@@ -217,6 +223,38 @@ export default function TermsPage() {
       showMessage(err.response?.data?.message || 'Failed to promote students', 'error');
     } finally {
       setIsPromoting(false);
+    }
+  };
+
+  // ── Copy subjects ──────────────────────────────────────────────────────────
+  const openCopySubjects = async () => {
+    if (!selectedTermId) return;
+    setIsCopyOpen(true);
+    setCopyPreview(null);
+    setCopyLoading(true);
+    try {
+      const res = await termRegistrationsAPI.copySubjects({ targetTermId: selectedTermId, dryRun: true });
+      setCopyPreview(res.data);
+    } catch (err: any) {
+      setCopyPreview(err.response?.data || { ok: false, message: 'Failed to load preview' });
+    } finally {
+      setCopyLoading(false);
+    }
+  };
+
+  const handleCopySubjects = async () => {
+    if (!selectedTermId || !copyPreview?.ok || !copyPreview.toInsert) return;
+    setIsCopying(true);
+    try {
+      const res = await termRegistrationsAPI.copySubjects({
+        targetTermId: selectedTermId, dryRun: false, expectedInserts: copyPreview.toInsert,
+      });
+      showMessage(res.data.message, 'success');
+      setIsCopyOpen(false);
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to copy subjects', 'error');
+    } finally {
+      setIsCopying(false);
     }
   };
 
@@ -418,6 +456,9 @@ export default function TermsPage() {
                   Promote All Paid ({stats.fullyPaid})
                 </button>
               )}
+              <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={openCopySubjects}>
+                <BookCopy size={13} /> Copy Subjects from Previous Term
+              </button>
               <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={openRegisterModal}>
                 <Users size={13} /> Register Students
               </button>
@@ -941,6 +982,79 @@ export default function TermsPage() {
                   {isPromoting ? 'Promoting...' : `Promote ${stats?.fullyPaid} Student${stats?.fullyPaid !== 1 ? 's' : ''}`}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Copy Subjects Modal ── */}
+      {isCopyOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}
+          onClick={() => !isCopying && setIsCopyOpen(false)}>
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', width: '100%', maxWidth: '680px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+            onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Copy Subjects from Previous Term</h2>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '4px 0 0' }}>
+                  {copyPreview?.sourceTermName ? `${copyPreview.sourceTermName} → ` : ''}{selectedTerm?.name} · preview only until you confirm
+                </p>
+              </div>
+              <button onClick={() => setIsCopyOpen(false)} disabled={isCopying} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: '20px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {copyLoading ? (
+                <p style={{ fontSize: 13, color: '#475569', margin: 0 }}>Calculating preview...</p>
+              ) : !copyPreview?.ok ? (
+                <p style={{ fontSize: 13, color: '#dc2626', margin: 0 }}>{copyPreview?.message}</p>
+              ) : (
+                <>
+                  <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 14px', fontSize: 12, color: '#1e3a8a' }}>
+                    <strong>{copyPreview.toInsert}</strong> subject rows will be copied. {copyPreview.skippedExisting} already exist and will be left alone
+                    {copyPreview.skippedCampusOrCurriculum > 0 && <>; {copyPreview.skippedCampusOrCurriculum} skipped because the student changed campus or curriculum</>}
+                    {copyPreview.skippedInactiveSubject > 0 && <>; {copyPreview.skippedInactiveSubject} skipped because the subject has been deactivated</>}.
+                    {' '}No invoices, registrations or marks are changed.
+                  </div>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table">
+                      <thead><tr><th>Campus</th><th>Class</th><th>Students</th><th>To copy</th><th>Already there</th><th>Skipped</th></tr></thead>
+                      <tbody>
+                        {copyPreview.perClass.map((r: any) => (
+                          <tr key={`${r.campus}|${r.form}`}>
+                            <td>{r.campus}</td><td>{r.form}</td><td>{r.students}</td><td>{r.toInsert}</td><td>{r.skippedExisting}</td>
+                            <td>{r.skippedCampusOrCurriculum + r.skippedInactiveSubject}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {copyPreview.needsManualSubjects.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 6px', color: '#92400e' }}>
+                        {copyPreview.needsManualSubjects.length} student(s) need subjects added by hand
+                      </p>
+                      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#475569' }}>
+                        {copyPreview.needsManualSubjects.map((s: any) => (
+                          <li key={s.studentId}>{s.name} ({s.studentNumber}) · {s.campus} {s.form} · {s.reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div style={{ padding: '14px 24px', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0' }}>
+              <button className="btn btn-secondary" onClick={() => setIsCopyOpen(false)} disabled={isCopying}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleCopySubjects}
+                disabled={isCopying || copyLoading || !copyPreview?.ok || !copyPreview?.toInsert}
+                style={{ opacity: isCopying || !copyPreview?.toInsert ? 0.6 : 1 }}
+              >
+                {isCopying ? 'Copying...' : `Copy ${copyPreview?.toInsert ?? 0} Rows`}
+              </button>
             </div>
           </div>
         </div>
