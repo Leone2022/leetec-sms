@@ -86,6 +86,8 @@ namespace LeeTec.API.Services
 
             var campus = student.Campus ?? "";
             var usesPapers = campus == "AHJ";
+            // Term 3 2026 onward: Final Mark is the end-of-term mark only; mid-term is ignored.
+            var finalMarkOnly = MarkPolicy.IsFinalMarkOnly(term);
             var gradingCurriculum = campus == "AHJ" ? "Cambridge Checkpoint" : student.Curriculum;
 
             var nextTerm = await _context.Terms
@@ -110,13 +112,14 @@ namespace LeeTec.API.Services
 
             var subjectGroups = marks
                 .Where(m => m.Subject != null && activeSubjectIds.Contains(m.SubjectId))
+                .Where(m => !finalMarkOnly || m.AssessmentType == MarkPolicy.EndOfTerm)
                 .GroupBy(m => m.Subject!)
                 .OrderBy(g => g.Key.Name);
 
             var subjectResults = subjectGroups.Select(g =>
             {
                 var subject = g.Key;
-                var midterm = g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test");
+                var midterm = finalMarkOnly ? null : g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test");
                 var endTerm = g.FirstOrDefault(m => m.AssessmentType == "End of Term Exam");
 
                 var noTerminalExam = NoTerminalExamSubjects.Contains(subject.Name);
@@ -196,7 +199,7 @@ namespace LeeTec.API.Services
                         total = midtermTotal,
                         comments = midterm?.Comments ?? "",
                     },
-                    endTerm = noTerminalExam ? null : (object?)new
+                    endTerm = noTerminalExam && !finalMarkOnly ? null : (object?)new
                     {
                         paper1 = endTerm?.Paper1Score,
                         paper2 = endTerm?.Paper2Score,
@@ -230,6 +233,7 @@ namespace LeeTec.API.Services
                 },
                 usesPapers,
                 gradingCurriculum,
+                finalMarkOnly,
                 subjects = subjectResults,
                 attendance = (string?)null,
             };

@@ -117,6 +117,11 @@ namespace LeeTec.API.Controllers
             // Combined midterm + end-of-term entries (unified marks entry table)
             if (dto.Marks != null && dto.Marks.Count > 0)
             {
+                // Term 3 2026 onward has no mid-term: never create, clear or overwrite a
+                // mid-term row, only the final (end-of-term) mark.
+                var combinedTerm = await _context.Terms.FindAsync(dto.TermId);
+                var finalMarkOnly = combinedTerm != null && MarkPolicy.IsFinalMarkOnly(combinedTerm);
+
                 var combinedStudentIds = dto.Marks.Select(m => m.StudentId).ToList();
                 var combinedExisting = await _context.Marks
                     .Where(m => m.TermId == dto.TermId && m.SubjectId == dto.SubjectId
@@ -133,7 +138,7 @@ namespace LeeTec.API.Controllers
                 int lockedSkipped = 0;
                 foreach (var entry in dto.Marks)
                 {
-                    if (!UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "Mid-term Test", entry.MidtermScore, entry.Comments)) lockedSkipped++;
+                    if (!finalMarkOnly && !UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "Mid-term Test", entry.MidtermScore, entry.Comments)) lockedSkipped++;
                     if (!UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "End of Term Exam", entry.EndOfTermScore, entry.Comments)) lockedSkipped++;
                     combinedSaved++;
                 }
@@ -143,6 +148,13 @@ namespace LeeTec.API.Controllers
                     ? $"Marks saved for {combinedSaved} students (some entries were already submitted and were left unchanged)"
                     : $"Marks saved for {combinedSaved} students";
                 return Ok(new { message, saved = combinedSaved });
+            }
+
+            if (dto.AssessmentType == MarkPolicy.MidTerm)
+            {
+                var entriesTerm = await _context.Terms.FindAsync(dto.TermId);
+                if (entriesTerm != null && MarkPolicy.IsFinalMarkOnly(entriesTerm))
+                    return BadRequest(new { message = "This term records the final mark only; there is no mid-term test." });
             }
 
             var studentIds = dto.Entries.Select(e => e.StudentId).ToList();
@@ -220,7 +232,12 @@ namespace LeeTec.API.Controllers
                 .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId && studentIds.Contains(m.StudentId))
                 .ToListAsync();
 
+            // Term 3 2026 onward only the final (end-of-term) mark counts.
+            var submitTerm = await _context.Terms.FindAsync(dto.TermId);
+            var finalMarkOnly = submitTerm != null && MarkPolicy.IsFinalMarkOnly(submitTerm);
+
             var studentsWithMarks = allMarksForSubject
+                .Where(m => !finalMarkOnly || m.AssessmentType == MarkPolicy.EndOfTerm)
                 .Where(m => m.Score != null || m.Paper1Score != null || m.Paper2Score != null)
                 .Select(m => m.StudentId)
                 .ToHashSet();

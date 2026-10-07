@@ -71,6 +71,7 @@ export interface ReportCardData {
   };
   usesPapers: boolean;
   gradingCurriculum: CurriculumType;
+  finalMarkOnly?: boolean;
   subjects: ReportCardSubjectResult[];
   attendance: string | null;
 }
@@ -231,7 +232,8 @@ async function generateAhjReportCard(reportData: ReportCardData) {
     startY: (doc as any).lastAutoTable.finalY + 8,
     head: [['Subject', 'Final Mark', 'Band', 'Comments']],
     body: subjects.map(s => {
-      const comments = (s.noTerminalExam ? s.midterm.comments : s.endTerm?.comments) || '—';
+      // From Term 3 2026 (finalMarkOnly) every subject's mark and comment are on endTerm.
+      const comments = (s.noTerminalExam ? s.midterm.comments || s.endTerm?.comments : s.endTerm?.comments) || '—';
       const label = s.noTerminalExam
         ? s.name
         : `${s.name} (Core Subject)`;

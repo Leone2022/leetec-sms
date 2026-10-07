@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import VerseCard, { type VerseData } from '../components/VerseCard';
 import { calculateGrade } from '../utils/reportCard';
+import { isFinalMarkOnlyTerm } from '../utils/markPolicy';
 
 interface MarkRow {
   studentId: number;
@@ -118,6 +119,7 @@ export default function TeacherDashboardPage() {
       return;
     }
     let cancelled = false;
+    const finalOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === termId));
     (async () => {
       setStatsLoading(true);
       let totalStudents = 0;
@@ -146,8 +148,8 @@ export default function TeacherDashboardPage() {
             const endD = endByStudent.get(d.studentId);
             const midStatus = d.status || 'Draft';
             const endStatus = endD?.status || 'Draft';
-            const status = statusRank[midStatus] >= statusRank[endStatus] ? midStatus : endStatus;
-            const sendBackComment = d.sendBackComment || endD?.sendBackComment || null;
+            const status = finalOnly ? endStatus : statusRank[midStatus] >= statusRank[endStatus] ? midStatus : endStatus;
+            const sendBackComment = (finalOnly ? endD?.sendBackComment : d.sendBackComment || endD?.sendBackComment) || null;
             return { status, sendBackComment };
           });
 
@@ -184,7 +186,7 @@ export default function TeacherDashboardPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [assignments, termId, teacherInfo?.id]);
+  }, [assignments, termId, terms, teacherInfo?.id]);
 
   useEffect(() => {
     announcementsAPI.getAll(1).then((res) => setAnnouncements(res.data || [])).catch(() => {});
@@ -274,7 +276,7 @@ export default function TeacherDashboardPage() {
     if (!selectedAssignment || !termId) { setRows([]); return; }
     loadEntrySheet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAssignment, termId]);
+  }, [selectedAssignment, termId, terms]);
 
   const loadEntrySheet = async () => {
     if (!selectedAssignment || !termId || !teacherInfo?.id) return;
@@ -302,11 +304,27 @@ export default function TeacherDashboardPage() {
       const endData: any[] = endRes.data || [];
       const endByStudent = new Map(endData.map(d => [d.studentId, d]));
       const statusRank: Record<string, number> = { Draft: 0, Submitted: 1, Approved: 2 };
+      const finalOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === termId));
       setRows(midData.map(d => {
         const endD = endByStudent.get(d.studentId);
         const midStatus = d.status || 'Draft';
         const endStatus = endD?.status || 'Draft';
-        const status = statusRank[midStatus] >= statusRank[endStatus] ? midStatus : endStatus;
+        const status = finalOnly ? endStatus : statusRank[midStatus] >= statusRank[endStatus] ? midStatus : endStatus;
+        if (finalOnly) {
+          return {
+            studentId: d.studentId,
+            studentName: d.studentName,
+            studentNumber: d.studentNumber,
+            curriculum: d.curriculum || endD?.curriculum || '',
+            midtermScore: '',
+            endOfTermScore: endD?.score != null ? String(endD.score) : '',
+            comments: endD?.comments || '',
+            status,
+            sendBackComment: endD?.sendBackComment || null,
+            amendmentRequested: Boolean(endD?.amendmentRequested),
+            amendmentRequestedAt: endD?.amendmentRequestedAt || null,
+          };
+        }
         return {
           studentId: d.studentId,
           studentName: d.studentName,
@@ -342,7 +360,10 @@ export default function TeacherDashboardPage() {
     return value;
   };
 
+  const finalMarkOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === termId));
+
   const total = (row: MarkRow) => {
+    if (finalMarkOnly) return row.endOfTermScore;
     if (row.midtermScore === '' && row.endOfTermScore === '') return '';
     if (row.midtermScore !== '' && row.endOfTermScore !== '') {
       return String((Number(row.midtermScore) + Number(row.endOfTermScore)) / 2);
@@ -361,7 +382,7 @@ export default function TeacherDashboardPage() {
     try {
       const marks = rows.map(r => ({
         studentId: r.studentId,
-        midtermScore: r.midtermScore !== '' ? Number(r.midtermScore) : null,
+        midtermScore: !finalMarkOnly && r.midtermScore !== '' ? Number(r.midtermScore) : null,
         endOfTermScore: r.endOfTermScore !== '' ? Number(r.endOfTermScore) : null,
         comments: r.comments || null,
       }));
@@ -388,7 +409,7 @@ export default function TeacherDashboardPage() {
   const handleSubmitForReview = async () => {
     if (!termId || !selectedAssignment || !teacherInfo?.id) return;
 
-    const missing = rows.filter(r => r.midtermScore === '' && r.endOfTermScore === '');
+    const missing = rows.filter(r => finalMarkOnly ? r.endOfTermScore === '' : r.midtermScore === '' && r.endOfTermScore === '');
     if (missing.length > 0) {
       showMsg(`Cannot submit — the following students have no marks entered: ${missing.map(r => r.studentName).join(', ')}`, 'error');
       return;
@@ -688,9 +709,15 @@ export default function TeacherDashboardPage() {
                 <tr>
                   <th>Student Name</th>
                   <th>Student No.</th>
-                  <th style={{ textAlign: 'center' }}>Midterm (%)</th>
-                  <th style={{ textAlign: 'center' }}>End of Term (%)</th>
-                  <th style={{ textAlign: 'center' }}>Total</th>
+                  {finalMarkOnly ? (
+                    <th style={{ textAlign: 'center' }}>Final Mark (%)</th>
+                  ) : (
+                    <>
+                      <th style={{ textAlign: 'center' }}>Midterm (%)</th>
+                      <th style={{ textAlign: 'center' }}>End of Term (%)</th>
+                      <th style={{ textAlign: 'center' }}>Total</th>
+                    </>
+                  )}
                   <th style={{ textAlign: 'center' }}>Grade</th>
                   <th>Comments</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
@@ -705,17 +732,19 @@ export default function TeacherDashboardPage() {
                     <tr key={row.studentId}>
                       <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{row.studentName}</td>
                       <td style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>{row.studentNumber}</td>
-                      <td style={{ textAlign: 'center' }}>
-                        <input className="text-field" style={scoreInput} type="number" min={0} max={100}
-                          value={row.midtermScore} disabled={locked}
-                          onChange={e => updateRow(row.studentId, 'midtermScore', clamp(e.target.value, 100))} />
-                      </td>
+                      {!finalMarkOnly && (
+                        <td style={{ textAlign: 'center' }}>
+                          <input className="text-field" style={scoreInput} type="number" min={0} max={100}
+                            value={row.midtermScore} disabled={locked}
+                            onChange={e => updateRow(row.studentId, 'midtermScore', clamp(e.target.value, 100))} />
+                        </td>
+                      )}
                       <td style={{ textAlign: 'center' }}>
                         <input className="text-field" style={scoreInput} type="number" min={0} max={100}
                           value={row.endOfTermScore} disabled={locked}
                           onChange={e => updateRow(row.studentId, 'endOfTermScore', clamp(e.target.value, 100))} />
                       </td>
-                      <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{total(row)}</td>
+                      {!finalMarkOnly && <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{total(row)}</td>}
                       <td style={{ textAlign: 'center' }}>
                         {grade(row) && (
                           <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
