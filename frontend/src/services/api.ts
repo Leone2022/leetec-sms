@@ -153,6 +153,15 @@ export const termRegistrationsAPI = {
     api.delete(`/termregistrations/${id}`),
 };
 
+export interface PromotionDecision { studentId: number; fromCampus: string; fromForm: string; optionKey: string }
+
+export const rolloverAPI = {
+  promotionPreview: (schoolId = 1) => api.get(`/rollover/promotion-preview?schoolId=${schoolId}`),
+  promote: (data: { schoolId: number; numberYear: number; expectedCount: number; acknowledgeIncompleteTerm: boolean; decisions: PromotionDecision[] }) =>
+    api.post('/rollover/promote', data, { timeout: 60000 }),
+  termStatus: (termId: number) => api.get(`/rollover/term-status/${termId}`),
+};
+
 export const subjectsAPI = {
   getAll: (schoolId: number, campus?: string, curriculumType?: string) => {
     const params = new URLSearchParams();

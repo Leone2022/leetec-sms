@@ -34,7 +34,7 @@ const defaultCurriculum = (campus: string) =>
   campus === 'AHJ' ? 'Cambridge' : (CURRICULUM_OPTIONS[campus]?.[0] ?? 'Cambridge');
 
 const FORM_OPTIONS: Record<string, string[]> = {
-  AHJ: ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'],
+  AHJ: ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'],
   AHS: ['Lower 6', 'Upper 6'],
   AHA: ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'],
 };
@@ -1761,7 +1761,7 @@ export default function StudentsPage() {
       {isEditModalOpen && selectedStudent && (() => {
         const originalCampus = (selectedStudent.studentNumber ?? '').split('/')[0];
         const formOptions = editForm.campus === 'AHJ'
-          ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6']
+          ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7']
           : editForm.campus === 'AHS' ? ['Lower 6', 'Upper 6']
           : ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
         const curriculumOptions = editForm.campus === 'AHJ' ? ['Cambridge']
@@ -1769,7 +1769,7 @@ export default function StudentsPage() {
           : ['ZIMSEC O-Level', 'Cambridge IGCSE'];
         const handleEditCampusChange = (newCampus: string) => {
           const newFormOptions = newCampus === 'AHJ'
-            ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6']
+            ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7']
             : newCampus === 'AHS' ? ['Lower 6', 'Upper 6']
             : ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
           const newCurriculumOptions = newCampus === 'AHJ' ? ['Cambridge']
