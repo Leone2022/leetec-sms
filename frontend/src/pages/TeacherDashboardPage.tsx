@@ -11,6 +11,7 @@ import {
 import VerseCard, { type VerseData } from '../components/VerseCard';
 import { calculateGrade } from '../utils/reportCard';
 import { isFinalMarkOnlyTerm } from '../utils/markPolicy';
+import TeacherClassRegisterModal from '../components/TeacherClassRegisterModal';
 
 interface MarkRow {
   studentId: number;
@@ -63,6 +64,7 @@ export default function TeacherDashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [registerFor, setRegisterFor] = useState<{ campus: string; form: string } | null>(null);
 
   // Marks entry state
   const [terms, setTerms] = useState<any[]>([]);
@@ -836,13 +838,24 @@ export default function TeacherDashboardPage() {
                         {stat ? cardBadge.label : '—'}
                       </span>
                     </div>
-                    <button
-                      onClick={() => { setSelectedAssignment(a); setRows([]); }}
-                      className="btn btn-primary"
-                      style={{ fontSize: 12, width: '100%', justifyContent: 'center' }}
-                    >
-                      <ClipboardList size={13} /> Enter Marks
-                    </button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        onClick={() => { setSelectedAssignment(a); setRows([]); }}
+                        className="btn btn-primary"
+                        style={{ fontSize: 12, flex: 1, justifyContent: 'center', whiteSpace: 'nowrap' }}
+                      >
+                        <ClipboardList size={13} /> Enter Marks
+                      </button>
+                      <button
+                        onClick={() => termId && setRegisterFor({ campus: a.campus, form: a.form })}
+                        className="btn btn-secondary"
+                        disabled={!termId}
+                        title="Class list, guardian contacts and a printable attendance sheet"
+                        style={{ fontSize: 12, justifyContent: 'center' }}
+                      >
+                        <Users size={13} /> Register
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1213,6 +1226,9 @@ export default function TeacherDashboardPage() {
         <div style={{ flex: 1, overflow: 'auto' }}>
           {view === 'dashboard' && DashboardView}
           {view === 'classes' && ClassesView}
+          {registerFor && termId && (
+            <TeacherClassRegisterModal termId={termId as number} campus={registerFor.campus} form={registerFor.form} onClose={() => setRegisterFor(null)} />
+          )}
           {view === 'notifications' && NotificationsView}
           {view === 'homework' && HomeworkView}
           {view === 'profile' && ProfileView}
