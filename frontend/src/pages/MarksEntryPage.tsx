@@ -3,6 +3,7 @@ import { marksAPI, subjectsAPI, feesAPI, termRegistrationsAPI, reportsAPI } from
 import { ClipboardList, Save, FileDown } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { generateReportCard } from '../utils/reportCard';
+import { isFinalMarkOnlyTerm } from '../utils/markPolicy';
 
 const CAMPUSES = ['AHJ', 'AHA', 'AHS'];
 
@@ -218,6 +219,13 @@ export default function MarksEntryPage() {
   const fld: React.CSSProperties = { width: '100%', boxSizing: 'border-box' };
   const scoreInput: React.CSSProperties = { width: 70, textAlign: 'center', padding: '0 6px', color: '#0f172a' };
 
+  // Term 3 2026 onward has no mid-term test: only the final (end-of-term) mark is entered.
+  const finalMarkOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === termId));
+  const assessmentTypes = finalMarkOnly ? ['End of Term Exam'] : ASSESSMENT_TYPES;
+  useEffect(() => {
+    if (finalMarkOnly && assessmentType !== 'End of Term Exam') setAssessmentType('End of Term Exam');
+  }, [finalMarkOnly, assessmentType]);
+
   const canShowTable = termId && campus && form && subjectId && assessmentType;
 
   return (
@@ -274,14 +282,14 @@ export default function MarksEntryPage() {
             <div>
               <label style={lbl}>Assessment Type</label>
               <div style={{ display: 'flex', gap: 6 }}>
-                {ASSESSMENT_TYPES.map(a => (
+                {assessmentTypes.map(a => (
                   <button key={a} type="button" onClick={() => setAssessmentType(a)}
                     style={{
                       flex: 1, padding: '8px 6px', borderRadius: '8px', fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none',
                       background: assessmentType === a ? '#1a237e' : '#f1f5f9',
                       color: assessmentType === a ? 'white' : '#475569',
                     }}>
-                    {a}
+                    {finalMarkOnly ? 'Final Mark' : a}
                   </button>
                 ))}
               </div>

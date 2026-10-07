@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI, marksAPI } from '../services/api';
 import { generateReportCard, calculateGrade } from '../utils/reportCard';
+import { isFinalMarkOnlyTerm } from '../utils/markPolicy';
 import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } from '../utils/credentials';
 import AdminLayout from '../components/AdminLayout';
 import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
@@ -183,8 +184,21 @@ export default function BulkReportsPage() {
       const midData: any[] = midRes.data || [];
       const endData: any[] = endRes.data || [];
       const endByStudent = new Map(endData.map((d: any) => [d.studentId, d]));
+      const finalOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === g.termId));
       setViewMarksRows(midData.map((d: any) => {
         const endD = endByStudent.get(d.studentId);
+        if (finalOnly) {
+          const total = endD?.score != null ? Number(endD.score) : null;
+          const curriculum = d.curriculum || endD?.curriculum || '';
+          return {
+            studentId: d.studentId,
+            studentName: d.studentName,
+            studentNumber: d.studentNumber,
+            paper1: null, paper2: total, total,
+            grade: total != null ? calculateGrade(total, curriculum) : '',
+            comments: endD?.comments || '',
+          };
+        }
         const paper1 = d.score;
         const paper2 = endD?.score;
         const total = paper1 != null && paper2 != null
@@ -751,7 +765,9 @@ export default function BulkReportsPage() {
       )}
 
       {/* View Marks modal */}
-      {viewingGroup && (
+      {viewingGroup && (() => {
+        const viewFinalOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === viewingGroup.termId));
+        return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}
           onClick={() => setViewingGroup(null)}>
           <div style={{ background: 'white', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', width: '100%', maxWidth: 760, maxHeight: '85vh', overflow: 'auto' }}
@@ -774,9 +790,15 @@ export default function BulkReportsPage() {
                       <tr>
                         <th>Student Name</th>
                         <th>Student No.</th>
-                        <th style={{ textAlign: 'center' }}>Paper 1</th>
-                        <th style={{ textAlign: 'center' }}>Paper 2</th>
-                        <th style={{ textAlign: 'center' }}>Total</th>
+                        {viewFinalOnly ? (
+                          <th style={{ textAlign: 'center' }}>Final Mark</th>
+                        ) : (
+                          <>
+                            <th style={{ textAlign: 'center' }}>Paper 1</th>
+                            <th style={{ textAlign: 'center' }}>Paper 2</th>
+                            <th style={{ textAlign: 'center' }}>Total</th>
+                          </>
+                        )}
                         <th style={{ textAlign: 'center' }}>Grade</th>
                         <th>Comments</th>
                       </tr>
@@ -786,8 +808,8 @@ export default function BulkReportsPage() {
                         <tr key={r.studentId}>
                           <td style={{ fontWeight: 600, color: '#0f172a', fontSize: 13 }}>{r.studentName}</td>
                           <td style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>{r.studentNumber}</td>
-                          <td style={{ textAlign: 'center' }}>{r.paper1 ?? '—'}</td>
-                          <td style={{ textAlign: 'center' }}>{r.paper2 ?? '—'}</td>
+                          {!viewFinalOnly && <td style={{ textAlign: 'center' }}>{r.paper1 ?? '—'}</td>}
+                          {!viewFinalOnly && <td style={{ textAlign: 'center' }}>{r.paper2 ?? '—'}</td>}
                           <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{r.total ?? '—'}</td>
                           <td style={{ textAlign: 'center' }}>
                             {r.grade && (
@@ -816,7 +838,8 @@ export default function BulkReportsPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Request Amendment modal */}
       {amendmentGroup && (

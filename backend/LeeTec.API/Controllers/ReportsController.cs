@@ -214,9 +214,11 @@ namespace LeeTec.API.Controllers
                 .Where(m => m.StudentId == studentId && m.TermId == termId)
                 .ToListAsync();
 
+            var finalMarkOnly = MarkPolicy.IsFinalMarkOnly(term);
+
             var subjectResults = subjects.Select(subject =>
             {
-                var midterm = marks.FirstOrDefault(m => m.SubjectId == subject.Id && m.AssessmentType == "Mid-term Test");
+                var midterm = finalMarkOnly ? null : marks.FirstOrDefault(m => m.SubjectId == subject.Id && m.AssessmentType == "Mid-term Test");
                 var endTerm = marks.FirstOrDefault(m => m.SubjectId == subject.Id && m.AssessmentType == "End of Term Exam");
 
                 decimal? midtermTotal = null;
@@ -226,11 +228,15 @@ namespace LeeTec.API.Controllers
                 var noTerminalExam = ReportCardService.NoTerminalExamSubjects.Contains(subject.Name);
 
                 decimal? endTermTotal = null;
-                if (!noTerminalExam && endTerm != null)
+                if ((!noTerminalExam || finalMarkOnly) && endTerm != null)
                     endTermTotal = Math.Min((endTerm.Paper1Score ?? 0) + (endTerm.Paper2Score ?? 0), 50);
 
                 int? cm = null;
-                if (noTerminalExam)
+                if (finalMarkOnly)
+                {
+                    if (endTermTotal.HasValue) cm = (int)Math.Round(endTermTotal.Value, MidpointRounding.AwayFromZero);
+                }
+                else if (noTerminalExam)
                 {
                     if (midtermTotal.HasValue) cm = (int)Math.Round(midtermTotal.Value, MidpointRounding.AwayFromZero);
                 }
@@ -258,7 +264,7 @@ namespace LeeTec.API.Controllers
                         paper2 = midterm?.Paper2Score,
                         total = midtermTotal,
                     },
-                    endTerm = noTerminalExam ? null : (object?)new
+                    endTerm = noTerminalExam && !finalMarkOnly ? null : (object?)new
                     {
                         paper1 = endTerm?.Paper1Score,
                         paper2 = endTerm?.Paper2Score,
@@ -286,6 +292,7 @@ namespace LeeTec.API.Controllers
                     year = term.Year,
                     nextTermStartDate = nextTerm?.StartDate,
                 },
+                finalMarkOnly,
                 subjects = subjectResults,
                 attendance = (string?)null,
             });
