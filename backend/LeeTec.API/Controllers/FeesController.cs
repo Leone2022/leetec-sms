@@ -627,6 +627,72 @@ namespace LeeTec.API.Controllers
             return Ok(new { summary, invoices });
         }
 
+        // FEES BY STUDENT STATUS — the term's invoices split into New and Continuing
+        // (current, Active) students and those who have since left (Transferred, Graduated,
+        // Withdrawn, Inactive). New + Continuing equals the Fees & Billing page totals,
+        // which count Active students only; the other rows show money billed to, collected
+        // from, or still owed by students who are no longer at the school.
+        [HttpGet("status-breakdown/{termId}")]
+        public async Task<IActionResult> GetStatusBreakdown(int termId, [FromQuery] int schoolId = 1)
+        {
+            var term = await _context.Terms.FirstOrDefaultAsync(t => t.Id == termId && t.SchoolId == schoolId);
+            if (term == null) return NotFound(new { message = "Term not found" });
+
+            var rows = await _context.Invoices
+                .Where(i => i.SchoolId == schoolId && i.TermId == termId)
+                .Select(i => new
+                {
+                    i.TotalAmount,
+                    i.AmountPaid,
+                    i.Balance,
+                    i.Student.Status,
+                    i.Student.DateOfEntry,
+                    i.Student.StudentNumber,
+                })
+                .ToListAsync();
+
+            string Group(string? status, string? dateOfEntry, string? studentNumber)
+            {
+                var normalized = StudentLifecycle.Normalize(status) ?? StudentLifecycle.Inactive;
+                if (normalized != StudentLifecycle.Active) return normalized;
+                var intake = StudentLifecycle.ParseYear(dateOfEntry) ?? StudentLifecycle.ParseYear(studentNumber);
+                return intake.HasValue && intake.Value >= term.Year ? "New" : "Continuing";
+            }
+
+            var order = new[] { "New", "Continuing", StudentLifecycle.Transferred, StudentLifecycle.Graduated, StudentLifecycle.Withdrawn, StudentLifecycle.Inactive };
+            var groups = rows
+                .GroupBy(r => Group(r.Status, r.DateOfEntry, r.StudentNumber))
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var breakdown = order.Select(key =>
+            {
+                groups.TryGetValue(key, out var list);
+                list ??= new();
+                return new
+                {
+                    Group = key,
+                    IsCurrent = key == "New" || key == "Continuing",
+                    Students = list.Count,
+                    Billed = list.Sum(r => r.TotalAmount),
+                    Collected = list.Sum(r => r.AmountPaid),
+                    Outstanding = list.Sum(r => r.Balance),
+                };
+            }).ToList();
+
+            var current = breakdown.Where(b => b.IsCurrent).ToList();
+            var left = breakdown.Where(b => !b.IsCurrent).ToList();
+
+            return Ok(new
+            {
+                termId,
+                termName = term.Name,
+                breakdown,
+                current = new { Students = current.Sum(b => b.Students), Billed = current.Sum(b => b.Billed), Collected = current.Sum(b => b.Collected), Outstanding = current.Sum(b => b.Outstanding) },
+                left = new { Students = left.Sum(b => b.Students), Billed = left.Sum(b => b.Billed), Collected = left.Sum(b => b.Collected), Outstanding = left.Sum(b => b.Outstanding) },
+                all = new { Students = rows.Count, Billed = rows.Sum(r => r.TotalAmount), Collected = rows.Sum(r => r.AmountPaid), Outstanding = rows.Sum(r => r.Balance) },
+            });
+        }
+
         // =====================
         // PAYMENTS
         // =====================
