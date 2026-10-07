@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { feesAPI, termRegistrationsAPI } from '../services/api';
-import { Calendar, Plus, X, Zap, AlertTriangle, Users, Trash2, TrendingUp, Search, FileDown, FileSpreadsheet, FileText, BookCopy } from 'lucide-react';
+import { Calendar, Plus, X, Zap, AlertTriangle, Users, Trash2, TrendingUp, Search, FileDown, FileSpreadsheet, FileText, BookCopy, GraduationCap } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
+import TermChecklist from '../components/TermChecklist';
+import YearEndPromotionModal from '../components/YearEndPromotionModal';
 import { exportTableToPdf, exportTableToExcel, exportTableToWord } from '../utils/exportTable';
 
 const todayISO = () => new Date().toISOString().split('T')[0];
@@ -49,6 +51,10 @@ export default function TermsPage() {
   const [copyLoading, setCopyLoading] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
 
+  // ── Year-end promotion + term checklist ────────────────────────────────────
+  const [isYearEndOpen, setIsYearEndOpen] = useState(false);
+  const [checklistKey, setChecklistKey] = useState(0);
+
   useEffect(() => { loadTerms(); }, []);
 
   useEffect(() => {
@@ -72,7 +78,21 @@ export default function TermsPage() {
     }
   };
 
+  const registerAllUnregistered = async () => {
+    if (!selectedTermId) return;
+    try {
+      const res = await termRegistrationsAPI.getUnregistered(selectedTermId);
+      const ids: number[] = (res.data || []).map((s: { id: number }) => s.id);
+      if (ids.length === 0) { showMessage('Every current student is already registered', 'success'); return; }
+      if (!window.confirm(`Register all ${ids.length} current students who are not yet in ${selectedTerm?.name ?? 'this term'}? Each is registered in their current class.`)) return;
+      await handleRegister(ids);
+    } catch (err: any) {
+      showMessage(err.response?.data?.message || 'Failed to load unregistered students', 'error');
+    }
+  };
+
   const loadDashboard = async (termId: number) => {
+    setChecklistKey((k) => k + 1);
     setDashboardLoading(true);
     setDashboard(null);
     try {
@@ -251,6 +271,7 @@ export default function TermsPage() {
       });
       showMessage(res.data.message, 'success');
       setIsCopyOpen(false);
+      setChecklistKey((k) => k + 1);
     } catch (err: any) {
       showMessage(err.response?.data?.message || 'Failed to copy subjects', 'error');
     } finally {
@@ -358,9 +379,15 @@ export default function TermsPage() {
             {terms.length} term{terms.length !== 1 ? 's' : ''} · Click a term to view its registration dashboard
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ fontSize: 13 }}>
-          <Plus size={14} /> New Term
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={() => setIsYearEndOpen(true)} style={{ fontSize: 13 }}
+            title="Once a year: move every current student to their next class, graduate leavers">
+            <GraduationCap size={14} /> Year-End Promotion
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ fontSize: 13 }}>
+            <Plus size={14} /> New Term
+          </button>
+        </div>
       </div>
 
       {/* ── Terms grid ── */}
@@ -464,6 +491,10 @@ export default function TermsPage() {
               </button>
             </div>
           </div>
+
+          {selectedTermId && (
+            <TermChecklist termId={selectedTermId} refreshKey={checklistKey} onRegisterAll={registerAllUnregistered} onCopySubjects={openCopySubjects} />
+          )}
 
           {dashboardLoading ? (
             <div style={{ textAlign: 'center', padding: '48px', color: '#475569', fontSize: 13 }}>
@@ -1058,6 +1089,13 @@ export default function TermsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {isYearEndOpen && (
+        <YearEndPromotionModal
+          onClose={() => setIsYearEndOpen(false)}
+          onDone={(msg) => { showMessage(msg, 'success'); if (selectedTermId) loadDashboard(selectedTermId); }}
+        />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>

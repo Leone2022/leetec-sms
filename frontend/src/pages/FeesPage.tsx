@@ -24,9 +24,18 @@ const blankPayment = (invoiceId: number) => ({
   notes: '',
 });
 
+interface MoneyTotals { students: number; billed: number; collected: number; outstanding: number }
+interface StatusBreakdown {
+  breakdown: (MoneyTotals & { group: string; isCurrent: boolean })[];
+  current: MoneyTotals;
+  left: MoneyTotals;
+  all: MoneyTotals;
+}
+
 export default function FeesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
+  const [breakdown, setBreakdown] = useState<StatusBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterKey>('all');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -56,7 +65,17 @@ export default function FeesPage() {
     loadBursaryTotal(termId);
   }, [termId]);
 
+  const loadBreakdown = async (selectedTermId: number) => {
+    try {
+      const res = await feesAPI.getStatusBreakdown(selectedTermId);
+      setBreakdown(res.data);
+    } catch {
+      setBreakdown(null);
+    }
+  };
+
   const loadInvoices = async (selectedTermId: number) => {
+    loadBreakdown(selectedTermId);
     setLoading(true);
     try {
       const res = await feesAPI.getTermInvoices(1, selectedTermId);
@@ -197,6 +216,63 @@ export default function FeesPage() {
           ))}
         </section>
       )}
+
+      {breakdown && breakdown.all?.students > 0 && (() => {
+        const money = (v: number) => `$${Number(v).toLocaleString()}`;
+        const LABELS: Record<string, { label: string; note: string }> = {
+          New: { label: 'New students', note: `joined in ${selectedTerm?.year ?? 'this year'}` },
+          Continuing: { label: 'Continuing students', note: 'joined in an earlier year' },
+          Transferred: { label: 'Transferred out', note: 'left for another school' },
+          Graduated: { label: 'Graduated', note: 'completed their final year' },
+          Withdrawn: { label: 'Withdrawn', note: 'left for another reason' },
+          Inactive: { label: 'Inactive', note: 'deactivated' },
+        };
+        const rows = breakdown.breakdown.filter((b) => b.isCurrent || b.students > 0);
+        return (
+          <section className="table-card" style={{ marginBottom: 16, padding: '16px 24px' }}>
+            <div style={{ marginBottom: 10 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Fees by Student Status</h3>
+              <p style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
+                {selectedTerm ? selectedTerm.name : 'This term'}: current students match the totals above; students who have left are shown separately.
+              </p>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr><th>Group</th><th style={{ textAlign: 'right' }}>Students</th><th style={{ textAlign: 'right' }}>Billed</th><th style={{ textAlign: 'right' }}>Collected</th><th style={{ textAlign: 'right' }}>Outstanding</th></tr>
+                </thead>
+                <tbody>
+                  {rows.map((b) => (
+                    <tr key={b.group}>
+                      <td><strong style={{ fontSize: 13 }}>{LABELS[b.group]?.label ?? b.group}</strong><div style={{ fontSize: 11, color: '#64748b' }}>{LABELS[b.group]?.note}</div></td>
+                      <td style={{ textAlign: 'right' }}>{b.students}</td>
+                      <td style={{ textAlign: 'right' }}>{money(b.billed)}</td>
+                      <td style={{ textAlign: 'right', color: '#15803d' }}>{money(b.collected)}</td>
+                      <td style={{ textAlign: 'right', color: b.outstanding > 0 ? '#dc2626' : undefined }}>{money(b.outstanding)}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: '#f8fafc' }}>
+                    <td><strong>Current students</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{breakdown.current.students}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{money(breakdown.current.billed)}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{money(breakdown.current.collected)}</strong></td>
+                    <td style={{ textAlign: 'right' }}><strong>{money(breakdown.current.outstanding)}</strong></td>
+                  </tr>
+                  {breakdown.left.students > 0 && (
+                    <tr style={{ background: '#f8fafc' }}>
+                      <td><strong>Students who have left</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{breakdown.left.students}</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{money(breakdown.left.billed)}</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{money(breakdown.left.collected)}</strong></td>
+                      <td style={{ textAlign: 'right' }}><strong>{money(breakdown.left.outstanding)}</strong></td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })()}
 
       {summary && summary.totalInvoices > 0 && (() => {
         const total = summary.totalInvoices;
