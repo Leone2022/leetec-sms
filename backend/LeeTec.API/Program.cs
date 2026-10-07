@@ -57,6 +57,9 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 // Report Card Service — shared by admin and student-portal report-card endpoints
 builder.Services.AddScoped<IReportCardService, ReportCardService>();
 
+// Term rollover — copies StudentSubjects into a new term (admin button on the Terms page)
+builder.Services.AddScoped<ISubjectRolloverService, SubjectRolloverService>();
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

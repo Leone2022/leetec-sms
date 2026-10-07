@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using LeeTec.API.Data;
 using LeeTec.API.Models;
 using LeeTec.API.DTOs;
+using LeeTec.API.Services;
 
 namespace LeeTec.API.Controllers
 {
@@ -11,10 +13,12 @@ namespace LeeTec.API.Controllers
     public class TermRegistrationsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly ISubjectRolloverService _subjectRollover;
 
-        public TermRegistrationsController(AppDbContext context)
+        public TermRegistrationsController(AppDbContext context, ISubjectRolloverService subjectRollover)
         {
             _context = context;
+            _subjectRollover = subjectRollover;
         }
 
         // TERM DASHBOARD — all registrations for a term
@@ -269,6 +273,71 @@ namespace LeeTec.API.Controllers
                 message = $"{promoted} students promoted",
                 promoted
             });
+        }
+
+        // COPY SUBJECTS from the previous term into this term (dry run unless DryRun=false).
+        // The school is taken from the target term, never from the request body. Admin JWTs
+        // carry no role/school/permission claims yet, so the caller is checked against the
+        // database: the same rule the admin sidebar uses to show Terms & Periods (SuperAdmin
+        // role or the "Terms & Periods" permission), plus the caller's own school. Replace
+        // with RequirePermission("Terms & Periods") once that system lands.
+        [Authorize]
+        [HttpPost("copy-subjects")]
+        public async Task<IActionResult> CopySubjects([FromBody] CopySubjectsDTO dto)
+        {
+            var termSchoolId = await _context.Terms
+                .Where(t => t.Id == dto.TargetTermId)
+                .Select(t => (int?)t.SchoolId)
+                .FirstOrDefaultAsync();
+            if (termSchoolId == null)
+                return NotFound(new { message = "Target term not found." });
+
+            var denied = await CheckTermsAdminAsync(termSchoolId.Value);
+            if (denied != null) return denied;
+
+            if (!dto.DryRun && dto.ExpectedInserts == null)
+                return BadRequest(new { ok = false, message = "Run the preview first; ExpectedInserts is required to copy." });
+
+            var result = await _subjectRollover.CopyFromPreviousTermAsync(
+                dto.TargetTermId, termSchoolId.Value, dto.SourceTermId, dto.DryRun, dto.ExpectedInserts);
+            return result.Ok ? Ok(result) : BadRequest(result);
+        }
+
+        // Null when the caller is an active admin user allowed to manage terms for this school.
+        // Teacher and student tokens are signed with the same key, so reject any token that
+        // carries a role or student claim before trusting NameIdentifier as a Users.Id.
+        private async Task<IActionResult?> CheckTermsAdminAsync(int schoolId)
+        {
+            var forbidden = StatusCode(403, new { ok = false, message = "You do not have permission to manage terms." });
+
+            if (User.Claims.Any(c => c.Type == System.Security.Claims.ClaimTypes.Role || c.Type == "role"
+                    || c.Type == "studentId" || c.Type == "studentNumber"))
+                return forbidden;
+            if (!int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId))
+                return forbidden;
+
+            var user = await _context.Users
+                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => u.Id == userId);
+            if (user == null || user.Status != "Active") return forbidden;
+
+            var isSuperAdmin = user.UserRoles.Any(ur => ur.Role != null && ur.Role.Name == "SuperAdmin");
+            if (isSuperAdmin) return null;
+
+            List<string> permissions;
+            try
+            {
+                permissions = string.IsNullOrWhiteSpace(user.Permissions)
+                    ? new List<string>()
+                    : (System.Text.Json.JsonSerializer.Deserialize<List<string>>(user.Permissions) ?? new List<string>());
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                permissions = new List<string>();
+            }
+
+            if (!permissions.Contains("Terms & Periods") || user.SchoolId != schoolId) return forbidden;
+            return null;
         }
 
         // UPDATE payment status
