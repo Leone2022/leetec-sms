@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { studentsAPI, feesAPI, subjectsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Search, Users, X, FileDown, FileSpreadsheet, FileText, Plus, ChevronRight, ChevronLeft, Lock, Unlock } from 'lucide-react';
@@ -70,6 +71,8 @@ const blankContact = () => ({
 
 export default function StudentsPage() {
   useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -397,6 +400,18 @@ export default function StudentsPage() {
       setProfileLoading(false);
     }
   };
+
+  // Auto-open a student's profile when arriving from the Dashboard search
+  // (navigate('/students', { state: { openStudentId } })) — clears the nav
+  // state afterward so it doesn't re-trigger on later visits to this page.
+  useEffect(() => {
+    const openStudentId = (location.state as any)?.openStudentId;
+    if (!openStudentId || students.length === 0) return;
+    const match = students.find((s: any) => s.id === openStudentId);
+    if (match) openProfilePanel(match);
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, location.state]);
 
   const loadStudentSubjects = async (studentId: number) => {
     setSubjectsLoading(true);
