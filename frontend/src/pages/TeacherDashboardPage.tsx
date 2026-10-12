@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { marksAPI, feesAPI, authAPI, versesAPI, announcementsAPI, homeworkAPI } from '../services/api';
 import { teacherAssignmentsAPI } from '../services/api';
+import TeacherClassRegisterModal from '../components/TeacherClassRegisterModal';
 import {
   GraduationCap, LogOut, BookOpen, User, Menu, X,
   ClipboardList, ChevronLeft, Save, Send, AlertTriangle,
@@ -11,7 +12,6 @@ import {
 import VerseCard, { type VerseData } from '../components/VerseCard';
 import { calculateGrade } from '../utils/reportCard';
 import { isFinalMarkOnlyTerm } from '../utils/markPolicy';
-import TeacherClassRegisterModal from '../components/TeacherClassRegisterModal';
 
 interface MarkRow {
   studentId: number;
