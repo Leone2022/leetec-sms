@@ -152,16 +152,6 @@ export const termRegistrationsAPI = {
     api.delete(`/termregistrations/${id}`),
 };
 
-export const classRegisterAPI = {
-  classes: (termId: number, schoolId = 1) => api.get(`/class-register/classes?termId=${termId}&schoolId=${schoolId}`),
-  get: (termId: number, campus: string, form: string, schoolId = 1) =>
-    api.get(`/class-register?${new URLSearchParams({ termId: String(termId), campus, form, schoolId: String(schoolId) })}`),
-  // Teacher portal: its own token, kept under a different localStorage key.
-  forTeacher: (termId: number, campus: string, form: string, token: string) =>
-    api.get(`/class-register/teacher?${new URLSearchParams({ termId: String(termId), campus, form })}`,
-      { headers: { Authorization: `Bearer ${token}` } }),
-};
-
 export const subjectsAPI = {
   getAll: (schoolId: number, campus?: string, curriculumType?: string) => {
     const params = new URLSearchParams();
@@ -339,6 +329,16 @@ export const homeworkAPI = {
   create: (data: { subjectId: number; teacherId: number; schoolId?: number; termId: number; title: string; description?: string; dueDate: string }) =>
     api.post('/homework', data),
   delete: (id: number) => api.delete(`/homework/${id}`),
+};
+
+export const classRegisterAPI = {
+  classes: (termId: number, schoolId = 1) => api.get(`/class-register/classes?termId=${termId}&schoolId=${schoolId}`),
+  get: (termId: number, campus: string, form: string, schoolId = 1) =>
+    api.get(`/class-register?${new URLSearchParams({ termId: String(termId), campus, form, schoolId: String(schoolId) })}`),
+  // Teacher portal: its own token, kept under a different localStorage key.
+  forTeacher: (termId: number, campus: string, form: string, token: string) =>
+    api.get(`/class-register/teacher?${new URLSearchParams({ termId: String(termId), campus, form })}`,
+      { headers: { Authorization: `Bearer ${token}` } }),
 };
 
 export default api;
