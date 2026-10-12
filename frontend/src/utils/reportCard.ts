@@ -72,6 +72,9 @@ export interface ReportCardData {
   usesPapers: boolean;
   gradingCurriculum: CurriculumType;
   finalMarkOnly?: boolean;
+  // AHJ from Term 3 2026: separate Mid-Term and End of Term reports.
+  separateReports?: boolean;
+  reportType?: 'final' | 'midterm';
   subjects: ReportCardSubjectResult[];
   attendance: string | null;
 }
@@ -174,6 +177,8 @@ async function drawWatermark(doc: jsPDF, pageWidth: number, pageHeight: number) 
 
 async function generateAhjReportCard(reportData: ReportCardData) {
   const { student, term, subjects, attendance } = reportData;
+  const isMidTerm = reportData.reportType === 'midterm';
+  const reportTitle = isMidTerm ? 'MID-TERM REPORT' : reportData.separateReports ? 'END OF TERM REPORT' : "LEARNER'S REPORT";
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -207,7 +212,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
   doc.setTextColor(...NAVY);
   doc.text('ADVENT HOPE JUNIOR SCHOOL', pageWidth / 2, 22, { align: 'center' });
   doc.setFontSize(12);
-  doc.text("LEARNER'S REPORT", pageWidth / 2, 30, { align: 'center' });
+  doc.text(reportTitle, pageWidth / 2, 30, { align: 'center' });
 
   doc.setTextColor(0);
   doc.setFont('helvetica', 'normal');
@@ -220,7 +225,8 @@ async function generateAhjReportCard(reportData: ReportCardData) {
       ['Stage:', student.form || '—'],
       ['Term:', termLabel || '—'],
       ['Attendance:', attendance || '—'],
-      ['Next Term Begins on:', nextTerm],
+      // A mid-term report is issued during the term: no "next term" line.
+      ...(isMidTerm ? [] : [['Next Term Begins on:', nextTerm]]),
     ],
     theme: 'grid',
     styles: { fontSize: 10, cellPadding: 3, lineColor: [180, 180, 180], lineWidth: 0.3 },
@@ -233,7 +239,8 @@ async function generateAhjReportCard(reportData: ReportCardData) {
     head: [['Subject', 'Final Mark', 'Band', 'Comments']],
     body: subjects.map(s => {
       // From Term 3 2026 (finalMarkOnly) every subject's mark and comment are on endTerm.
-      const comments = (s.noTerminalExam ? s.midterm.comments || s.endTerm?.comments : s.endTerm?.comments) || '—';
+      const comments = (isMidTerm ? s.midterm.comments
+        : s.noTerminalExam ? s.midterm.comments || s.endTerm?.comments : s.endTerm?.comments) || '—';
       const label = s.noTerminalExam
         ? s.name
         : `${s.name} (Core Subject)`;
@@ -278,7 +285,7 @@ async function generateAhjReportCard(reportData: ReportCardData) {
   doc.setTextColor(120);
   doc.text('This is a computer generated report', pageWidth / 2, footY, { align: 'center' });
 
-  const fileName = `ReportCard_${student.studentNumber}_${termLabel}`.replace(/\s+/g, '_');
+  const fileName = `${isMidTerm ? 'MidTermReport' : 'ReportCard'}_${student.studentNumber}_${termLabel}`.replace(/\s+/g, '_');
   doc.save(`${fileName}.pdf`);
 }
 

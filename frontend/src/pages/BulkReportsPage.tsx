@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI, marksAPI } from '../services/api';
 import { generateReportCard, calculateGrade } from '../utils/reportCard';
-import { isFinalMarkOnlyTerm } from '../utils/markPolicy';
+import { markMode, isFrom2026Term3 } from '../utils/markPolicy';
 import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } from '../utils/credentials';
 import AdminLayout from '../components/AdminLayout';
 import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
@@ -45,6 +45,9 @@ export default function BulkReportsPage() {
   const [publishCampus, setPublishCampus] = useState('All');
   const [publishForm, setPublishForm] = useState('All');
   const [publishingReportCards, setPublishingReportCards] = useState(false);
+  // AHJ from Term 3 2026: a Mid-Term Report and an End of Term Report, published separately.
+  const [publishReportType, setPublishReportType] = useState<'final' | 'midterm'>('final');
+  const [reportType, setReportType] = useState<'final' | 'midterm'>('final');
 
   // Tabs
   const [tab, setTab] = useState<'completion' | 'approvals'>('completion');
@@ -184,9 +187,24 @@ export default function BulkReportsPage() {
       const midData: any[] = midRes.data || [];
       const endData: any[] = endRes.data || [];
       const endByStudent = new Map(endData.map((d: any) => [d.studentId, d]));
-      const finalOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === g.termId));
+      const viewMode = markMode(terms.find(t => t.id === g.termId), g.campus);
+      const finalOnly = viewMode === 'final-only';
       setViewMarksRows(midData.map((d: any) => {
         const endD = endByStudent.get(d.studentId);
+        if (viewMode === 'separate') {
+          // AHJ: mid-term and end-of-term are separate results, never combined.
+          const mid = d.score != null ? Number(d.score) : null;
+          const end = endD?.score != null ? Number(endD.score) : null;
+          const curriculum = d.curriculum || endD?.curriculum || '';
+          return {
+            studentId: d.studentId,
+            studentName: d.studentName,
+            studentNumber: d.studentNumber,
+            paper1: mid, paper2: end, total: null,
+            grade: [mid, end].map(v => v != null ? calculateGrade(v, curriculum) : '—').join(' / '),
+            comments: [d.comments, endD?.comments].filter(Boolean).join(' | '),
+          };
+        }
         if (finalOnly) {
           const total = endD?.score != null ? Number(endD.score) : null;
           const curriculum = d.curriculum || endD?.curriculum || '';
@@ -237,13 +255,15 @@ export default function BulkReportsPage() {
       const res = await marksAPI.publishReportCards({
         termId: publishTermId,
         schoolId: 1,
-        campus: publishCampus,
+        campus: publishReportType === 'midterm' ? 'AHJ' : publishCampus,
         form: publishForm,
+        reportType: publishReportType,
       });
       const count = res.data?.published ?? 0;
-      showMsg(`${count} report card${count !== 1 ? 's' : ''} published successfully`, 'success');
-    } catch {
-      showMsg('Failed to publish report cards', 'error');
+      const what = publishReportType === 'midterm' ? 'mid-term report' : 'report card';
+      showMsg(`${count} ${what}${count !== 1 ? 's' : ''} published successfully`, 'success');
+    } catch (err: any) {
+      showMsg(err?.response?.data?.message || 'Failed to publish report cards', 'error');
     } finally {
       setPublishingReportCards(false);
     }
@@ -302,7 +322,7 @@ export default function BulkReportsPage() {
       const row = rows.find(r => r.studentId === studentId);
       setProgress(`Generating report card ${done + 1} of ${ids.length} — ${row?.studentName ?? '...'}`);
       try {
-        const res = await reportsAPI.getReportCard(studentId, termId as number);
+        const res = await reportsAPI.getReportCard(studentId, termId as number, reportType);
         await generateReportCard(res.data);
         done++;
       } catch {
@@ -352,7 +372,7 @@ export default function BulkReportsPage() {
     setPublishing(true);
     setProgress(`Publishing ${ids.length} report${ids.length !== 1 ? 's' : ''} to portal...`);
     try {
-      const res = await bulkReportsAPI.publishReports(1, termId as number, ids);
+      const res = await bulkReportsAPI.publishReports(1, termId as number, ids, reportType);
       const { published, errors } = res.data as { published: number; errors: string[] };
       if (errors.length > 0) {
         showMsg(`Published ${published}, but ${errors.length} error(s): ${errors[0]}`, 'error');
@@ -546,7 +566,17 @@ export default function BulkReportsPage() {
         {/* Publish Report Cards */}
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 18px' }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: '#0f172a' }}>Publish Report Cards</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: 12, alignItems: 'end', maxWidth: 800 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isFrom2026Term3(terms.find(t => t.id === publishTermId)) ? 4 : 3}, 1fr) auto`, gap: 12, alignItems: 'end', maxWidth: 960 }}>
+            {isFrom2026Term3(terms.find(t => t.id === publishTermId)) && (
+              <div>
+                <label style={lbl}>Report</label>
+                <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
+                  value={publishReportType} onChange={e => setPublishReportType(e.target.value as 'final' | 'midterm')}>
+                  <option value="final">End of Term Report</option>
+                  <option value="midterm">Mid-Term Report (Junior only)</option>
+                </select>
+              </div>
+            )}
             <div>
               <label style={lbl}>Term</label>
               <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
@@ -558,7 +588,8 @@ export default function BulkReportsPage() {
             <div>
               <label style={lbl}>Campus</label>
               <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
-                value={publishCampus} onChange={e => setPublishCampus(e.target.value)}>
+                value={publishReportType === 'midterm' ? 'AHJ' : publishCampus} disabled={publishReportType === 'midterm'}
+                onChange={e => setPublishCampus(e.target.value)}>
                 {['All', 'AHJ', 'AHA', 'AHS'].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
@@ -574,7 +605,7 @@ export default function BulkReportsPage() {
               onClick={handlePublishReportCards}
               disabled={!publishTermId || publishingReportCards}
             >
-              📋 {publishingReportCards ? 'Publishing...' : 'Publish Report Cards'}
+              📋 {publishingReportCards ? 'Publishing...' : publishReportType === 'midterm' ? 'Publish Mid-Term Reports' : 'Publish Report Cards'}
             </button>
           </div>
         </div>
@@ -621,7 +652,15 @@ export default function BulkReportsPage() {
             {selected.size} student{selected.size !== 1 ? 's' : ''} selected
           </span>
 
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            {isFrom2026Term3(terms.find(t => t.id === termId)) && (
+              <select className="text-field" aria-label="Report type" style={{ appearance: 'auto', fontSize: 12, padding: '6px 8px' }}
+                value={reportType} onChange={e => setReportType(e.target.value as 'final' | 'midterm')}
+                title="Mid-term reports are for Junior School (AHJ) learners only">
+                <option value="final">End of Term Report</option>
+                <option value="midterm">Mid-Term Report (Junior only)</option>
+              </select>
+            )}
             <button
               className="btn btn-secondary"
               style={{ fontSize: 12 }}
@@ -743,7 +782,7 @@ export default function BulkReportsPage() {
                             onClick={async () => {
                               if (!termId) return;
                               try {
-                                const res = await reportsAPI.getReportCard(row.studentId, termId as number);
+                                const res = await reportsAPI.getReportCard(row.studentId, termId as number, reportType);
                                 await generateReportCard(res.data);
                               } catch {
                                 showMsg(`Failed to generate report for ${row.studentName}`, 'error');
@@ -766,7 +805,9 @@ export default function BulkReportsPage() {
 
       {/* View Marks modal */}
       {viewingGroup && (() => {
-        const viewFinalOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === viewingGroup.termId));
+        const viewModeNow = markMode(terms.find(t => t.id === viewingGroup.termId), viewingGroup.campus);
+        const viewFinalOnly = viewModeNow === 'final-only';
+        const viewSeparate = viewModeNow === 'separate';
         return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}
           onClick={() => setViewingGroup(null)}>
@@ -794,9 +835,9 @@ export default function BulkReportsPage() {
                           <th style={{ textAlign: 'center' }}>Final Mark</th>
                         ) : (
                           <>
-                            <th style={{ textAlign: 'center' }}>Paper 1</th>
-                            <th style={{ textAlign: 'center' }}>Paper 2</th>
-                            <th style={{ textAlign: 'center' }}>Total</th>
+                            <th style={{ textAlign: 'center' }}>{viewSeparate ? 'Mid-term' : 'Paper 1'}</th>
+                            <th style={{ textAlign: 'center' }}>{viewSeparate ? 'End of Term' : 'Paper 2'}</th>
+                            {!viewSeparate && <th style={{ textAlign: 'center' }}>Total</th>}
                           </>
                         )}
                         <th style={{ textAlign: 'center' }}>Grade</th>
@@ -810,7 +851,7 @@ export default function BulkReportsPage() {
                           <td style={{ fontSize: 12, fontFamily: 'ui-monospace, monospace', color: '#1a237e' }}>{r.studentNumber}</td>
                           {!viewFinalOnly && <td style={{ textAlign: 'center' }}>{r.paper1 ?? '—'}</td>}
                           {!viewFinalOnly && <td style={{ textAlign: 'center' }}>{r.paper2 ?? '—'}</td>}
-                          <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{r.total ?? '—'}</td>
+                          {!viewSeparate && <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{r.total ?? '—'}</td>}
                           <td style={{ textAlign: 'center' }}>
                             {r.grade && (
                               <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>

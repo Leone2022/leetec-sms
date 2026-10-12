@@ -96,6 +96,15 @@ namespace LeeTec.API.Controllers
             return Ok(result);
         }
 
+        // Mark rule for a term + subject (subjects belong to one campus).
+        private async Task<MarkMode> ModeForAsync(int termId, int subjectId)
+        {
+            var term = await _context.Terms.FindAsync(termId);
+            if (term == null) return MarkMode.Averaged;
+            var campus = await _context.Subjects.Where(s => s.Id == subjectId).Select(s => s.Campus).FirstOrDefaultAsync();
+            return MarkPolicy.ModeFor(term, campus);
+        }
+
         private static readonly HashSet<string> LockedMarkStatuses = new(StringComparer.OrdinalIgnoreCase) { "Submitted", "Approved" };
 
         // BULK SAVE — upsert marks for a subject + term + assessment type
@@ -117,10 +126,12 @@ namespace LeeTec.API.Controllers
             // Combined midterm + end-of-term entries (unified marks entry table)
             if (dto.Marks != null && dto.Marks.Count > 0)
             {
-                // Term 3 2026 onward has no mid-term: never create, clear or overwrite a
-                // mid-term row, only the final (end-of-term) mark.
-                var combinedTerm = await _context.Terms.FindAsync(dto.TermId);
-                var finalMarkOnly = combinedTerm != null && MarkPolicy.IsFinalMarkOnly(combinedTerm);
+                // Term 3 2026 onward: AHA/AHS have no mid-term, so a mid-term row is never
+                // created, cleared or overwritten; AHJ keeps both as separate assessments, each
+                // with its own comment, and an empty box never creates a row.
+                var mode = await ModeForAsync(dto.TermId, dto.SubjectId);
+                var finalMarkOnly = mode == MarkMode.FinalOnly;
+                var separate = mode == MarkMode.Separate;
 
                 var combinedStudentIds = dto.Marks.Select(m => m.StudentId).ToList();
                 var combinedExisting = await _context.Marks
@@ -138,8 +149,10 @@ namespace LeeTec.API.Controllers
                 int lockedSkipped = 0;
                 foreach (var entry in dto.Marks)
                 {
-                    if (!finalMarkOnly && !UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "Mid-term Test", entry.MidtermScore, entry.Comments)) lockedSkipped++;
-                    if (!UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "End of Term Exam", entry.EndOfTermScore, entry.Comments)) lockedSkipped++;
+                    if (!finalMarkOnly && !UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "Mid-term Test", entry.MidtermScore,
+                            separate ? entry.MidtermComments ?? entry.Comments : entry.Comments, skipEmptyNew: separate)) lockedSkipped++;
+                    if (!UpsertAssessmentMark(combinedExisting, dto, entry.StudentId, "End of Term Exam", entry.EndOfTermScore,
+                            separate ? entry.EndOfTermComments ?? entry.Comments : entry.Comments, skipEmptyNew: separate)) lockedSkipped++;
                     combinedSaved++;
                 }
 
@@ -150,12 +163,8 @@ namespace LeeTec.API.Controllers
                 return Ok(new { message, saved = combinedSaved });
             }
 
-            if (dto.AssessmentType == MarkPolicy.MidTerm)
-            {
-                var entriesTerm = await _context.Terms.FindAsync(dto.TermId);
-                if (entriesTerm != null && MarkPolicy.IsFinalMarkOnly(entriesTerm))
-                    return BadRequest(new { message = "This term records the final mark only; there is no mid-term test." });
-            }
+            if (dto.AssessmentType == MarkPolicy.MidTerm && await ModeForAsync(dto.TermId, dto.SubjectId) == MarkMode.FinalOnly)
+                return BadRequest(new { message = "This term records the final mark only; there is no mid-term test." });
 
             var studentIds = dto.Entries.Select(e => e.StudentId).ToList();
 
@@ -232,20 +241,41 @@ namespace LeeTec.API.Controllers
                 .Where(m => m.SubjectId == dto.SubjectId && m.TermId == dto.TermId && studentIds.Contains(m.StudentId))
                 .ToListAsync();
 
-            // Term 3 2026 onward only the final (end-of-term) mark counts.
-            var submitTerm = await _context.Terms.FindAsync(dto.TermId);
-            var finalMarkOnly = submitTerm != null && MarkPolicy.IsFinalMarkOnly(submitTerm);
+            var mode = await ModeForAsync(dto.TermId, dto.SubjectId);
+            static bool HasScore(Mark m) => m.Score != null || m.Paper1Score != null || m.Paper2Score != null;
 
-            var studentsWithMarks = allMarksForSubject
-                .Where(m => !finalMarkOnly || m.AssessmentType == MarkPolicy.EndOfTerm)
-                .Where(m => m.Score != null || m.Paper1Score != null || m.Paper2Score != null)
-                .Select(m => m.StudentId)
-                .ToHashSet();
+            List<Mark> marks;
+            if (mode == MarkMode.Separate)
+            {
+                // AHJ: mid-term and end-of-term are submitted separately (weeks apart). Each
+                // assessment that has any mark in this class must be complete, and only marks
+                // that have a score are submitted, so an empty end-of-term box stays editable.
+                var scored = allMarksForSubject.Where(HasScore).ToList();
+                if (scored.Count == 0 || studentIds.Count == 0)
+                    return BadRequest(new { message = "All students must have marks before submitting" });
+                foreach (var type in scored.Select(m => m.AssessmentType).Distinct())
+                {
+                    var have = scored.Where(m => m.AssessmentType == type).Select(m => m.StudentId).ToHashSet();
+                    if (studentIds.Any(id => !have.Contains(id)))
+                        return BadRequest(new { message = $"All students must have {(type == MarkPolicy.MidTerm ? "a mid-term" : "an end of term")} mark before submitting" });
+                }
+                marks = scored.Where(m => m.Status == "Draft" && studentIds.Contains(m.StudentId)).ToList();
+            }
+            else
+            {
+                // Term 3 2026 onward (AHA/AHS) only the final (end-of-term) mark counts.
+                var finalMarkOnly = mode == MarkMode.FinalOnly;
+                var studentsWithMarks = allMarksForSubject
+                    .Where(m => !finalMarkOnly || m.AssessmentType == MarkPolicy.EndOfTerm)
+                    .Where(HasScore)
+                    .Select(m => m.StudentId)
+                    .ToHashSet();
 
-            if (studentIds.Any(id => !studentsWithMarks.Contains(id)))
-                return BadRequest(new { message = "All students must have marks before submitting" });
+                if (studentIds.Any(id => !studentsWithMarks.Contains(id)))
+                    return BadRequest(new { message = "All students must have marks before submitting" });
 
-            var marks = allMarksForSubject.Where(m => m.Status == "Draft").ToList();
+                marks = allMarksForSubject.Where(m => m.Status == "Draft").ToList();
+            }
 
             foreach (var mark in marks)
             {
@@ -588,11 +618,13 @@ namespace LeeTec.API.Controllers
         // Returns false (and leaves the row untouched) if this specific assessment mark is
         // already locked (Submitted/Approved) — callers should not treat that as a failure,
         // just as "nothing to save here."
-        private bool UpsertAssessmentMark(List<Mark> existing, BulkSaveMarksDTO dto, int studentId, string assessmentType, decimal? score, string? comments)
+        private bool UpsertAssessmentMark(List<Mark> existing, BulkSaveMarksDTO dto, int studentId, string assessmentType, decimal? score, string? comments, bool skipEmptyNew = false)
         {
             var mark = existing.FirstOrDefault(m => m.StudentId == studentId && m.AssessmentType == assessmentType);
             if (mark != null && LockedMarkStatuses.Contains(mark.Status))
                 return false;
+            if (mark == null && skipEmptyNew && score == null && string.IsNullOrWhiteSpace(comments))
+                return true; // nothing entered for this assessment yet
 
             if (mark == null)
             {
@@ -632,10 +664,23 @@ namespace LeeTec.API.Controllers
             if (!string.IsNullOrEmpty(request.Form) && request.Form != "All")
                 query = query.Where(s => s.Form == request.Form);
 
+            // The AHJ mid-term report is published separately, as its own row
+            // (Status "MidTermPublished"), so it never overwrites the end-of-term report.
+            var isMidTerm = ReportTypes.Normalize(request.ReportType) == ReportTypes.MidTerm;
+            if (isMidTerm)
+            {
+                var term = await _context.Terms.FindAsync(request.TermId);
+                if (term == null || MarkPolicy.ModeFor(term, "AHJ") != MarkMode.Separate)
+                    return BadRequest(new { message = "Mid-term reports exist only for Junior School (AHJ) terms from Term 3 2026." });
+                query = query.Where(s => s.Campus == "AHJ");
+            }
+            var status = isMidTerm ? MarkPolicy.MidTermPublished : "Published";
+
             var studentIds = await query.Select(s => s.Id).Distinct().ToListAsync();
 
             var existingRecords = await _context.ReportCardRecords
-                .Where(r => r.TermId == request.TermId && studentIds.Contains(r.StudentId))
+                .Where(r => r.TermId == request.TermId && studentIds.Contains(r.StudentId)
+                    && (isMidTerm ? r.Status == MarkPolicy.MidTermPublished : r.Status != MarkPolicy.MidTermPublished))
                 .ToListAsync();
 
             int published = 0;
@@ -649,14 +694,14 @@ namespace LeeTec.API.Controllers
                         SchoolId = request.SchoolId,
                         StudentId = studentId,
                         TermId = request.TermId,
-                        Status = "Published",
+                        Status = status,
                         GeneratedAt = DateTime.UtcNow,
                         ReportData = "",
                     });
                 }
                 else
                 {
-                    record.Status = "Published";
+                    record.Status = status;
                     record.GeneratedAt = DateTime.UtcNow;
                 }
                 published++;
@@ -669,15 +714,19 @@ namespace LeeTec.API.Controllers
         // REPORT CARD — student portal view. Returns the same ReportCardData shape as
         // GET /api/reports/report-card/{studentId}, gated behind publish status.
         [HttpGet("report-card/{studentId}/{termId}")]
-        public async Task<IActionResult> GetReportCard(int studentId, int termId)
+        public async Task<IActionResult> GetReportCard(int studentId, int termId, [FromQuery] string? reportType = null)
         {
+            var type = ReportTypes.Normalize(reportType);
+            var publishedStatus = type == ReportTypes.MidTerm ? MarkPolicy.MidTermPublished : "Published";
             var record = await _context.ReportCardRecords
-                .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == termId && r.Status == "Published");
+                .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == termId && r.Status == publishedStatus);
 
             if (record == null)
-                return NotFound(new { message = "Report card not yet published for this term." });
+                return NotFound(new { message = type == ReportTypes.MidTerm
+                    ? "The mid-term report has not been published yet."
+                    : "Report card not yet published for this term." });
 
-            var data = await _reportCardService.BuildReportCardDataAsync(studentId, termId);
+            var data = await _reportCardService.BuildReportCardDataAsync(studentId, termId, type);
             if (data == null) return NotFound(new { message = "Student or term not found" });
 
             return Ok(data);

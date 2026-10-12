@@ -5,7 +5,16 @@ namespace LeeTec.API.Services
 {
     public interface IReportCardService
     {
-        Task<object?> BuildReportCardDataAsync(int studentId, int termId);
+        // reportType: "final" (end of term) or "midterm". Only AHJ terms from Term 3 2026
+        // (MarkMode.Separate) have a separate mid-term report; elsewhere it is ignored.
+        Task<object?> BuildReportCardDataAsync(int studentId, int termId, string reportType = ReportTypes.Final);
+    }
+
+    public static class ReportTypes
+    {
+        public const string Final = "final";
+        public const string MidTerm = "midterm";
+        public static string Normalize(string? t) => string.Equals(t, MidTerm, StringComparison.OrdinalIgnoreCase) ? MidTerm : Final;
     }
 
     // Single source of truth for the ReportCardData shape consumed by
@@ -76,7 +85,7 @@ namespace LeeTec.API.Services
             return "U";
         }
 
-        public async Task<object?> BuildReportCardDataAsync(int studentId, int termId)
+        public async Task<object?> BuildReportCardDataAsync(int studentId, int termId, string reportType = ReportTypes.Final)
         {
             var student = await _context.Students.FindAsync(studentId);
             if (student == null) return null;
@@ -86,8 +95,13 @@ namespace LeeTec.API.Services
 
             var campus = student.Campus ?? "";
             var usesPapers = campus == "AHJ";
-            // Term 3 2026 onward: Final Mark is the end-of-term mark only; mid-term is ignored.
-            var finalMarkOnly = MarkPolicy.IsFinalMarkOnly(term);
+            // Term 3 2026 onward the Final Mark is ONE assessment, never an average:
+            // AHA/AHS always the end-of-term mark; AHJ the mid-term mark on the Mid-Term Report
+            // and the end-of-term mark on the End of Term Report.
+            var mode = MarkPolicy.ModeFor(term, campus);
+            var isMidTermReport = mode == MarkMode.Separate && ReportTypes.Normalize(reportType) == ReportTypes.MidTerm;
+            var finalMarkOnly = mode != MarkMode.Averaged;
+            var onlyAssessment = isMidTermReport ? MarkPolicy.MidTerm : MarkPolicy.EndOfTerm;
             var gradingCurriculum = campus == "AHJ" ? "Cambridge Checkpoint" : student.Curriculum;
 
             var nextTerm = await _context.Terms
@@ -112,15 +126,15 @@ namespace LeeTec.API.Services
 
             var subjectGroups = marks
                 .Where(m => m.Subject != null && activeSubjectIds.Contains(m.SubjectId))
-                .Where(m => !finalMarkOnly || m.AssessmentType == MarkPolicy.EndOfTerm)
+                .Where(m => !finalMarkOnly || m.AssessmentType == onlyAssessment)
                 .GroupBy(m => m.Subject!)
                 .OrderBy(g => g.Key.Name);
 
             var subjectResults = subjectGroups.Select(g =>
             {
                 var subject = g.Key;
-                var midterm = finalMarkOnly ? null : g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test");
-                var endTerm = g.FirstOrDefault(m => m.AssessmentType == "End of Term Exam");
+                var midterm = finalMarkOnly && !isMidTermReport ? null : g.FirstOrDefault(m => m.AssessmentType == "Mid-term Test");
+                var endTerm = isMidTermReport ? null : g.FirstOrDefault(m => m.AssessmentType == "End of Term Exam");
 
                 var noTerminalExam = NoTerminalExamSubjects.Contains(subject.Name);
 
@@ -199,7 +213,7 @@ namespace LeeTec.API.Services
                         total = midtermTotal,
                         comments = midterm?.Comments ?? "",
                     },
-                    endTerm = noTerminalExam && !finalMarkOnly ? null : (object?)new
+                    endTerm = isMidTermReport || (noTerminalExam && !finalMarkOnly) ? null : (object?)new
                     {
                         paper1 = endTerm?.Paper1Score,
                         paper2 = endTerm?.Paper2Score,
@@ -234,6 +248,8 @@ namespace LeeTec.API.Services
                 usesPapers,
                 gradingCurriculum,
                 finalMarkOnly,
+                separateReports = mode == MarkMode.Separate,
+                reportType = isMidTermReport ? ReportTypes.MidTerm : ReportTypes.Final,
                 subjects = subjectResults,
                 attendance = (string?)null,
             };
