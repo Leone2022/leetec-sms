@@ -23,9 +23,9 @@ namespace LeeTec.API.Controllers
         // ── GET /api/reports/report-card/{studentId} ─────────────────────────────
 
         [HttpGet("report-card/{studentId}")]
-        public async Task<IActionResult> GetReportCard(int studentId, [FromQuery] int termId)
+        public async Task<IActionResult> GetReportCard(int studentId, [FromQuery] int termId, [FromQuery] string? reportType = null)
         {
-            var data = await _reportCardService.BuildReportCardDataAsync(studentId, termId);
+            var data = await _reportCardService.BuildReportCardDataAsync(studentId, termId, ReportTypes.Normalize(reportType));
             if (data == null) return NotFound(new { message = "Student or term not found" });
             return Ok(data);
         }
@@ -125,12 +125,28 @@ namespace LeeTec.API.Controllers
         {
             var published = 0;
             var errors = new List<string>();
+            var reportType = ReportTypes.Normalize(request.ReportType);
+            var isMidTerm = reportType == ReportTypes.MidTerm;
+            var status = isMidTerm ? MarkPolicy.MidTermPublished : "Published";
+
+            if (isMidTerm)
+            {
+                var term = await _context.Terms.FindAsync(request.TermId);
+                if (term == null || MarkPolicy.ModeFor(term, "AHJ") != MarkMode.Separate)
+                    return BadRequest(new { message = "Mid-term reports exist only for Junior School (AHJ) terms from Term 3 2026." });
+            }
 
             foreach (var studentId in request.StudentIds)
             {
                 try
                 {
-                    var data = await _reportCardService.BuildReportCardDataAsync(studentId, request.TermId);
+                    if (isMidTerm && await _context.Students.Where(s => s.Id == studentId).Select(s => s.Campus).FirstOrDefaultAsync() != "AHJ")
+                    {
+                        errors.Add($"Student {studentId}: mid-term reports are for Junior School (AHJ) learners only");
+                        continue;
+                    }
+
+                    var data = await _reportCardService.BuildReportCardDataAsync(studentId, request.TermId, reportType);
                     if (data == null)
                     {
                         errors.Add($"Student {studentId}: not found or no registration");
@@ -139,14 +155,16 @@ namespace LeeTec.API.Controllers
 
                     var json = JsonSerializer.Serialize(data);
 
+                    // The mid-term report is its own row; never overwrite one with the other.
                     var existing = await _context.ReportCardRecords
-                        .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == request.TermId);
+                        .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == request.TermId
+                            && (isMidTerm ? r.Status == MarkPolicy.MidTermPublished : r.Status != MarkPolicy.MidTermPublished));
 
                     if (existing != null)
                     {
                         existing.ReportData = json;
                         existing.GeneratedAt = DateTime.UtcNow;
-                        existing.Status = "Published";
+                        existing.Status = status;
                     }
                     else
                     {
@@ -156,7 +174,7 @@ namespace LeeTec.API.Controllers
                             StudentId = studentId,
                             TermId = request.TermId,
                             GeneratedAt = DateTime.UtcNow,
-                            Status = "Published",
+                            Status = status,
                             ReportData = json,
                         });
                     }
@@ -214,7 +232,9 @@ namespace LeeTec.API.Controllers
                 .Where(m => m.StudentId == studentId && m.TermId == termId)
                 .ToListAsync();
 
-            var finalMarkOnly = MarkPolicy.IsFinalMarkOnly(term);
+            // Legacy AHJ endpoint: the end-of-term view (the mid-term report comes from
+            // /api/reports/report-card?reportType=midterm).
+            var finalMarkOnly = MarkPolicy.ModeFor(term, "AHJ") != MarkMode.Averaged;
 
             var subjectResults = subjects.Select(subject =>
             {
@@ -304,5 +324,6 @@ namespace LeeTec.API.Controllers
         public int SchoolId { get; set; }
         public int TermId { get; set; }
         public int[] StudentIds { get; set; } = [];
+        public string? ReportType { get; set; } // "final" (default) or "midterm" (AHJ only)
     }
 }

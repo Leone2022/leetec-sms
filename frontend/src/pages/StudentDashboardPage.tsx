@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { portalAPI, feesAPI, studentsAPI, announcementsAPI, marksAPI, subjectsAPI, versesAPI, homeworkAPI } from '../services/api';
 import { generateStatementPdf, buildStatementRows } from '../utils/statement';
 import { generateReportCard, type ReportCardData } from '../utils/reportCard';
+import { markMode } from '../utils/markPolicy';
 import { GRADE_REFERENCE_TABLES } from '../utils/grading';
 import {
   LogOut, GraduationCap, LayoutDashboard, DollarSign,
@@ -105,6 +106,10 @@ export default function StudentDashboardPage() {
   const studentInfo = JSON.parse(localStorage.getItem('student_info') || '{}');
   const studentId: number | undefined = studentInfo?.id ?? studentInfo?.studentId;
   const studentCampus = studentInfo?.campus || (studentInfo?.studentNumber || '').split('/')[0];
+  // AHJ from Term 3 2026: a Mid-Term Report and an End of Term Report per term.
+  const [portalReportType, setPortalReportType] = useState<'final' | 'midterm'>('final');
+  const [reportTypeChosen, setReportTypeChosen] = useState(false);
+  const portalSeparate = markMode(terms.find(t => t.id === reportTermId), studentCampus) === 'separate';
 
   useEffect(() => {
     if (!localStorage.getItem('student_token')) navigate('/student-login');
@@ -133,7 +138,7 @@ export default function StudentDashboardPage() {
     if (!reportTermId || !studentId) { setReportCard(null); return; }
     loadReportCard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportTermId, studentId]);
+  }, [reportTermId, studentId, portalReportType]);
 
   useEffect(() => {
     setAnnouncementsLoading(true);
@@ -273,9 +278,14 @@ export default function StudentDashboardPage() {
     setReportError(false);
     setReportNotFound(false);
     try {
-      const res = await marksAPI.getStudentReportCard(studentId, reportTermId as number);
+      const res = await marksAPI.getStudentReportCard(studentId, reportTermId as number, portalSeparate ? portalReportType : 'final');
       setReportCard(res.data as ReportCardData);
     } catch (err: any) {
+      // Junior learners: if the End of Term Report is not out yet, show the Mid-Term Report.
+      if (err?.response?.status === 404 && portalSeparate && portalReportType === 'final' && !reportTypeChosen) {
+        setPortalReportType('midterm');
+        return; // the effect reloads with the mid-term report
+      }
       if (err?.response?.status === 404) setReportNotFound(true);
       else setReportError(true);
     } finally {
@@ -564,11 +574,23 @@ export default function StudentDashboardPage() {
           <select
             style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, background: 'white', cursor: 'pointer' }}
             value={reportTermId}
-            onChange={e => setReportTermId(Number(e.target.value))}
+            onChange={e => { setReportTermId(Number(e.target.value)); setReportTypeChosen(false); setPortalReportType('final'); }}
           >
             <option value="">Select term</option>
             {terms.map(t => <option key={t.id} value={t.id}>{t.name} {t.year}</option>)}
           </select>
+          {portalSeparate && (
+            <div role="group" aria-label="Report" style={{ display: 'flex', border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+              {([['midterm', 'Mid-Term'], ['final', 'End of Term']] as const).map(([value, label]) => (
+                <button key={value} type="button"
+                  onClick={() => { setReportTypeChosen(true); setPortalReportType(value); }}
+                  style={{ padding: '8px 12px', border: 'none', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    background: portalReportType === value ? '#1a237e' : 'white', color: portalReportType === value ? 'white' : '#475569' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {reportCard && (
             <button
               onClick={handleDownloadReportCardPdf}
@@ -600,7 +622,9 @@ export default function StudentDashboardPage() {
           <FileText size={36} style={{ color: '#94a3b8', marginBottom: 12 }} />
           <h3 style={{ fontWeight: 700, fontSize: 15, margin: '0 0 8px', color: '#0f172a' }}>Report Card Unavailable</h3>
           <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
-            Your report card is currently unavailable. Please see the school administrator.
+            {portalSeparate && portalReportType === 'midterm'
+              ? 'Your mid-term report has not been published yet.'
+              : 'Your report card is currently unavailable. Please see the school administrator.'}
           </p>
         </div>
       ) : (
@@ -612,6 +636,11 @@ export default function StudentDashboardPage() {
             </p>
             <h2 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 700 }}>
               {reportCard.student.firstName} {reportCard.student.surname}
+              {reportCard.separateReports && (
+                <span style={{ marginLeft: 10, fontSize: 12, fontWeight: 600, padding: '2px 10px', borderRadius: 12, background: 'rgba(255,255,255,0.15)' }}>
+                  {reportCard.reportType === 'midterm' ? 'Mid-Term Report' : 'End of Term Report'}
+                </span>
+              )}
             </h2>
             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, opacity: 0.85 }}>
               <span><strong>Form:</strong> {reportCard.student.form || '—'}</span>
@@ -630,7 +659,9 @@ export default function StudentDashboardPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#1a237e' }}>
-                    {['Subject', 'Paper 1', 'Paper 2', 'Total', 'Grade', 'Comments'].map(h => (
+                    {(reportCard.finalMarkOnly
+                      ? ['Subject', 'Final Mark', reportCard.usesPapers ? 'Band' : 'Grade', 'Comments']
+                      : ['Subject', 'Paper 1', 'Paper 2', 'Total', 'Grade', 'Comments']).map(h => (
                       <th key={h} style={{ padding: '10px 12px', textAlign: h === 'Subject' ? 'left' : 'center', color: 'white', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -647,8 +678,23 @@ export default function StudentDashboardPage() {
                       : (midtermScore !== null && endOfTermScore !== null
                         ? Math.round((Number(midtermScore) + Number(endOfTermScore)) / 2)
                         : midtermScore ?? endOfTermScore);
-                    const comments = s.endTerm?.comments || s.midterm?.comments || '—';
+                    const comments = (reportCard.reportType === 'midterm' ? s.midterm?.comments : s.endTerm?.comments || s.midterm?.comments) || '—';
                     const rowBg = i % 2 === 0 ? '#ffffff' : '#f8fafc';
+                    if (reportCard.finalMarkOnly) {
+                      // One assessment per report from Term 3 2026: show the Final Mark only.
+                      return (
+                        <tr key={s.subjectId} style={{ background: rowBg }}>
+                          <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>{s.name}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{fmt(s.cm)}</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                            <span style={{ padding: '2px 10px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 12 }}>
+                              {(reportCard.usesPapers ? s.band : s.grade) || '—'}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px', color: '#64748b', fontSize: 12 }}>{comments}</td>
+                        </tr>
+                      );
+                    }
                     return (
                       <tr key={s.subjectId} style={{ background: rowBg }}>
                         <td style={{ padding: '10px 12px', fontWeight: 600, color: '#0f172a' }}>

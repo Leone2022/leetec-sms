@@ -41,6 +41,10 @@ namespace LeeTec.API.DTOs
         public decimal? MidtermScore { get; set; }
         public decimal? EndOfTermScore { get; set; }
         public string? Comments { get; set; }
+        // AHJ (separate mid-term and end-of-term reports): a comment for each report.
+        // When null, Comments is used for both, as before.
+        public string? MidtermComments { get; set; }
+        public string? EndOfTermComments { get; set; }
     }
 
     public class PublishReportCardsRequest
@@ -49,6 +53,7 @@ namespace LeeTec.API.DTOs
         public int SchoolId { get; set; } = 1;
         public string? Campus { get; set; }
         public string? Form { get; set; }
+        public string? ReportType { get; set; } // "final" (default) or "midterm" (AHJ only)
     }
 
     public class MarkResponseDTO

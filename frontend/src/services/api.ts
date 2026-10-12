@@ -184,8 +184,9 @@ export const marksAPI = {
     api.get(`/marks/student/${studentId}?termId=${termId}`),
   publishReportCards: (data: any) =>
     api.post('/marks/publish-report-cards', data),
-  getStudentReportCard: (studentId: number, termId: number) =>
-    api.get(`/marks/report-card/${studentId}/${termId}`),
+  // reportType 'midterm' = the AHJ Mid-Term Report (Term 3 2026 onward); default is end of term.
+  getStudentReportCard: (studentId: number, termId: number, reportType: 'final' | 'midterm' = 'final') =>
+    api.get(`/marks/report-card/${studentId}/${termId}?reportType=${reportType}`),
   submitMarks: (data: { subjectId: number; termId: number; campus: string; form: string; submittedBy: string }) =>
     api.post('/marks/submit', data),
   approveMarks: (data: { subjectId: number; termId: number; campus: string; form: string; approvedBy: string }) =>
@@ -209,8 +210,8 @@ export const marksAPI = {
 export const reportsAPI = {
   getAHJReportCard: (studentId: number, termId: number) =>
     api.get(`/reports/ahj-report-card/${studentId}?termId=${termId}`),
-  getReportCard: (studentId: number, termId: number) =>
-    api.get(`/reports/report-card/${studentId}?termId=${termId}`),
+  getReportCard: (studentId: number, termId: number, reportType: 'final' | 'midterm' = 'final') =>
+    api.get(`/reports/report-card/${studentId}?termId=${termId}&reportType=${reportType}`),
   getStudentView: (studentId: number, termId: number) =>
     api.get(`/reports/student-view/${studentId}?termId=${termId}`),
 };
@@ -248,8 +249,8 @@ export const versesAPI = {
 export const bulkReportsAPI = {
   getCompletionStatus: (termId: number, schoolId = 1) =>
     api.get(`/reports/completion-status?termId=${termId}&schoolId=${schoolId}`),
-  publishReports: (schoolId: number, termId: number, studentIds: number[]) =>
-    api.post('/reports/publish', { schoolId, termId, studentIds }),
+  publishReports: (schoolId: number, termId: number, studentIds: number[], reportType: 'final' | 'midterm' = 'final') =>
+    api.post('/reports/publish', { schoolId, termId, studentIds, reportType }),
 };
 
 export const superadminAPI = {

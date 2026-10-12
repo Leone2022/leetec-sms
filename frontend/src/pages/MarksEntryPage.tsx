@@ -3,7 +3,7 @@ import { marksAPI, subjectsAPI, feesAPI, termRegistrationsAPI, reportsAPI } from
 import { ClipboardList, Save, FileDown } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { generateReportCard } from '../utils/reportCard';
-import { isFinalMarkOnlyTerm } from '../utils/markPolicy';
+import { markMode } from '../utils/markPolicy';
 
 const CAMPUSES = ['AHJ', 'AHA', 'AHS'];
 
@@ -92,11 +92,13 @@ export default function MarksEntryPage() {
     }).catch(() => setReportStudents([]));
   }, [campus, termId, form]);
 
+  const [reportType, setReportType] = useState<'final' | 'midterm'>('final');
+
   const handleGenerateReportCard = async () => {
     if (!reportStudentId || !termId) return;
     setGeneratingReport(true);
     try {
-      const res = await reportsAPI.getReportCard(reportStudentId as number, termId as number);
+      const res = await reportsAPI.getReportCard(reportStudentId as number, termId as number, separateReports ? reportType : 'final');
       await generateReportCard(res.data);
     } catch {
       showMsg('Failed to generate report card', 'error');
@@ -219,8 +221,11 @@ export default function MarksEntryPage() {
   const fld: React.CSSProperties = { width: '100%', boxSizing: 'border-box' };
   const scoreInput: React.CSSProperties = { width: 70, textAlign: 'center', padding: '0 6px', color: '#0f172a' };
 
-  // Term 3 2026 onward has no mid-term test: only the final (end-of-term) mark is entered.
-  const finalMarkOnly = isFinalMarkOnlyTerm(terms.find(t => t.id === termId));
+  // Term 3 2026 onward: AHA/AHS enter only the final (end-of-term) mark; AHJ keeps mid-term and
+  // end-of-term as separate assessments, each with its own report.
+  const mode = markMode(terms.find(t => t.id === termId), campus);
+  const finalMarkOnly = mode === 'final-only';
+  const separateReports = mode === 'separate';
   const assessmentTypes = finalMarkOnly ? ['End of Term Exam'] : ASSESSMENT_TYPES;
   useEffect(() => {
     if (finalMarkOnly && assessmentType !== 'End of Term Exam') setAssessmentType('End of Term Exam');
@@ -307,6 +312,16 @@ export default function MarksEntryPage() {
                 ))}
               </select>
             </div>
+            {separateReports && (
+              <div>
+                <label style={lbl}>Report</label>
+                <select className="text-field" style={{ ...fld, appearance: 'auto', cursor: 'pointer' }}
+                  value={reportType} onChange={e => setReportType(e.target.value as 'final' | 'midterm')}>
+                  <option value="midterm">Mid-Term Report</option>
+                  <option value="final">End of Term Report</option>
+                </select>
+              </div>
+            )}
             <button className="btn btn-secondary" style={{ fontSize: 12 }}
               onClick={handleGenerateReportCard} disabled={!reportStudentId || generatingReport}>
               <FileDown size={13} /> {generatingReport ? 'Generating...' : 'Generate Report Card'}
