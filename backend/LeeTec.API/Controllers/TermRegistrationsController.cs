@@ -292,8 +292,8 @@ namespace LeeTec.API.Controllers
             if (termSchoolId == null)
                 return NotFound(new { message = "Target term not found." });
 
-            var denied = await CheckTermsAdminAsync(termSchoolId.Value);
-            if (denied != null) return denied;
+            if (!await TermsAdmin.IsAllowedAsync(_context, User, termSchoolId.Value))
+                return TermsAdmin.Forbidden();
 
             if (!dto.DryRun && dto.ExpectedInserts == null)
                 return BadRequest(new { ok = false, message = "Run the preview first; ExpectedInserts is required to copy." });
@@ -301,43 +301,6 @@ namespace LeeTec.API.Controllers
             var result = await _subjectRollover.CopyFromPreviousTermAsync(
                 dto.TargetTermId, termSchoolId.Value, dto.SourceTermId, dto.DryRun, dto.ExpectedInserts);
             return result.Ok ? Ok(result) : BadRequest(result);
-        }
-
-        // Null when the caller is an active admin user allowed to manage terms for this school.
-        // Teacher and student tokens are signed with the same key, so reject any token that
-        // carries a role or student claim before trusting NameIdentifier as a Users.Id.
-        private async Task<IActionResult?> CheckTermsAdminAsync(int schoolId)
-        {
-            var forbidden = StatusCode(403, new { ok = false, message = "You do not have permission to manage terms." });
-
-            if (User.Claims.Any(c => c.Type == System.Security.Claims.ClaimTypes.Role || c.Type == "role"
-                    || c.Type == "studentId" || c.Type == "studentNumber"))
-                return forbidden;
-            if (!int.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId))
-                return forbidden;
-
-            var user = await _context.Users
-                .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-                .FirstOrDefaultAsync(u => u.Id == userId);
-            if (user == null || user.Status != "Active") return forbidden;
-
-            var isSuperAdmin = user.UserRoles.Any(ur => ur.Role != null && ur.Role.Name == "SuperAdmin");
-            if (isSuperAdmin) return null;
-
-            List<string> permissions;
-            try
-            {
-                permissions = string.IsNullOrWhiteSpace(user.Permissions)
-                    ? new List<string>()
-                    : (System.Text.Json.JsonSerializer.Deserialize<List<string>>(user.Permissions) ?? new List<string>());
-            }
-            catch (System.Text.Json.JsonException)
-            {
-                permissions = new List<string>();
-            }
-
-            if (!permissions.Contains("Terms & Periods") || user.SchoolId != schoolId) return forbidden;
-            return null;
         }
 
         // UPDATE payment status

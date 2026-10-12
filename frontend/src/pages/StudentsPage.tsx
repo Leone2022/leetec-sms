@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { studentsAPI, feesAPI, subjectsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Search, Users, X, FileDown, FileSpreadsheet, FileText, Plus, ChevronRight, ChevronLeft, Lock, Unlock } from 'lucide-react';
+import { Search, Users, X, FileDown, FileSpreadsheet, FileText, Plus, ChevronRight, ChevronLeft } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { exportTableToExcel, exportTableToPdf, exportTableToWord } from '../utils/exportTable';
 
@@ -34,7 +34,7 @@ const defaultCurriculum = (campus: string) =>
   campus === 'AHJ' ? 'Cambridge' : (CURRICULUM_OPTIONS[campus]?.[0] ?? 'Cambridge');
 
 const FORM_OPTIONS: Record<string, string[]> = {
-  AHJ: ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'],
+  AHJ: ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'],
   AHS: ['Lower 6', 'Upper 6'],
   AHA: ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'],
 };
@@ -68,7 +68,25 @@ const blankContact = () => ({
   cell: '', relationship: '',
 });
 
+// Student.Status values (backend Services/StudentLifecycle.cs). Only Active students are
+// current; the rest stay on record for history and fee reports.
+const STUDENT_STATUSES = ['Active', 'Transferred', 'Graduated', 'Withdrawn', 'Inactive'] as const;
+type StudentStatus = typeof STUDENT_STATUSES[number];
+const STATUS_INFO: Record<StudentStatus, { label: string; tab: string; action: string; bg: string; color: string }> = {
+  Active: { label: 'Active', tab: 'Current', action: 'Make current (Active)', bg: '#dcfce7', color: '#15803d' },
+  Transferred: { label: 'Transferred', tab: 'Transferred', action: 'Mark as transferred out', bg: '#e0f2fe', color: '#0369a1' },
+  Graduated: { label: 'Graduated', tab: 'Graduated / Alumni', action: 'Mark as graduated', bg: '#f3e8ff', color: '#7e22ce' },
+  Withdrawn: { label: 'Withdrawn', tab: 'Withdrawn', action: 'Mark as withdrawn', bg: '#fef3c7', color: '#b45309' },
+  Inactive: { label: 'Inactive', tab: 'Inactive', action: 'Deactivate', bg: '#fee2e2', color: '#b91c1c' },
+};
+
+function StatusPill({ status }: { status?: string }) {
+  const info = STATUS_INFO[(status ?? 'Active') as StudentStatus] ?? STATUS_INFO.Inactive;
+  return <span className="pill" style={{ background: info.bg, color: info.color, fontSize: 11 }}>{status ?? 'Active'}</span>;
+}
+
 export default function StudentsPage() {
+  const [statusTab, setStatusTab] = useState<StudentStatus | 'All'>('Active');
   useAuth();
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -489,12 +507,16 @@ export default function StudentsPage() {
     }
   };
 
-  const handleToggleStatus = async () => {
-    if (!selectedStudent) return;
-    const newStatus = selectedStudent.status === 'Active' ? 'Inactive' : 'Active';
+  const handleChangeStatus = async (newStatus: StudentStatus) => {
+    if (!selectedStudent || newStatus === selectedStudent.status) return;
+    const name = `${selectedStudent.firstName} ${selectedStudent.surname}`;
+    const prompt = newStatus === 'Active'
+      ? `Make ${name} a current (Active) student again? They will be counted in fees, registers and teacher sheets.`
+      : `Mark ${name} as ${STATUS_INFO[newStatus].label}? They will be removed from current fee totals, registers and teacher sheets, but their record, invoices and marks are kept.`;
+    if (!window.confirm(prompt)) return;
     try {
       await studentsAPI.updateStatus(selectedStudent.id, newStatus);
-      showMessage(`Student ${newStatus.toLowerCase()} successfully`, 'success');
+      showMessage(`${name} is now ${STATUS_INFO[newStatus].label}`, 'success');
       setSelectedStudent((prev: any) => ({ ...prev, status: newStatus }));
       setStudents((prev) =>
         prev.map((s) => (s.id === selectedStudent.id ? { ...s, status: newStatus } : s))
@@ -697,7 +719,12 @@ export default function StudentsPage() {
     }
   };
 
+  const statusCounts = STUDENT_STATUSES.reduce<Record<string, number>>((acc, st) => {
+    acc[st] = students.filter((s) => (s.status ?? 'Active') === st).length;
+    return acc;
+  }, {});
   const filtered = students.filter((s) =>
+    (statusTab === 'All' || (s.status ?? 'Active') === statusTab) &&
     `${s.firstName} ${s.surname} ${s.studentNumber}`.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -797,7 +824,7 @@ export default function StudentsPage() {
         />
       )}
 
-    <AdminLayout title="Students" subtitle={`${students.length} enrolled`}>
+    <AdminLayout title="Students" subtitle={`${statusCounts.Active ?? 0} current · ${students.length} on record`}>
 
       <div className="toolbar">
         <div className="toolbar-search">
@@ -811,6 +838,19 @@ export default function StudentsPage() {
               </button>
             )}
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', width: '100%', order: 10 }}>
+          {(['Active', 'Transferred', 'Graduated', 'Withdrawn', 'Inactive', 'All'] as const).map((tab) => (
+            <button key={tab} type="button" onClick={() => setStatusTab(tab)}
+              style={{
+                padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: statusTab === tab ? '1px solid #1a237e' : '1px solid #e2e8f0',
+                background: statusTab === tab ? '#1a237e' : 'white',
+                color: statusTab === tab ? 'white' : '#475569',
+              }}>
+              {tab === 'All' ? 'All' : STATUS_INFO[tab].tab} ({tab === 'All' ? students.length : statusCounts[tab] ?? 0})
+            </button>
+          ))}
         </div>
         <div className="toolbar-meta">
           <Users size={13} style={{ verticalAlign: 'middle', marginRight: 6 }} />
@@ -858,9 +898,7 @@ export default function StudentsPage() {
                         <td>{s.curriculum}</td>
                         <td>{s.gender}</td>
                         <td>
-                          <span className={`pill ${s.status === 'Active' ? 'pill-success' : 'pill-danger'}`}>
-                            {s.status}
-                          </span>
+                          <StatusPill status={s.status} />
                         </td>
                       </tr>
                     );
@@ -1398,9 +1436,7 @@ export default function StudentsPage() {
                         <span style={{ fontFamily: 'ui-monospace, monospace' }}>{selectedStudent.studentNumber}</span>
                         {' · '}{selectedStudent.form}
                       </p>
-                      <span className={`pill ${selectedStudent.status === 'Active' ? 'pill-success' : 'pill-danger'}`} style={{ fontSize: '11px' }}>
-                        {selectedStudent.status}
-                      </span>
+                      <StatusPill status={selectedStudent.status} />
                     </div>
                   </div>
                 </div>
@@ -1696,13 +1732,18 @@ export default function StudentsPage() {
                 >
                   ✏️ Edit
                 </button>
-                <button
-                  onClick={handleToggleStatus}
+                <select
                   className="btn"
-                  style={{ background: selectedStudent.status === 'Active' ? '#dc2626' : '#0ea5e9', color: 'white', border: 'none' }}
+                  aria-label="Change student status"
+                  value=""
+                  onChange={(e) => { const v = e.target.value as StudentStatus; e.target.value = ''; if (v) handleChangeStatus(v); }}
+                  style={{ background: '#f1f5f9', color: '#0f172a', border: '1px solid #cbd5e1', cursor: 'pointer', appearance: 'auto' }}
                 >
-                  {selectedStudent.status === 'Active' ? <><Lock size={14} /> Deactivate</> : <><Unlock size={14} /> Activate</>}
-                </button>
+                  <option value="">Change status…</option>
+                  {STUDENT_STATUSES.filter((st) => st !== (selectedStudent.status ?? 'Active')).map((st) => (
+                    <option key={st} value={st}>{STATUS_INFO[st].action}</option>
+                  ))}
+                </select>
                 <button
                   onClick={handleDeleteStudent}
                   className="btn"
@@ -1720,7 +1761,7 @@ export default function StudentsPage() {
       {isEditModalOpen && selectedStudent && (() => {
         const originalCampus = (selectedStudent.studentNumber ?? '').split('/')[0];
         const formOptions = editForm.campus === 'AHJ'
-          ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6']
+          ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7']
           : editForm.campus === 'AHS' ? ['Lower 6', 'Upper 6']
           : ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
         const curriculumOptions = editForm.campus === 'AHJ' ? ['Cambridge']
@@ -1728,7 +1769,7 @@ export default function StudentsPage() {
           : ['ZIMSEC O-Level', 'Cambridge IGCSE'];
         const handleEditCampusChange = (newCampus: string) => {
           const newFormOptions = newCampus === 'AHJ'
-            ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6']
+            ? ['Nursery', 'ECD A', 'ECD B', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7']
             : newCampus === 'AHS' ? ['Lower 6', 'Upper 6']
             : ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
           const newCurriculumOptions = newCampus === 'AHJ' ? ['Cambridge']

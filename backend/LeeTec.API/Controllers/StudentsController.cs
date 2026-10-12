@@ -36,11 +36,13 @@ namespace LeeTec.API.Controllers
                     "AHS" => "AHS",
                     _     => "AHA"
                 };
-                var yearPrefix = $"{prefix}/{DateTime.Now.Year}/";
+                // Intake year: next year's number when enrolling ahead for the January intake.
+                var numberYear = StudentLifecycle.StudentNumberYear(dto.DateOfEntry, DateTime.Now);
+                var yearPrefix = $"{prefix}/{numberYear}/";
                 var lastStudent = _context.Students.Where(s => s.StudentNumber.StartsWith(yearPrefix)).OrderByDescending(s => s.StudentNumber).FirstOrDefault();
                 int nextNumber = 1;
                 if (lastStudent != null) { var parts = lastStudent.StudentNumber.Split('/'); if (parts.Length == 3 && int.TryParse(parts[2], out int last)) nextNumber = last + 1; }
-                var studentNumber = $"{prefix}/{DateTime.Now.Year}/{nextNumber:D4}";
+                var studentNumber = $"{prefix}/{numberYear}/{nextNumber:D4}";
 
                 var student = new Student
                 {
@@ -479,12 +481,16 @@ namespace LeeTec.API.Controllers
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, string status)
         {
+            var normalized = StudentLifecycle.Normalize(status);
+            if (normalized == null)
+                return BadRequest(new { message = $"Unknown status. Use one of: {string.Join(", ", StudentLifecycle.All)}." });
+
             var student = await _context.Students.FindAsync(id);
             if (student == null) return NotFound("Student not found");
 
-            student.Status = status;
+            student.Status = normalized;
             await _context.SaveChangesAsync();
-            return Ok($"Student status updated to {status}");
+            return Ok($"Student status updated to {normalized}");
         }
 
         // DELETE STUDENT

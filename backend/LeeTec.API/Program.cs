@@ -59,6 +59,7 @@ builder.Services.AddScoped<IReportCardService, ReportCardService>();
 
 // Term rollover — copies StudentSubjects into a new term (admin button on the Terms page)
 builder.Services.AddScoped<ISubjectRolloverService, SubjectRolloverService>();
+builder.Services.AddScoped<YearEndPromotionService>();
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
