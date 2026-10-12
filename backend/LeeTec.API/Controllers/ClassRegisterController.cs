@@ -7,7 +7,7 @@ using LeeTec.API.Services;
 namespace LeeTec.API.Controllers
 {
     // Class registers: the current (Active) students of a class, using Student.Campus/Form,
-    // the same membership as teacher entry sheets, with the term's registration and subjects.
+    // the same membership as teacher entry sheets, for printing tick-box attendance registers.
     [ApiController]
     [Route("api/class-register")]
     public class ClassRegisterController : ControllerBase
@@ -80,6 +80,8 @@ namespace LeeTec.API.Controllers
             return Ok(await BuildAsync(termId, campus, form, assignment.Value));
         }
 
+        // A register is a list of names to tick: number, name, sex and student number only.
+        // Contact details and subjects are deliberately left out (they live on the student record).
         private async Task<object> BuildAsync(int termId, string campus, string form, int schoolId)
         {
             var term = await _context.Terms.Where(t => t.Id == termId).Select(t => new { t.Id, t.Name }).FirstOrDefaultAsync();
@@ -87,7 +89,7 @@ namespace LeeTec.API.Controllers
             var students = await _context.Students
                 .Where(s => s.SchoolId == schoolId && s.Status == "Active" && s.Campus == campus && s.Form == form)
                 .OrderBy(s => s.Surname).ThenBy(s => s.FirstName)
-                .Select(s => new { s.Id, s.StudentNumber, s.Surname, s.FirstName, s.Gender, s.DateOfBirth, s.StudentType, s.Curriculum })
+                .Select(s => new { s.Id, s.StudentNumber, s.Surname, s.FirstName, s.Gender })
                 .ToListAsync();
             var ids = students.Select(s => s.Id).ToList();
 
@@ -95,48 +97,15 @@ namespace LeeTec.API.Controllers
                 .Where(r => r.TermId == termId && r.Status == "Active" && ids.Contains(r.StudentId))
                 .Select(r => r.StudentId).ToListAsync()).ToHashSet();
 
-            var subjects = (await _context.StudentSubjects
-                    .Where(ss => ss.TermId == termId && ss.IsActive && ids.Contains(ss.StudentId))
-                    .Join(_context.Subjects, ss => ss.SubjectId, sub => sub.Id, (ss, sub) => new { ss.StudentId, sub.Name })
-                    .ToListAsync())
-                .ToLookup(x => x.StudentId, x => x.Name);
-
-            var guardians = (await _context.Guardians
-                    .Where(g => ids.Contains(g.StudentId))
-                    .Select(g => new { g.StudentId, g.GuardianType, g.Title, g.Forenames, g.Surname, g.Cell })
-                    .ToListAsync())
-                .ToLookup(g => g.StudentId);
-
-            var familyPhones = (await _context.Families
-                    .Where(f => ids.Contains(f.StudentId))
-                    .Select(f => new { f.StudentId, f.Cell, f.HomeTelephone })
-                    .ToListAsync())
-                .GroupBy(f => f.StudentId)
-                .ToDictionary(g => g.Key, g => g.Select(f => !string.IsNullOrWhiteSpace(f.Cell) ? f.Cell : f.HomeTelephone).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p)));
-
-            var rows = students.Select((s, i) =>
+            var rows = students.Select((s, i) => new
             {
-                // Prefer a guardian with a cell number; fall back to the family phone.
-                var g = guardians[s.Id].OrderBy(x => string.IsNullOrWhiteSpace(x.Cell) ? 1 : 0).FirstOrDefault();
-                var guardianName = g == null ? "" : $"{g.Title} {g.Forenames} {g.Surname}".Trim();
-                var phone = !string.IsNullOrWhiteSpace(g?.Cell) ? g!.Cell : familyPhones.GetValueOrDefault(s.Id) ?? "";
-                return new
-                {
-                    No = i + 1,
-                    s.Id,
-                    s.StudentNumber,
-                    s.Surname,
-                    s.FirstName,
-                    s.Gender,
-                    s.DateOfBirth,
-                    s.StudentType,
-                    s.Curriculum,
-                    Guardian = guardianName,
-                    GuardianRelation = g?.GuardianType ?? "",
-                    GuardianPhone = phone,
-                    RegisteredForTerm = registered.Contains(s.Id),
-                    Subjects = subjects[s.Id].OrderBy(n => n).ToList(),
-                };
+                No = i + 1,
+                s.Id,
+                s.StudentNumber,
+                s.Surname,
+                s.FirstName,
+                s.Gender,
+                RegisteredForTerm = registered.Contains(s.Id),
             }).ToList();
 
             return new

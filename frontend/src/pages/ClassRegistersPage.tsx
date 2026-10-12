@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { FileDown, FileSpreadsheet, ClipboardList, Users } from 'lucide-react';
+import { FileSpreadsheet, Printer, Users } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { classRegisterAPI, feesAPI } from '../services/api';
 import {
-  type ClassRegister, downloadRegisterPdf, downloadAttendanceSheetPdf, downloadRegisterExcel, downloadAllRegistersExcel,
+  type ClassRegister, downloadRegisterPdf, downloadAllRegistersPdf, downloadRegisterExcel,
 } from '../utils/classRegister';
 
 interface ClassSummary { campus: string; form: string; total: number; boys: number; girls: number; notRegistered: number }
@@ -54,7 +54,7 @@ export default function ClassRegistersPage() {
     try {
       const registers: ClassRegister[] = [];
       for (const c of classes) registers.push((await classRegisterAPI.get(termId, c.campus, c.form)).data);
-      downloadAllRegistersExcel(registers, terms.find((t) => t.id === termId)?.name ?? 'Term');
+      downloadAllRegistersPdf(registers, terms.find((t) => t.id === termId)?.name ?? 'Term');
     } catch {
       setError('Failed to export all classes');
     } finally {
@@ -76,7 +76,7 @@ export default function ClassRegistersPage() {
         </div>
         <div className="toolbar-actions">
           <button className="btn btn-secondary" onClick={exportAll} disabled={exportingAll || classes.length === 0}>
-            <FileSpreadsheet size={14} /> {exportingAll ? 'Preparing...' : 'All classes (Excel)'}
+            <Printer size={14} /> {exportingAll ? 'Preparing...' : 'Print all classes'}
           </button>
         </div>
       </div>
@@ -112,9 +112,8 @@ export default function ClassRegistersPage() {
             </div>
             {register && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn btn-secondary" onClick={() => downloadRegisterPdf(register)}><FileDown size={14} /> Register PDF</button>
-                <button className="btn btn-secondary" onClick={() => downloadAttendanceSheetPdf(register)}><ClipboardList size={14} /> Attendance sheet</button>
-                <button className="btn btn-secondary" onClick={() => downloadRegisterExcel(register)}><FileSpreadsheet size={14} /> Excel</button>
+                <button className="btn btn-primary" onClick={() => downloadRegisterPdf(register)}><Printer size={14} /> Print register</button>
+                <button className="btn btn-secondary" onClick={() => downloadRegisterExcel(register)}><FileSpreadsheet size={14} /> Class list (Excel)</button>
               </div>
             )}
           </div>
@@ -124,7 +123,7 @@ export default function ClassRegistersPage() {
             <div className="data-table-wrap">
               <table className="data-table">
                 <thead>
-                  <tr><th>No.</th><th>Learner</th><th>Student No.</th><th>Sex</th><th>Day/Boarder</th><th>Parent / Guardian</th><th>Phone</th><th>Subjects</th></tr>
+                  <tr><th>No.</th><th>Learner</th><th>Student No.</th><th>Sex</th></tr>
                 </thead>
                 <tbody>
                   {register.students.map((s) => (
@@ -134,10 +133,6 @@ export default function ClassRegistersPage() {
                         {!s.registeredForTerm && <div style={{ fontSize: 11, color: '#b45309' }}>Not registered for this term</div>}</td>
                       <td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{s.studentNumber}</td>
                       <td>{s.gender}</td>
-                      <td>{s.studentType}</td>
-                      <td style={{ fontSize: 12 }}>{s.guardian || '—'}{s.guardianRelation && <div style={{ color: '#64748b', fontSize: 11 }}>{s.guardianRelation}</div>}</td>
-                      <td style={{ fontSize: 12 }}>{s.guardianPhone || '—'}</td>
-                      <td style={{ fontSize: 12, color: s.subjects.length ? '#475569' : '#b45309' }}>{s.subjects.length ? `${s.subjects.length} subjects` : 'None this term'}</td>
                     </tr>
                   ))}
                 </tbody>

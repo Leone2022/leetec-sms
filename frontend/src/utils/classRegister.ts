@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { type CellHookData } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 export interface RegisterStudent {
@@ -9,14 +9,7 @@ export interface RegisterStudent {
   surname: string;
   firstName: string;
   gender: string;
-  dateOfBirth: string;
-  studentType: string;
-  curriculum: string;
-  guardian: string;
-  guardianRelation: string;
-  guardianPhone: string;
   registeredForTerm: boolean;
-  subjects: string[];
 }
 
 export interface ClassRegister {
@@ -36,83 +29,127 @@ const SCHOOL_NAMES: Record<string, string> = {
   AHS: 'ADVENT HOPE ACADEMY (SIXTH FORM)',
 };
 const NAVY: [number, number, number] = [26, 35, 126];
+const WEEKS = 5;
+const DAYS = ['M', 'T', 'W', 'T', 'F'];
+const BLANK_ROWS = 3; // spare lines for learners who join after printing
+const MARGIN = 28;
 
 const fileBase = (r: ClassRegister) => `${r.campus}_${r.form}_${r.termName}`.replace(/\s+/g, '_');
-const today = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
-function header(doc: jsPDF, r: ClassRegister, title: string) {
-  const w = doc.internal.pageSize.getWidth();
+// One class register on the current page(s): names down the left, a square tick box for
+// every school day of five weeks across, and a Total column. Long classes continue on a
+// new page with the headings repeated.
+function drawRegister(doc: jsPDF, r: ClassRegister) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
+  doc.setFontSize(13);
   doc.setTextColor(...NAVY);
-  doc.text(SCHOOL_NAMES[r.campus] ?? 'ADVENT HOPE SCHOOLS', w / 2, 34, { align: 'center' });
+  doc.text(SCHOOL_NAMES[r.campus] ?? 'ADVENT HOPE SCHOOLS', pageWidth / 2, 30, { align: 'center' });
   doc.setFontSize(11);
-  doc.text(`${title}: ${r.campus} ${r.form}`, w / 2, 52, { align: 'center' });
+  doc.text(`CLASS REGISTER: ${r.campus} ${r.form}`, pageWidth / 2, 46, { align: 'center' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(80);
-  doc.text(`${r.termName}  ·  ${r.total} learners (${r.boys} boys, ${r.girls} girls)  ·  Printed ${today()}`, w / 2, 66, { align: 'center' });
+  doc.setTextColor(60);
+  doc.text(`${r.termName}  ·  ${r.total} learners (${r.boys} boys, ${r.girls} girls)`, MARGIN, 64);
+  doc.text('Month: ____________________     Class teacher: ______________________________', pageWidth - MARGIN, 64, { align: 'right' });
   doc.setTextColor(0);
+
+  const boxCount = WEEKS * DAYS.length;
+  const noWidth = 24;
+  const nameWidth = 170;
+  const totalWidth = 36;
+  const boxWidth = (pageWidth - 2 * MARGIN - noWidth - nameWidth - totalWidth) / boxCount;
+  const firstBox = 2;
+  const isBox = (col: number) => col >= firstBox && col < firstBox + boxCount;
+  const isWeekStart = (col: number) => isBox(col) && (col - firstBox) % DAYS.length === 0;
+
+  const columnStyles: Record<number, { cellWidth: number; halign?: 'center' | 'left' }> = {
+    0: { cellWidth: noWidth, halign: 'center' },
+    1: { cellWidth: nameWidth },
+    [firstBox + boxCount]: { cellWidth: totalWidth, halign: 'center' },
+  };
+  for (let i = 0; i < boxCount; i++) columnStyles[firstBox + i] = { cellWidth: boxWidth, halign: 'center' };
+
+  const body = [
+    ...r.students.map((s) => [String(s.no), `${s.surname}, ${s.firstName}`, ...Array(boxCount).fill(''), '']),
+    ...Array.from({ length: BLANK_ROWS }, (_, i) => [String(r.students.length + i + 1), '', ...Array(boxCount).fill(''), '']),
+  ];
+
+  autoTable(doc, {
+    startY: 72,
+    margin: { left: MARGIN, right: MARGIN, top: 40, bottom: 44 },
+    head: [
+      [
+        { content: 'No.', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+        { content: 'Learner', rowSpan: 2, styles: { valign: 'middle' } },
+        ...Array.from({ length: WEEKS }, (_, w) => ({ content: `Week ${w + 1}   __/__`, colSpan: DAYS.length, styles: { halign: 'center' as const } })),
+        { content: 'Total', rowSpan: 2, styles: { valign: 'middle', halign: 'center' } },
+      ],
+      Array.from({ length: WEEKS }, () => DAYS).flat().map((d) => ({ content: d, styles: { halign: 'center' as const } })),
+    ],
+    body,
+    theme: 'grid',
+    showHead: 'everyPage',
+    headStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold', fontSize: 7.5, cellPadding: 3, lineColor: [255, 255, 255], lineWidth: 0.4 },
+    styles: { fontSize: 8.5, cellPadding: 3, minCellHeight: 17, valign: 'middle', lineColor: [170, 170, 170], lineWidth: 0.4, overflow: 'ellipsize' },
+    alternateRowStyles: { fillColor: [247, 248, 252] },
+    columnStyles,
+    didDrawCell: (data: CellHookData) => {
+      if (data.section !== 'body') return;
+      const { cell, column } = data;
+      if (isBox(column.index)) {
+        // The tick box itself: a square centred in the cell.
+        const size = Math.min(cell.width, cell.height) - 6;
+        doc.setDrawColor(90);
+        doc.setLineWidth(0.6);
+        doc.rect(cell.x + (cell.width - size) / 2, cell.y + (cell.height - size) / 2, size, size);
+      }
+      if (isWeekStart(column.index)) {
+        // Heavier line between weeks so rows are easy to follow across the page.
+        doc.setDrawColor(...NAVY);
+        doc.setLineWidth(1.2);
+        doc.line(cell.x, cell.y, cell.x, cell.y + cell.height);
+      }
+    },
+    didDrawPage: () => {
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8);
+      doc.setTextColor(80);
+      doc.text('Key:   /  present     O  absent     L  late     E  excused', MARGIN, pageHeight - 24);
+      doc.text('Signature: ______________________', pageWidth - MARGIN, pageHeight - 24, { align: 'right' });
+      doc.setTextColor(0);
+    },
+  });
 }
 
-// Class list with guardian contacts, one line per learner.
+const newDoc = () => new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+// Printable tick-box register for one class.
 export function downloadRegisterPdf(r: ClassRegister) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-  header(doc, r, 'CLASS REGISTER');
-  autoTable(doc, {
-    startY: 80,
-    head: [['No.', 'Student No.', 'Surname', 'First name', 'Sex', 'Date of birth', 'Day/Boarder', 'Parent / Guardian', 'Phone']],
-    body: r.students.map((s) => [s.no, s.studentNumber, s.surname, s.firstName, s.gender, s.dateOfBirth, s.studentType, s.guardian || '—', s.guardianPhone || '—']),
-    theme: 'grid',
-    headStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold' },
-    styles: { fontSize: 8.5, cellPadding: 4, lineColor: [190, 190, 190], lineWidth: 0.4 },
-    columnStyles: { 0: { cellWidth: 28, halign: 'center' }, 4: { halign: 'center' } },
-  });
+  const doc = newDoc();
+  drawRegister(doc, r);
   doc.save(`Class_Register_${fileBase(r)}.pdf`);
 }
 
-// Blank attendance sheet: learner names with empty day columns to tick by hand.
-export function downloadAttendanceSheetPdf(r: ClassRegister, days = 15) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-  header(doc, r, 'ATTENDANCE REGISTER');
-  autoTable(doc, {
-    startY: 80,
-    head: [['No.', 'Learner', ...Array.from({ length: days }, () => '__/__'), 'Days present']],
-    body: r.students.map((s) => [s.no, `${s.surname}, ${s.firstName}`, ...Array.from({ length: days }, () => ''), '']),
-    theme: 'grid',
-    headStyles: { fillColor: NAVY, textColor: 255, fontStyle: 'bold', fontSize: 7, halign: 'center' },
-    styles: { fontSize: 8, cellPadding: 4, minCellHeight: 16, lineColor: [150, 150, 150], lineWidth: 0.4 },
-    columnStyles: { 0: { cellWidth: 26, halign: 'center' }, 1: { cellWidth: 150 } },
+// Every class in one PDF, each class starting on a new page.
+export function downloadAllRegistersPdf(registers: ClassRegister[], termName: string) {
+  const doc = newDoc();
+  registers.forEach((r, i) => {
+    if (i > 0) doc.addPage();
+    drawRegister(doc, r);
   });
-  const y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 24;
-  doc.setFontSize(9);
-  doc.text('Key:  /  present     O  absent     L  late     E  excused', 40, y);
-  doc.text('Class teacher: ______________________     Signature: ______________', 40, y + 18);
-  doc.save(`Attendance_Sheet_${fileBase(r)}.pdf`);
+  doc.save(`Class_Registers_${termName.replace(/\s+/g, '_')}.pdf`);
 }
 
-const sheetRows = (r: ClassRegister) => [
-  ['No.', 'Student No.', 'Surname', 'First name', 'Sex', 'Date of birth', 'Day/Boarder', 'Curriculum', 'Parent / Guardian', 'Relation', 'Phone', `Registered for ${r.termName}`, 'Subjects'],
-  ...r.students.map((s) => [s.no, s.studentNumber, s.surname, s.firstName, s.gender, s.dateOfBirth, s.studentType, s.curriculum,
-    s.guardian, s.guardianRelation, s.guardianPhone, s.registeredForTerm ? 'Yes' : 'No', s.subjects.join(', ')]),
-];
-
-function addSheet(wb: XLSX.WorkBook, r: ClassRegister) {
-  const ws = XLSX.utils.aoa_to_sheet(sheetRows(r));
-  ws['!cols'] = [6, 16, 16, 16, 6, 13, 12, 18, 26, 10, 16, 12, 60].map((wch) => ({ wch }));
-  // Sheet names: max 31 chars, no special characters.
-  XLSX.utils.book_append_sheet(wb, ws, `${r.campus} ${r.form}`.replace(/[\\/?*[\]:]/g, '-').slice(0, 31));
-}
-
+// Plain class list for anyone who prefers to keep the register in Excel.
 export function downloadRegisterExcel(r: ClassRegister) {
   const wb = XLSX.utils.book_new();
-  addSheet(wb, r);
-  XLSX.writeFile(wb, `Class_Register_${fileBase(r)}.xlsx`);
-}
-
-// Every class in one workbook, one sheet per class.
-export function downloadAllRegistersExcel(registers: ClassRegister[], termName: string) {
-  const wb = XLSX.utils.book_new();
-  registers.forEach((r) => addSheet(wb, r));
-  XLSX.writeFile(wb, `Class_Registers_${termName.replace(/\s+/g, '_')}.xlsx`);
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['No.', 'Surname', 'First name', 'Sex', 'Student No.'],
+    ...r.students.map((s) => [s.no, s.surname, s.firstName, s.gender, s.studentNumber]),
+  ]);
+  ws['!cols'] = [6, 18, 18, 6, 16].map((wch) => ({ wch }));
+  XLSX.utils.book_append_sheet(wb, ws, `${r.campus} ${r.form}`.replace(/[\\/?*[\]:]/g, '-').slice(0, 31));
+  XLSX.writeFile(wb, `Class_List_${fileBase(r)}.xlsx`);
 }
