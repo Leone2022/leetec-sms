@@ -8,6 +8,7 @@ import TermsPage from './pages/TermsPage.tsx';
 import FeeSetupPage from './pages/FeeSetupPage.tsx';
 // import BursariesPage from './pages/BursariesPage.tsx';
 import SuperAdminPage from './pages/SuperAdminPage.tsx';
+import ClassRegistersPage from './pages/ClassRegistersPage.tsx';
 import SubjectsPage from './pages/SubjectsPage.tsx';
 import MarksEntryPage from './pages/MarksEntryPage.tsx';
 import BulkReportsPage from './pages/BulkReportsPage.tsx';
@@ -52,6 +53,7 @@ function App() {
       {/* Protected Admin Routes */}
       <Route path="/dashboard" element={<AdminRoute><DashboardPage /></AdminRoute>} />
       <Route path="/students" element={<AdminRoute><StudentsPage /></AdminRoute>} />
+      <Route path="/class-registers" element={<AdminRoute><ClassRegistersPage /></AdminRoute>} />
       <Route path="/subject-requests" element={<AdminRoute><SubjectRequestsPage /></AdminRoute>} />
       <Route path="/fees" element={<AdminRoute><FeesPage /></AdminRoute>} />
       <Route path="/terms" element={<AdminRoute><TermsPage /></AdminRoute>} />

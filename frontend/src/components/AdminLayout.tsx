@@ -20,6 +20,7 @@ import {
   Globe,
   ArrowLeftRight,
   KeyRound,
+  ClipboardCheck,
 } from 'lucide-react';
 
 interface NavChild {
@@ -40,6 +41,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { label: 'Dashboard', Icon: LayoutDashboard, path: '/dashboard' },
   { label: 'Students', Icon: Users, path: '/students', permission: 'Students' },
+  { label: 'Class Registers', Icon: ClipboardCheck, path: '/class-registers', permission: 'Students' },
   { label: 'Subject Requests', Icon: ArrowLeftRight, path: '/subject-requests' },
   {
     label: 'Finances',
