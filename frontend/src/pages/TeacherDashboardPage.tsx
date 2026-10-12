@@ -942,7 +942,7 @@ export default function TeacherDashboardPage() {
                         onClick={() => termId && setRegisterFor({ campus: a.campus, form: a.form })}
                         className="btn btn-secondary"
                         disabled={!termId}
-                        title="Class list, guardian contacts and a printable attendance sheet"
+                        title="Class list and a printable tick-box register"
                         style={{ fontSize: 12, justifyContent: 'center' }}
                       >
                         <Users size={13} /> Register

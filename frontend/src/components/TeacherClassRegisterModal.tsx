@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { X, FileDown, ClipboardList } from 'lucide-react';
+import { X, Printer } from 'lucide-react';
 import { classRegisterAPI } from '../services/api';
-import { type ClassRegister, downloadRegisterPdf, downloadAttendanceSheetPdf } from '../utils/classRegister';
+import { type ClassRegister, downloadRegisterPdf } from '../utils/classRegister';
 
 interface Props { termId: number; campus: string; form: string; onClose: () => void }
 
@@ -28,8 +28,7 @@ export default function TeacherClassRegisterModal({ termId, campus, form, onClos
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {register && (
               <>
-                <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => downloadRegisterPdf(register)}><FileDown size={13} /> Register PDF</button>
-                <button className="btn btn-secondary" style={{ fontSize: 12 }} onClick={() => downloadAttendanceSheetPdf(register)}><ClipboardList size={13} /> Attendance sheet</button>
+                <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => downloadRegisterPdf(register)}><Printer size={13} /> Print register</button>
               </>
             )}
             <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569' }}><X size={18} /></button>
@@ -40,7 +39,7 @@ export default function TeacherClassRegisterModal({ termId, campus, form, onClos
             : !register ? <p style={{ color: '#475569', fontSize: 13, padding: '0 22px' }}>Loading...</p>
             : (
               <table className="data-table">
-                <thead><tr><th>No.</th><th>Learner</th><th>Student No.</th><th>Sex</th><th>Parent / Guardian</th><th>Phone</th></tr></thead>
+                <thead><tr><th>No.</th><th>Learner</th><th>Student No.</th><th>Sex</th></tr></thead>
                 <tbody>
                   {register.students.map((s) => (
                     <tr key={s.id}>
@@ -48,8 +47,6 @@ export default function TeacherClassRegisterModal({ termId, campus, form, onClos
                       <td><strong style={{ fontSize: 13 }}>{s.surname}, {s.firstName}</strong></td>
                       <td style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{s.studentNumber}</td>
                       <td>{s.gender}</td>
-                      <td style={{ fontSize: 12 }}>{s.guardian || '—'}</td>
-                      <td style={{ fontSize: 12 }}>{s.guardianPhone || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
