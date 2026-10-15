@@ -253,6 +253,10 @@ namespace LeeTec.API.Controllers
                 var scored = allMarksForSubject.Where(HasScore).ToList();
                 if (scored.Count == 0 || studentIds.Count == 0)
                     return BadRequest(new { message = "All students must have marks before submitting" });
+                // AHJ marks are entered out of 50; anything above 50 must be re-entered first.
+                var overMax = scored.Count(m => studentIds.Contains(m.StudentId) && m.Status == "Draft" && (m.Score ?? 0) > 50);
+                if (overMax > 0)
+                    return BadRequest(new { message = $"{overMax} mark(s) are above 50. Junior School marks are out of 50: please re-enter them before submitting." });
                 foreach (var type in scored.Select(m => m.AssessmentType).Distinct())
                 {
                     var have = scored.Where(m => m.AssessmentType == type).Select(m => m.StudentId).ToHashSet();

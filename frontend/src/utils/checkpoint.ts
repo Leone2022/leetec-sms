@@ -1,18 +1,12 @@
 // Junior School (AHJ, Cambridge Checkpoint) marks are out of 50 with performance bands.
-// They have always been STORED doubled, as a percentage (e.g. 76 for 38/50): the report card
-// halves them for display. Teachers see and type marks out of 50; these helpers convert at the
-// edges so stored data, reports and past terms are unchanged.
+// From Term 3 2026 teachers enter the actual mark out of 50: it is stored, shown and printed
+// exactly as typed. (Earlier terms stored a doubled percentage that the report card halved;
+// those terms are left as they were.)
 // Keep checkpointBand in sync with ReportCardService.GetBand (backend).
 
 export const CHECKPOINT_MAX = 50;
 
 export const isCheckpointCampus = (campus?: string | null) => (campus ?? '').toUpperCase() === 'AHJ';
-
-/** Stored percentage → mark out of 50, as shown to teachers. */
-export const storedToOutOf50 = (stored: number) => Math.round((stored / 2) * 10) / 10;
-
-/** Mark out of 50 typed by a teacher → stored percentage. */
-export const outOf50ToStored = (mark: number) => Math.round(mark * 2 * 10) / 10;
 
 /** Performance band for a mark out of 50 (rounded half away from zero, as on the report card). */
 export function checkpointBand(markOutOf50: number): string {

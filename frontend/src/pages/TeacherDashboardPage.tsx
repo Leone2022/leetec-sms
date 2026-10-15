@@ -12,7 +12,7 @@ import {
 import VerseCard, { type VerseData } from '../components/VerseCard';
 import { calculateGrade } from '../utils/reportCard';
 import { markMode } from '../utils/markPolicy';
-import { CHECKPOINT_MAX, checkpointBand, isCheckpointCampus, outOf50ToStored, storedToOutOf50 } from '../utils/checkpoint';
+import { CHECKPOINT_MAX, checkpointBand, isCheckpointCampus } from '../utils/checkpoint';
 
 interface MarkRow {
   studentId: number;
@@ -322,10 +322,8 @@ export default function TeacherDashboardPage() {
       const mode = markMode(terms.find(t => t.id === termId), selectedAssignment.campus);
       const finalOnly = mode === 'final-only';
       const onEndTerm = endData.some(d => d.score != null);
-      // Junior School: stored as a percentage, shown to the teacher out of 50.
-      const ahj = isCheckpointCampus(selectedAssignment.campus);
-      const show = (score: number | null | undefined) =>
-        score == null ? '' : String(ahj ? storedToOutOf50(Number(score)) : score);
+      // Marks are shown exactly as stored (and stored exactly as typed).
+      const show = (score: number | null | undefined) => (score == null ? '' : String(score));
       setRows(midData.map(d => {
         const endD = endByStudent.get(d.studentId);
         const midStatus = d.status || 'Draft';
@@ -404,11 +402,14 @@ export default function TeacherDashboardPage() {
   const entryMode = markMode(terms.find(t => t.id === termId), selectedAssignment?.campus);
   const finalMarkOnly = entryMode === 'final-only';
   const separate = entryMode === 'separate';
-  // Junior School (Cambridge Checkpoint): marks out of 50 with performance bands, not letter grades.
-  const ahjEntry = isCheckpointCampus(selectedAssignment?.campus);
+  // Junior School from Term 3 2026 (Cambridge Checkpoint): teachers type the actual mark out of 50,
+  // saved exactly as typed, with performance bands instead of letter grades.
+  const ahjEntry = isCheckpointCampus(selectedAssignment?.campus) && separate;
   const scoreMax = ahjEntry ? CHECKPOINT_MAX : 100;
   const unit = ahjEntry ? '(/50)' : '(%)';
-  const toStored = (value: string) => (ahjEntry ? outOf50ToStored(Number(value)) : Number(value));
+  const toStored = (value: string) => Number(value);
+  // A mark entered before marks were out of 50 can be above 50: flag it, never change it.
+  const overMax = (value: string) => ahjEntry && value !== '' && Number(value) > CHECKPOINT_MAX;
   const gradeOf = (score: string, row: MarkRow) =>
     score === '' ? '' : ahjEntry ? checkpointBand(Number(score))
       : calculateGrade(Number(score), row.curriculum || selectedAssignment?.curriculumType || '');
@@ -469,6 +470,11 @@ export default function TeacherDashboardPage() {
         { label: 'end of term', filled: (r: MarkRow) => r.endOfTermScore !== '' },
       ].filter(c => rows.some(c.filled));
       if (columns.length === 0) { showMsg('Enter marks before submitting', 'error'); return; }
+      const over = rows.filter(r => overMax(r.midtermScore) || overMax(r.endOfTermScore));
+      if (over.length > 0) {
+        showMsg(`Cannot submit — marks are out of 50. Please re-enter: ${over.map(r => r.studentName).join(', ')}`, 'error');
+        return;
+      }
       for (const c of columns) {
         const gaps = rows.filter(r => !c.filled(r));
         if (gaps.length > 0) {
@@ -818,11 +824,13 @@ export default function TeacherDashboardPage() {
                             return (
                               <Fragment key={c.score}>
                                 <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                  <input className="text-field" style={scoreInput} type="number" min={0} max={scoreMax} step="any"
+                                  <input className="text-field" type="number" min={0} max={scoreMax} step="any"
+                                    style={overMax(row[c.score]) ? { ...scoreInput, borderColor: '#dc2626', color: '#dc2626' } : scoreInput}
                                     aria-label={`${c.label} mark for ${row.studentName}`}
                                     value={row[c.score]} disabled={isLocked}
                                     onChange={e => updateRow(row.studentId, c.score, clamp(e.target.value, scoreMax))} />
-                                  {g && <span style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 11 }}>{g}</span>}
+                                  {g && !overMax(row[c.score]) && <span style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 11 }}>{g}</span>}
+                                  {overMax(row[c.score]) && <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2, fontWeight: 600 }}>Over 50: please re-enter out of 50</div>}
                                   {isLocked && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{c.lockedBy}</div>}
                                 </td>
                                 <td>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI, marksAPI } from '../services/api';
 import { generateReportCard, calculateGrade } from '../utils/reportCard';
 import { markMode, isFrom2026Term3 } from '../utils/markPolicy';
-import { checkpointBand, isCheckpointCampus, storedToOutOf50 } from '../utils/checkpoint';
+import { CHECKPOINT_MAX, checkpointBand, isCheckpointCampus } from '../utils/checkpoint';
 import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } from '../utils/credentials';
 import AdminLayout from '../components/AdminLayout';
 import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
@@ -190,11 +190,11 @@ export default function BulkReportsPage() {
       const endByStudent = new Map(endData.map((d: any) => [d.studentId, d]));
       const viewMode = markMode(terms.find(t => t.id === g.termId), g.campus);
       const finalOnly = viewMode === 'final-only';
-      // Junior School: marks shown out of 50 with performance bands (stored as a percentage).
-      const ahj = isCheckpointCampus(g.campus);
-      const shown = (v: number | null) => (v == null ? null : ahj ? storedToOutOf50(v) : v);
-      const gradeFor = (stored: number, curriculum: string) =>
-        ahj ? checkpointBand(storedToOutOf50(stored)) : calculateGrade(stored, curriculum);
+      // Junior School from Term 3 2026: marks are out of 50 as entered, with performance bands.
+      const ahj = isCheckpointCampus(g.campus) && viewMode === 'separate';
+      const shown = (v: number | null) => v;
+      const gradeFor = (mark: number, curriculum: string) =>
+        !ahj ? calculateGrade(mark, curriculum) : mark > CHECKPOINT_MAX ? 'Over 50' : checkpointBand(mark);
       setViewMarksRows(midData.map((d: any) => {
         const endD = endByStudent.get(d.studentId);
         if (viewMode === 'separate') {
@@ -814,7 +814,7 @@ export default function BulkReportsPage() {
         const viewModeNow = markMode(terms.find(t => t.id === viewingGroup.termId), viewingGroup.campus);
         const viewFinalOnly = viewModeNow === 'final-only';
         const viewSeparate = viewModeNow === 'separate';
-        const viewAhj = isCheckpointCampus(viewingGroup.campus);
+        const viewAhj = isCheckpointCampus(viewingGroup.campus) && viewSeparate;
         return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}
           onClick={() => setViewingGroup(null)}>
