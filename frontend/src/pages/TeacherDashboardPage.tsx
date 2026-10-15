@@ -12,6 +12,7 @@ import {
 import VerseCard, { type VerseData } from '../components/VerseCard';
 import { calculateGrade } from '../utils/reportCard';
 import { markMode } from '../utils/markPolicy';
+import { CHECKPOINT_MAX, checkpointBand, isCheckpointCampus } from '../utils/checkpoint';
 
 interface MarkRow {
   studentId: number;
@@ -321,6 +322,8 @@ export default function TeacherDashboardPage() {
       const mode = markMode(terms.find(t => t.id === termId), selectedAssignment.campus);
       const finalOnly = mode === 'final-only';
       const onEndTerm = endData.some(d => d.score != null);
+      // Marks are shown exactly as stored (and stored exactly as typed).
+      const show = (score: number | null | undefined) => (score == null ? '' : String(score));
       setRows(midData.map(d => {
         const endD = endByStudent.get(d.studentId);
         const midStatus = d.status || 'Draft';
@@ -334,8 +337,8 @@ export default function TeacherDashboardPage() {
             studentName: d.studentName,
             studentNumber: d.studentNumber,
             curriculum: d.curriculum || endD?.curriculum || '',
-            midtermScore: d.score != null ? String(d.score) : '',
-            endOfTermScore: endD?.score != null ? String(endD.score) : '',
+            midtermScore: show(d.score),
+            endOfTermScore: show(endD?.score),
             comments: '',
             ...common,
             status: onEndTerm ? endStatus : midStatus,
@@ -351,7 +354,7 @@ export default function TeacherDashboardPage() {
             studentNumber: d.studentNumber,
             curriculum: d.curriculum || endD?.curriculum || '',
             midtermScore: '',
-            endOfTermScore: endD?.score != null ? String(endD.score) : '',
+            endOfTermScore: show(endD?.score),
             comments: endD?.comments || '',
             ...common,
             status,
@@ -365,8 +368,8 @@ export default function TeacherDashboardPage() {
           studentName: d.studentName,
           studentNumber: d.studentNumber,
           curriculum: d.curriculum || endD?.curriculum || '',
-          midtermScore: d.score != null ? String(d.score) : '',
-          endOfTermScore: endD?.score != null ? String(endD.score) : '',
+          midtermScore: show(d.score),
+          endOfTermScore: show(endD?.score),
           comments: d.comments || endD?.comments || '',
           ...common,
           status,
@@ -399,8 +402,17 @@ export default function TeacherDashboardPage() {
   const entryMode = markMode(terms.find(t => t.id === termId), selectedAssignment?.campus);
   const finalMarkOnly = entryMode === 'final-only';
   const separate = entryMode === 'separate';
+  // Junior School from Term 3 2026 (Cambridge Checkpoint): teachers type the actual mark out of 50,
+  // saved exactly as typed, with performance bands instead of letter grades.
+  const ahjEntry = isCheckpointCampus(selectedAssignment?.campus) && separate;
+  const scoreMax = ahjEntry ? CHECKPOINT_MAX : 100;
+  const unit = ahjEntry ? '(/50)' : '(%)';
+  const toStored = (value: string) => Number(value);
+  // A mark entered before marks were out of 50 can be above 50: flag it, never change it.
+  const overMax = (value: string) => ahjEntry && value !== '' && Number(value) > CHECKPOINT_MAX;
   const gradeOf = (score: string, row: MarkRow) =>
-    score === '' ? '' : calculateGrade(Number(score), row.curriculum || selectedAssignment?.curriculumType || '');
+    score === '' ? '' : ahjEntry ? checkpointBand(Number(score))
+      : calculateGrade(Number(score), row.curriculum || selectedAssignment?.curriculumType || '');
 
   const total = (row: MarkRow) => {
     if (finalMarkOnly) return row.endOfTermScore;
@@ -413,7 +425,8 @@ export default function TeacherDashboardPage() {
 
   const grade = (row: MarkRow) => {
     const t = total(row);
-    return t === '' ? '' : calculateGrade(Number(t), row.curriculum || selectedAssignment?.curriculumType || '');
+    return t === '' ? '' : ahjEntry ? checkpointBand(Number(t))
+      : calculateGrade(Number(t), row.curriculum || selectedAssignment?.curriculumType || '');
   };
 
   const handleSaveAll = async () => {
@@ -422,8 +435,8 @@ export default function TeacherDashboardPage() {
     try {
       const marks = rows.map(r => ({
         studentId: r.studentId,
-        midtermScore: !finalMarkOnly && r.midtermScore !== '' ? Number(r.midtermScore) : null,
-        endOfTermScore: r.endOfTermScore !== '' ? Number(r.endOfTermScore) : null,
+        midtermScore: !finalMarkOnly && r.midtermScore !== '' ? toStored(r.midtermScore) : null,
+        endOfTermScore: r.endOfTermScore !== '' ? toStored(r.endOfTermScore) : null,
         comments: separate ? null : r.comments || null,
         ...(separate ? { midtermComments: r.midComments || null, endOfTermComments: r.endComments || null } : {}),
       }));
@@ -457,6 +470,11 @@ export default function TeacherDashboardPage() {
         { label: 'end of term', filled: (r: MarkRow) => r.endOfTermScore !== '' },
       ].filter(c => rows.some(c.filled));
       if (columns.length === 0) { showMsg('Enter marks before submitting', 'error'); return; }
+      const over = rows.filter(r => overMax(r.midtermScore) || overMax(r.endOfTermScore));
+      if (over.length > 0) {
+        showMsg(`Cannot submit — marks are out of 50. Please re-enter: ${over.map(r => r.studentName).join(', ')}`, 'error');
+        return;
+      }
       for (const c of columns) {
         const gaps = rows.filter(r => !c.filled(r));
         if (gaps.length > 0) {
@@ -767,21 +785,21 @@ export default function TeacherDashboardPage() {
                   <th>Student No.</th>
                   {separate ? (
                     <>
-                      <th style={{ textAlign: 'center' }}>Mid-term (%)</th>
+                      <th style={{ textAlign: 'center' }}>Mid-term {unit}</th>
                       <th>Mid-term comment</th>
-                      <th style={{ textAlign: 'center' }}>End of Term (%)</th>
+                      <th style={{ textAlign: 'center' }}>End of Term {unit}</th>
                       <th>End of term comment</th>
                     </>
                   ) : finalMarkOnly ? (
-                    <th style={{ textAlign: 'center' }}>Final Mark (%)</th>
+                    <th style={{ textAlign: 'center' }}>Final Mark {unit}</th>
                   ) : (
                     <>
-                      <th style={{ textAlign: 'center' }}>Midterm (%)</th>
-                      <th style={{ textAlign: 'center' }}>End of Term (%)</th>
+                      <th style={{ textAlign: 'center' }}>Midterm {unit}</th>
+                      <th style={{ textAlign: 'center' }}>End of Term {unit}</th>
                       <th style={{ textAlign: 'center' }}>Total</th>
                     </>
                   )}
-                  {!separate && <th style={{ textAlign: 'center' }}>Grade</th>}
+                  {!separate && <th style={{ textAlign: 'center' }}>{ahjEntry ? 'Band' : 'Grade'}</th>}
                   {!separate && <th>Comments</th>}
                   <th style={{ textAlign: 'center' }}>Status</th>
                 </tr>
@@ -806,11 +824,13 @@ export default function TeacherDashboardPage() {
                             return (
                               <Fragment key={c.score}>
                                 <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                  <input className="text-field" style={scoreInput} type="number" min={0} max={100}
+                                  <input className="text-field" type="number" min={0} max={scoreMax} step="any"
+                                    style={overMax(row[c.score]) ? { ...scoreInput, borderColor: '#dc2626', color: '#dc2626' } : scoreInput}
                                     aria-label={`${c.label} mark for ${row.studentName}`}
                                     value={row[c.score]} disabled={isLocked}
-                                    onChange={e => updateRow(row.studentId, c.score, clamp(e.target.value, 100))} />
-                                  {g && <span style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 11 }}>{g}</span>}
+                                    onChange={e => updateRow(row.studentId, c.score, clamp(e.target.value, scoreMax))} />
+                                  {g && !overMax(row[c.score]) && <span style={{ marginLeft: 6, padding: '2px 8px', borderRadius: 12, background: '#eef2ff', color: '#1a237e', fontWeight: 700, fontSize: 11 }}>{g}</span>}
+                                  {overMax(row[c.score]) && <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2, fontWeight: 600 }}>Over 50: please re-enter out of 50</div>}
                                   {isLocked && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{c.lockedBy}</div>}
                                 </td>
                                 <td>
@@ -827,15 +847,15 @@ export default function TeacherDashboardPage() {
                       ) : (<>
                       {!finalMarkOnly && (
                         <td style={{ textAlign: 'center' }}>
-                          <input className="text-field" style={scoreInput} type="number" min={0} max={100}
+                          <input className="text-field" style={scoreInput} type="number" min={0} max={scoreMax} step="any"
                             value={row.midtermScore} disabled={locked}
-                            onChange={e => updateRow(row.studentId, 'midtermScore', clamp(e.target.value, 100))} />
+                            onChange={e => updateRow(row.studentId, 'midtermScore', clamp(e.target.value, scoreMax))} />
                         </td>
                       )}
                       <td style={{ textAlign: 'center' }}>
-                        <input className="text-field" style={scoreInput} type="number" min={0} max={100}
+                        <input className="text-field" style={scoreInput} type="number" min={0} max={scoreMax} step="any"
                           value={row.endOfTermScore} disabled={locked}
-                          onChange={e => updateRow(row.studentId, 'endOfTermScore', clamp(e.target.value, 100))} />
+                          onChange={e => updateRow(row.studentId, 'endOfTermScore', clamp(e.target.value, scoreMax))} />
                       </td>
                       {!finalMarkOnly && <td style={{ textAlign: 'center', fontWeight: 700, color: '#1a237e' }}>{total(row)}</td>}
                       <td style={{ textAlign: 'center' }}>

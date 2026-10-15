@@ -191,13 +191,18 @@ namespace LeeTec.API.Services
                 // 38/50) specifically so it reads as a percentage — that doubled value
                 // IS the mathematically correct percentage, so Grade must be computed
                 // from the raw cm before any halving below.
-                var grade = cm.HasValue ? GetGrade(cm.Value, gradingCurriculum) : "";
+                //
+                // From Term 3 2026 (MarkMode.Separate) AHJ teachers enter the actual mark out
+                // of 50, so it is stored, shown and banded exactly as typed; Grade uses the
+                // equivalent percentage. Earlier terms keep the doubled-percentage rule.
+                var enteredOutOf50 = usesPapers && mode == MarkMode.Separate;
+                var grade = cm.HasValue ? GetGrade(enteredOutOf50 ? cm.Value * 2 : cm.Value, gradingCurriculum) : "";
 
-                // AHJ/Cambridge Checkpoint's real scale is 0-50; teachers enter doubled
-                // marks so Grade above works correctly. Final Mark and Band must show
-                // the true /50 value, so halve cm for display only, after Grade has
+                // AHJ/Cambridge Checkpoint's real scale is 0-50; before Term 3 2026 teachers
+                // entered doubled marks so Grade above works correctly. Final Mark and Band
+                // must show the true /50 value, so halve cm for display only, after Grade has
                 // already used the raw (doubled) value.
-                var displayCm = usesPapers && cm.HasValue
+                var displayCm = usesPapers && cm.HasValue && !enteredOutOf50
                     ? Math.Round(cm.Value / 2m, MidpointRounding.AwayFromZero)
                     : cm;
 
