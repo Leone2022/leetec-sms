@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI, marksAPI } from '../services/api';
 import { generateReportCard, calculateGrade } from '../utils/reportCard';
 import { markMode, isFrom2026Term3 } from '../utils/markPolicy';
+import { checkpointBand, isCheckpointCampus, storedToOutOf50 } from '../utils/checkpoint';
 import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } from '../utils/credentials';
 import AdminLayout from '../components/AdminLayout';
 import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
@@ -189,6 +190,11 @@ export default function BulkReportsPage() {
       const endByStudent = new Map(endData.map((d: any) => [d.studentId, d]));
       const viewMode = markMode(terms.find(t => t.id === g.termId), g.campus);
       const finalOnly = viewMode === 'final-only';
+      // Junior School: marks shown out of 50 with performance bands (stored as a percentage).
+      const ahj = isCheckpointCampus(g.campus);
+      const shown = (v: number | null) => (v == null ? null : ahj ? storedToOutOf50(v) : v);
+      const gradeFor = (stored: number, curriculum: string) =>
+        ahj ? checkpointBand(storedToOutOf50(stored)) : calculateGrade(stored, curriculum);
       setViewMarksRows(midData.map((d: any) => {
         const endD = endByStudent.get(d.studentId);
         if (viewMode === 'separate') {
@@ -200,8 +206,8 @@ export default function BulkReportsPage() {
             studentId: d.studentId,
             studentName: d.studentName,
             studentNumber: d.studentNumber,
-            paper1: mid, paper2: end, total: null,
-            grade: [mid, end].map(v => v != null ? calculateGrade(v, curriculum) : '—').join(' / '),
+            paper1: shown(mid), paper2: shown(end), total: null,
+            grade: [mid, end].map(v => v != null ? gradeFor(v, curriculum) : '—').join(' / '),
             comments: [d.comments, endD?.comments].filter(Boolean).join(' | '),
           };
         }
@@ -227,8 +233,8 @@ export default function BulkReportsPage() {
           studentId: d.studentId,
           studentName: d.studentName,
           studentNumber: d.studentNumber,
-          paper1, paper2, total,
-          grade: total != null ? calculateGrade(total, curriculum) : '',
+          paper1: shown(paper1 ?? null), paper2: shown(paper2 ?? null), total: shown(total),
+          grade: total != null ? gradeFor(total, curriculum) : '',
           comments: d.comments || endD?.comments || '',
         };
       }));
@@ -808,6 +814,7 @@ export default function BulkReportsPage() {
         const viewModeNow = markMode(terms.find(t => t.id === viewingGroup.termId), viewingGroup.campus);
         const viewFinalOnly = viewModeNow === 'final-only';
         const viewSeparate = viewModeNow === 'separate';
+        const viewAhj = isCheckpointCampus(viewingGroup.campus);
         return (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 16 }}
           onClick={() => setViewingGroup(null)}>
@@ -835,12 +842,12 @@ export default function BulkReportsPage() {
                           <th style={{ textAlign: 'center' }}>Final Mark</th>
                         ) : (
                           <>
-                            <th style={{ textAlign: 'center' }}>{viewSeparate ? 'Mid-term' : 'Paper 1'}</th>
-                            <th style={{ textAlign: 'center' }}>{viewSeparate ? 'End of Term' : 'Paper 2'}</th>
-                            {!viewSeparate && <th style={{ textAlign: 'center' }}>Total</th>}
+                            <th style={{ textAlign: 'center' }}>{viewSeparate ? 'Mid-term' : 'Paper 1'}{viewAhj ? ' (/50)' : ''}</th>
+                            <th style={{ textAlign: 'center' }}>{viewSeparate ? 'End of Term' : 'Paper 2'}{viewAhj ? ' (/50)' : ''}</th>
+                            {!viewSeparate && <th style={{ textAlign: 'center' }}>Total{viewAhj ? ' (/50)' : ''}</th>}
                           </>
                         )}
-                        <th style={{ textAlign: 'center' }}>Grade</th>
+                        <th style={{ textAlign: 'center' }}>{viewAhj ? 'Band' : 'Grade'}</th>
                         <th>Comments</th>
                       </tr>
                     </thead>
