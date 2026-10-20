@@ -7,8 +7,9 @@ import { markMode } from '../utils/markPolicy';
 import { GRADE_REFERENCE_TABLES } from '../utils/grading';
 import {
   LogOut, GraduationCap, LayoutDashboard, DollarSign,
-  FileText, Bell, User, Menu, X, FileDown, BookOpen, Clock, Sparkles,
+  FileText, Bell, User, Menu, X, FileDown, BookOpen, Clock, Sparkles, Library, ExternalLink,
 } from 'lucide-react';
+import { TEXTBOOKS_URL } from '../utils/links';
 import VerseCard, { type VerseData } from '../components/VerseCard';
 
 const CAMPUS_FULL_NAMES: Record<string, string> = {
@@ -461,6 +462,11 @@ export default function StudentDashboardPage() {
             </button>
           );
         })}
+        <a href={TEXTBOOKS_URL} target="_blank" rel="noopener noreferrer" onClick={() => setSidebarOpen(false)}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, textDecoration: 'none', width: '100%', boxSizing: 'border-box', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
+          <Library size={15} />Textbooks
+          <ExternalLink size={12} style={{ marginLeft: 'auto', opacity: 0.6 }} />
+        </a>
       </nav>
 
       <div style={{ padding: '12px 10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
