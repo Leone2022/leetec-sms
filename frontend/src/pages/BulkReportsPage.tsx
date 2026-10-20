@@ -377,9 +377,17 @@ export default function BulkReportsPage() {
     }
   };
 
+  // Learners Send to Portal acts on: the ticked ones, or, when none are ticked, everyone shown in
+  // the list (after the Term / Campus / Status filters). Mid-term reports are Junior (AHJ) only.
+  const sendTargets = (selected.size > 0 ? rows.filter(r => selected.has(r.studentId)) : filtered)
+    .filter(r => reportType !== 'midterm' || r.campus === 'AHJ');
+  const reportLabel = reportType === 'midterm' ? 'mid-term report' : 'end of term report';
+
   const handleSendToPortal = async () => {
-    if (!termId || selected.size === 0) return;
-    const ids = [...selected];
+    if (!termId || sendTargets.length === 0) return;
+    const ids = sendTargets.map(r => r.studentId);
+    const who = selected.size > 0 ? `the ${ids.length} selected learner${ids.length !== 1 ? 's' : ''}` : `all ${ids.length} learner${ids.length !== 1 ? 's' : ''} shown in the list`;
+    if (!window.confirm(`Send the ${reportLabel} to ${who}? They will see it on their student portal. Learners with no marks for this report are skipped.`)) return;
     setPublishing(true);
     setProgress(`Publishing ${ids.length} report${ids.length !== 1 ? 's' : ''} to portal...`);
     try {
@@ -687,10 +695,11 @@ export default function BulkReportsPage() {
               className="btn btn-primary"
               style={{ fontSize: 12 }}
               onClick={handleSendToPortal}
-              disabled={selected.size === 0 || generating || publishing || !termId}
+              disabled={sendTargets.length === 0 || generating || publishing || !termId}
+              title={selected.size > 0 ? 'Send to the ticked learners' : 'Nothing ticked: sends to everyone shown in the list'}
             >
               <Send size={13} />
-              Send to Portal ({selected.size})
+              {selected.size > 0 ? `Send to Portal (${sendTargets.length})` : `Send all ${sendTargets.length} to Portal`}
             </button>
           </div>
         </div>
