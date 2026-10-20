@@ -79,11 +79,21 @@ namespace LeeTec.API.Controllers
                     );
 
                 // What is on each learner's portal (end-of-term "Published" / mid-term rows).
-                var portal = (await _context.ReportCardRecords
+                var portalRows = await _context.ReportCardRecords
                         .Where(r => r.TermId == termId && studentIds.Contains(r.StudentId))
-                        .Select(r => new { r.StudentId, r.Status })
-                        .ToListAsync())
-                    .ToLookup(r => r.StudentId, r => r.Status);
+                        .Select(r => new { r.StudentId, r.Status, r.FirstViewedAt, r.LastViewedAt, r.ViewCount, r.DownloadedAt })
+                        .ToListAsync();
+                var portal = portalRows.ToLookup(r => r.StudentId, r => r.Status);
+                object? Views(int studentId, string status)
+                {
+                    var r = portalRows.FirstOrDefault(x => x.StudentId == studentId && x.Status == status);
+                    return r == null ? null : new { r.FirstViewedAt, r.LastViewedAt, r.ViewCount, r.DownloadedAt };
+                }
+
+                // Learners can only see reports if they have an active portal account.
+                var accounts = (await _context.StudentPortalAccounts
+                        .Where(a => studentIds.Contains(a.StudentId) && a.Status == "Active")
+                        .Select(a => a.StudentId).ToListAsync()).ToHashSet();
 
                 bool HasReportMarks(int studentId, string reportType)
                 {
@@ -133,6 +143,10 @@ namespace LeeTec.API.Controllers
                         // report is not shown to the learner).
                         finalOnPortal = portal[reg.StudentId].Contains("Published") && HasReportMarks(reg.StudentId, ReportTypes.Final),
                         midTermOnPortal = portal[reg.StudentId].Contains(MarkPolicy.MidTermPublished) && HasReportMarks(reg.StudentId, ReportTypes.MidTerm),
+                        // Whether the learner has opened / downloaded each report on the portal.
+                        finalViews = Views(reg.StudentId, "Published"),
+                        midTermViews = Views(reg.StudentId, MarkPolicy.MidTermPublished),
+                        hasPortalAccount = accounts.Contains(reg.StudentId),
                     };
                 }).ToList();
 

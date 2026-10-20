@@ -6,7 +6,7 @@ import { markMode, isFrom2026Term3 } from '../utils/markPolicy';
 import { CHECKPOINT_MAX, checkpointBand, isCheckpointCampus } from '../utils/checkpoint';
 import { exportCredentialsToPdf, exportCredentialsToExcel, type CredentialRow } from '../utils/credentials';
 import AdminLayout from '../components/AdminLayout';
-import { FileDown, Send, CheckSquare, Square } from 'lucide-react';
+import { FileDown, Send, CheckSquare, Square, Eye, EyeOff, Search } from 'lucide-react';
 
 const PUBLISH_FORM_OPTIONS = [
   'All',
@@ -29,13 +29,24 @@ interface CompletionRow {
   // Which reports the learner can actually see on their portal (published and not empty).
   finalOnPortal?: boolean;
   midTermOnPortal?: boolean;
+  // When the learner opened / downloaded each report on the portal (null = never published).
+  finalViews?: ReportViews | null;
+  midTermViews?: ReportViews | null;
+  hasPortalAccount?: boolean;
 }
+
+interface ReportViews { firstViewedAt: string | null; lastViewedAt: string | null; viewCount: number; downloadedAt: string | null }
+
+const shortDate = (iso: string | null) =>
+  iso ? new Date(iso.endsWith('Z') ? iso : `${iso}Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
 
 export default function BulkReportsPage() {
   const [terms, setTerms] = useState<any[]>([]);
   const [termId, setTermId] = useState<number | ''>('');
   const [campusFilter, setCampusFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [search, setSearch] = useState('');
+  const [viewFilter, setViewFilter] = useState<'All' | 'Viewed' | 'Not viewed' | 'No portal account'>('All');
   const [rows, setRows] = useState<CompletionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -312,11 +323,29 @@ export default function BulkReportsPage() {
     }
   };
 
+  // This page's report (Mid-Term or End of Term): is it on the learner's portal, and opened?
+  const onPortalFor = (r: CompletionRow) => (isMidTermPage ? r.midTermOnPortal : r.finalOnPortal) ?? false;
+  const viewsFor = (r: CompletionRow) => (isMidTermPage ? r.midTermViews : r.finalViews) ?? null;
+  const viewedFor = (r: CompletionRow) => onPortalFor(r) && (viewsFor(r)?.viewCount ?? 0) > 0;
+  const q = search.trim().toLowerCase();
+
   const filtered = rows.filter(r => {
     if (campusFilter !== 'All' && r.campus !== campusFilter) return false;
     if (statusFilter !== 'All' && r.status !== statusFilter) return false;
+    if (q && !`${r.studentName} ${r.studentNumber}`.toLowerCase().includes(q)) return false;
+    if (viewFilter === 'Viewed' && !viewedFor(r)) return false;
+    if (viewFilter === 'Not viewed' && !(onPortalFor(r) && !viewedFor(r))) return false;
+    if (viewFilter === 'No portal account' && r.hasPortalAccount !== false) return false;
     return true;
   });
+
+  const inCampus = rows.filter(r => campusFilter === 'All' || r.campus === campusFilter);
+  const portalSummary = {
+    onPortal: inCampus.filter(onPortalFor).length,
+    viewed: inCampus.filter(viewedFor).length,
+    notViewed: inCampus.filter(r => onPortalFor(r) && !viewedFor(r)).length,
+    noAccount: inCampus.filter(r => onPortalFor(r) && r.hasPortalAccount === false).length,
+  };
 
   const selectAllReady = () => {
     const readyIds = filtered.filter(r => r.status === 'Ready').map(r => r.studentId);
@@ -643,7 +672,7 @@ export default function BulkReportsPage() {
 
         {/* Filter bar */}
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 18px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, maxWidth: 640 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(140px, 1fr)) minmax(220px, 1.6fr)', gap: 12 }}>
             <div>
               <label style={lbl}>Term</label>
               <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
@@ -665,6 +694,22 @@ export default function BulkReportsPage() {
                 value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
                 {['All', 'Ready', 'Partial', 'Not Started'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
+            </div>
+            <div>
+              <label style={lbl}>Viewed on portal</label>
+              <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
+                value={viewFilter} onChange={e => setViewFilter(e.target.value as typeof viewFilter)}>
+                {(['All', 'Viewed', 'Not viewed', 'No portal account'] as const).map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Search</label>
+              <div style={{ position: 'relative' }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <input className="text-field" type="search" placeholder="Name or student number"
+                  style={{ width: '100%', paddingLeft: 30, boxSizing: 'border-box' }}
+                  value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
             </div>
           </div>
         </div>
@@ -734,6 +779,14 @@ export default function BulkReportsPage() {
             <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0, color: '#0f172a' }}>
               Students {termId ? `— ${filtered.length} shown` : ''}
             </h3>
+            {termId && rows.length > 0 && (
+              <span style={{ fontSize: 12, color: '#475569', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <span>On portal: <strong>{portalSummary.onPortal}</strong></span>
+                <span style={{ color: '#166534' }}><Eye size={12} style={{ verticalAlign: 'middle' }} /> Viewed: <strong>{portalSummary.viewed}</strong></span>
+                <span style={{ color: '#b45309' }}><EyeOff size={12} style={{ verticalAlign: 'middle' }} /> Not yet viewed: <strong>{portalSummary.notViewed}</strong></span>
+                {portalSummary.noAccount > 0 && <span style={{ color: '#b91c1c' }}>No portal account: <strong>{portalSummary.noAccount}</strong></span>}
+              </span>
+            )}
           </div>
 
           {!termId ? (
@@ -767,6 +820,7 @@ export default function BulkReportsPage() {
                     <th style={{ textAlign: 'center' }}>Subjects</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
                     <th style={{ textAlign: 'center' }}>On portal</th>
+                    <th style={{ textAlign: 'center' }}>Viewed</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
@@ -808,6 +862,22 @@ export default function BulkReportsPage() {
                           ) : (
                             <span style={{ color: '#94a3b8' }}>Not sent</span>
                           )}
+                        </td>
+                        <td style={{ textAlign: 'center', fontSize: 11, whiteSpace: 'nowrap' }}>
+                          {(() => {
+                            if (!onPortalFor(row)) return <span style={{ color: '#cbd5e1' }}>—</span>;
+                            if (row.hasPortalAccount === false)
+                              return <span title="This learner has no active portal account, so cannot see the report" style={{ color: '#b91c1c', fontWeight: 600 }}>No portal account</span>;
+                            const v = viewsFor(row);
+                            if (!v || v.viewCount === 0)
+                              return <span title="On the portal but not opened yet" style={{ color: '#b45309', display: 'inline-flex', alignItems: 'center', gap: 4 }}><EyeOff size={13} /> Not yet</span>;
+                            return (
+                              <span title={`Opened ${v.viewCount} time(s); last ${shortDate(v.lastViewedAt)}${v.downloadedAt ? `; PDF downloaded ${shortDate(v.downloadedAt)}` : ''}`}
+                                style={{ color: '#166534', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <Eye size={13} /> {shortDate(v.firstViewedAt)}{v.viewCount > 1 ? ` (${v.viewCount}×)` : ''}{v.downloadedAt ? ' · PDF' : ''}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button
