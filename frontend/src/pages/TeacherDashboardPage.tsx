@@ -7,8 +7,9 @@ import {
   GraduationCap, LogOut, BookOpen, User, Menu, X,
   ClipboardList, ChevronLeft, Save, Send, AlertTriangle,
   CheckCircle, Users, Clock, Bell, Phone, Mail, LayoutDashboard,
-  FileText, Plus, Trash2, ArrowRight, Edit3,
+  FileText, Plus, Trash2, ArrowRight, Edit3, Library, ExternalLink,
 } from 'lucide-react';
+import { TEXTBOOKS_URL } from '../utils/links';
 import VerseCard, { type VerseData } from '../components/VerseCard';
 import { calculateGrade } from '../utils/reportCard';
 import { markMode } from '../utils/markPolicy';
@@ -637,6 +638,11 @@ export default function TeacherDashboardPage() {
             )}
           </button>
         ))}
+        <a href={TEXTBOOKS_URL} target="_blank" rel="noopener noreferrer" onClick={() => setSidebarOpen(false)}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, textDecoration: 'none', width: '100%', boxSizing: 'border-box', color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
+          <Library size={15} />Textbooks
+          <ExternalLink size={12} style={{ marginLeft: 'auto', opacity: 0.6 }} />
+        </a>
       </nav>
 
       <div style={{ padding: '12px 10px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>

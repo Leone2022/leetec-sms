@@ -21,7 +21,10 @@ import {
   ArrowLeftRight,
   KeyRound,
   ClipboardCheck,
+  Library,
+  ExternalLink,
 } from 'lucide-react';
+import { TEXTBOOKS_URL } from '../utils/links';
 
 interface NavChild {
   label: string;
@@ -33,6 +36,7 @@ interface NavItem {
   label: string;
   Icon: React.ComponentType<{ size?: number; className?: string }>;
   path?: string;
+  href?: string; // external site, opens in a new tab
   permission?: string;
   superAdminOnly?: boolean;
   children?: NavChild[];
@@ -65,6 +69,7 @@ const NAV: NavItem[] = [
     ],
   },
   { label: 'Announcements', Icon: Bell, path: '/announcements', permission: 'Announcements' },
+  { label: 'Textbooks', Icon: Library, href: TEXTBOOKS_URL },
   { label: 'Staff Assignments', Icon: Users, path: '/teacher-assignments', permission: 'Staff Assignments' },
   { label: 'Super Admin', Icon: Shield, path: '/super-admin', superAdminOnly: true },
 ];
@@ -188,6 +193,24 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
                     </div>
                   )}
                 </div>
+              );
+            }
+
+            if (item.href) {
+              return (
+                <a
+                  key={item.href}
+                  className="admin-nav-btn"
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={close}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <item.Icon size={15} />
+                  <span>{item.label}</span>
+                  <ExternalLink size={12} className="chevron" />
+                </a>
               );
             }
 
