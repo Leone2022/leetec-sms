@@ -688,8 +688,16 @@ namespace LeeTec.API.Controllers
                 .ToListAsync();
 
             int published = 0;
+            var skipped = 0;
             foreach (var studentId in studentIds)
             {
+                // Never publish an empty report (no marks yet for this report type).
+                if (!await _reportCardService.HasMarksForReportAsync(studentId, request.TermId, isMidTerm ? ReportTypes.MidTerm : ReportTypes.Final))
+                {
+                    skipped++;
+                    continue;
+                }
+
                 var record = existingRecords.FirstOrDefault(r => r.StudentId == studentId);
                 if (record == null)
                 {
@@ -712,7 +720,10 @@ namespace LeeTec.API.Controllers
             }
 
             await _context.SaveChangesAsync();
-            return Ok(new { published });
+            var hint = skipped == 0 ? null
+                : isMidTerm ? $"{skipped} learner(s) were skipped: no mid-term marks yet."
+                : $"{skipped} learner(s) were skipped: no end-of-term marks yet. For Junior mid-term reports choose \"Mid-Term Report (Junior only)\".";
+            return Ok(new { published, skipped, message = hint });
         }
 
         // REPORT CARD — student portal view. Returns the same ReportCardData shape as
@@ -729,6 +740,11 @@ namespace LeeTec.API.Controllers
                 return NotFound(new { message = type == ReportTypes.MidTerm
                     ? "The mid-term report has not been published yet."
                     : "Report card not yet published for this term." });
+
+            // A report published before it had any marks (e.g. an End of Term Report sent during
+            // mid-term) is treated as not available, so the portal can show the mid-term report.
+            if (!await _reportCardService.HasMarksForReportAsync(studentId, termId, type))
+                return NotFound(new { message = "This report has no marks yet." });
 
             var data = await _reportCardService.BuildReportCardDataAsync(studentId, termId, type);
             if (data == null) return NotFound(new { message = "Student or term not found" });

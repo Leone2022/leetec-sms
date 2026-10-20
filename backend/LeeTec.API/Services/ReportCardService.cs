@@ -8,6 +8,10 @@ namespace LeeTec.API.Services
         // reportType: "final" (end of term) or "midterm". Only AHJ terms from Term 3 2026
         // (MarkMode.Separate) have a separate mid-term report; elsewhere it is ignored.
         Task<object?> BuildReportCardDataAsync(int studentId, int termId, string reportType = ReportTypes.Final);
+
+        // Whether this report would contain at least one mark (an active subject with a score
+        // for the assessment the report shows). An empty report must not be published.
+        Task<bool> HasMarksForReportAsync(int studentId, int termId, string reportType = ReportTypes.Final);
     }
 
     public static class ReportTypes
@@ -83,6 +87,27 @@ namespace LeeTec.API.Services
             if (score >= 45) return "D";
             if (score >= 40) return "E";
             return "U";
+        }
+
+        public async Task<bool> HasMarksForReportAsync(int studentId, int termId, string reportType = ReportTypes.Final)
+        {
+            var campus = await _context.Students.Where(s => s.Id == studentId).Select(s => s.Campus).FirstOrDefaultAsync();
+            var term = await _context.Terms.FindAsync(termId);
+            if (campus == null || term == null) return false;
+
+            var mode = MarkPolicy.ModeFor(term, campus);
+            string? assessment = mode == MarkMode.Averaged ? null
+                : mode == MarkMode.Separate && ReportTypes.Normalize(reportType) == ReportTypes.MidTerm ? MarkPolicy.MidTerm
+                : MarkPolicy.EndOfTerm;
+
+            var activeSubjectIds = _context.StudentSubjects
+                .Where(ss => ss.StudentId == studentId && ss.TermId == termId && ss.IsActive)
+                .Select(ss => ss.SubjectId);
+
+            return await _context.Marks.AnyAsync(m => m.StudentId == studentId && m.TermId == termId
+                && activeSubjectIds.Contains(m.SubjectId)
+                && (assessment == null || m.AssessmentType == assessment)
+                && (m.Score != null || m.Paper1Score != null || m.Paper2Score != null));
         }
 
         public async Task<object?> BuildReportCardDataAsync(int studentId, int termId, string reportType = ReportTypes.Final)

@@ -50,8 +50,10 @@ namespace LeeTec.API.Controllers
                 // MariaDB provider cannot translate to SQL.
                 var rawMarks = await _context.Marks
                     .Where(m => m.TermId == termId && studentIds.Contains(m.StudentId))
-                    .Select(m => new { m.StudentId, m.SubjectId })
+                    .Select(m => new { m.StudentId, m.SubjectId, m.AssessmentType,
+                        HasScore = m.Score != null || m.Paper1Score != null || m.Paper2Score != null })
                     .ToListAsync();
+                var term = await _context.Terms.FindAsync(termId);
 
                 var enteredByStudent = rawMarks
                     .GroupBy(m => m.StudentId)
@@ -75,6 +77,26 @@ namespace LeeTec.API.Controllers
                         g => g.Key,
                         g => g.Select(ss => ss.SubjectId).Distinct().ToHashSet()
                     );
+
+                // What is on each learner's portal (end-of-term "Published" / mid-term rows).
+                var portal = (await _context.ReportCardRecords
+                        .Where(r => r.TermId == termId && studentIds.Contains(r.StudentId))
+                        .Select(r => new { r.StudentId, r.Status })
+                        .ToListAsync())
+                    .ToLookup(r => r.StudentId, r => r.Status);
+
+                bool HasReportMarks(int studentId, string reportType)
+                {
+                    if (term == null) return false;
+                    var active = activeSubjectsByStudent.TryGetValue(studentId, out var ids) ? ids : new HashSet<int>();
+                    var campus = registrations.First(r => r.StudentId == studentId).Student?.Campus;
+                    var mode = MarkPolicy.ModeFor(term, campus);
+                    string? assessment = mode == MarkMode.Averaged ? null
+                        : mode == MarkMode.Separate && reportType == ReportTypes.MidTerm ? MarkPolicy.MidTerm
+                        : MarkPolicy.EndOfTerm;
+                    return rawMarks.Any(m => m.StudentId == studentId && m.HasScore && active.Contains(m.SubjectId)
+                        && (assessment == null || m.AssessmentType == assessment));
+                }
 
                 var result = registrations.Select(reg =>
                 {
@@ -107,6 +129,10 @@ namespace LeeTec.API.Controllers
                         enteredSubjects = entered,
                         fullyEntered,
                         status,
+                        // On the portal = published AND has marks for that report (an empty
+                        // report is not shown to the learner).
+                        finalOnPortal = portal[reg.StudentId].Contains("Published") && HasReportMarks(reg.StudentId, ReportTypes.Final),
+                        midTermOnPortal = portal[reg.StudentId].Contains(MarkPolicy.MidTermPublished) && HasReportMarks(reg.StudentId, ReportTypes.MidTerm),
                     };
                 }).ToList();
 
@@ -143,6 +169,21 @@ namespace LeeTec.API.Controllers
                     if (isMidTerm && await _context.Students.Where(s => s.Id == studentId).Select(s => s.Campus).FirstOrDefaultAsync() != "AHJ")
                     {
                         errors.Add($"Student {studentId}: mid-term reports are for Junior School (AHJ) learners only");
+                        continue;
+                    }
+
+                    // Never publish an empty report (e.g. an End of Term Report before any
+                    // end-of-term marks exist): the learner would see a blank report card.
+                    if (!await _reportCardService.HasMarksForReportAsync(studentId, request.TermId, reportType))
+                    {
+                        var who = await _context.Students.Where(s => s.Id == studentId)
+                            .Select(s => new { s.FirstName, s.Surname, s.Campus }).FirstOrDefaultAsync();
+                        var name = who == null ? $"Student {studentId}" : $"{who.FirstName} {who.Surname}";
+                        errors.Add(isMidTerm
+                            ? $"{name}: no mid-term marks yet"
+                            : who?.Campus == "AHJ"
+                                ? $"{name}: no end-of-term marks yet. For Junior mid-term reports choose \"Mid-Term Report (Junior only)\""
+                                : $"{name}: no end-of-term marks yet");
                         continue;
                     }
 

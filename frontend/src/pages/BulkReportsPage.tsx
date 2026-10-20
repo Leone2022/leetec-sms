@@ -25,6 +25,9 @@ interface CompletionRow {
   enteredSubjects: number;
   fullyEntered: boolean;
   status: 'Ready' | 'Partial' | 'Not Started';
+  // Which reports the learner can actually see on their portal (published and not empty).
+  finalOnPortal?: boolean;
+  midTermOnPortal?: boolean;
 }
 
 export default function BulkReportsPage() {
@@ -267,7 +270,9 @@ export default function BulkReportsPage() {
       });
       const count = res.data?.published ?? 0;
       const what = publishReportType === 'midterm' ? 'mid-term report' : 'report card';
-      showMsg(`${count} ${what}${count !== 1 ? 's' : ''} published successfully`, 'success');
+      if (res.data?.message) showMsg(`${count} ${what}${count !== 1 ? 's' : ''} published. ${res.data.message}`, count > 0 ? 'success' : 'error');
+      else showMsg(`${count} ${what}${count !== 1 ? 's' : ''} published successfully`, 'success');
+      if (publishTermId === termId) loadStatus();
     } catch (err: any) {
       showMsg(err?.response?.data?.message || 'Failed to publish report cards', 'error');
     } finally {
@@ -372,19 +377,29 @@ export default function BulkReportsPage() {
     }
   };
 
+  // Learners Send to Portal acts on: the ticked ones, or, when none are ticked, everyone shown in
+  // the list (after the Term / Campus / Status filters). Mid-term reports are Junior (AHJ) only.
+  const sendTargets = (selected.size > 0 ? rows.filter(r => selected.has(r.studentId)) : filtered)
+    .filter(r => reportType !== 'midterm' || r.campus === 'AHJ');
+  const reportLabel = reportType === 'midterm' ? 'mid-term report' : 'end of term report';
+
   const handleSendToPortal = async () => {
-    if (!termId || selected.size === 0) return;
-    const ids = [...selected];
+    if (!termId || sendTargets.length === 0) return;
+    const ids = sendTargets.map(r => r.studentId);
+    const who = selected.size > 0 ? `the ${ids.length} selected learner${ids.length !== 1 ? 's' : ''}` : `all ${ids.length} learner${ids.length !== 1 ? 's' : ''} shown in the list`;
+    if (!window.confirm(`Send the ${reportLabel} to ${who}? They will see it on their student portal. Learners with no marks for this report are skipped.`)) return;
     setPublishing(true);
     setProgress(`Publishing ${ids.length} report${ids.length !== 1 ? 's' : ''} to portal...`);
     try {
       const res = await bulkReportsAPI.publishReports(1, termId as number, ids, reportType);
       const { published, errors } = res.data as { published: number; errors: string[] };
       if (errors.length > 0) {
-        showMsg(`Published ${published}, but ${errors.length} error(s): ${errors[0]}`, 'error');
+        const more = errors.length > 2 ? ` (and ${errors.length - 2} more)` : '';
+        showMsg(`Sent ${published} to the portal. ${errors.length} not sent: ${errors.slice(0, 2).join('; ')}${more}`, 'error');
       } else {
         showMsg(`Done — ${published} report card${published !== 1 ? 's' : ''} published to portal`, 'success');
       }
+      loadStatus();
     } catch {
       showMsg('Failed to publish reports', 'error');
     } finally {
@@ -680,10 +695,11 @@ export default function BulkReportsPage() {
               className="btn btn-primary"
               style={{ fontSize: 12 }}
               onClick={handleSendToPortal}
-              disabled={selected.size === 0 || generating || publishing || !termId}
+              disabled={sendTargets.length === 0 || generating || publishing || !termId}
+              title={selected.size > 0 ? 'Send to the ticked learners' : 'Nothing ticked: sends to everyone shown in the list'}
             >
               <Send size={13} />
-              Send to Portal ({selected.size})
+              {selected.size > 0 ? `Send to Portal (${sendTargets.length})` : `Send all ${sendTargets.length} to Portal`}
             </button>
           </div>
         </div>
@@ -748,6 +764,7 @@ export default function BulkReportsPage() {
                     <th>Form</th>
                     <th style={{ textAlign: 'center' }}>Subjects</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
+                    <th style={{ textAlign: 'center' }}>On portal</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
@@ -779,6 +796,16 @@ export default function BulkReportsPage() {
                           <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600, background: badge.bg, color: badge.color }}>
                             {badge.label}
                           </span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontSize: 11, whiteSpace: 'nowrap' }}>
+                          {row.midTermOnPortal || row.finalOnPortal ? (
+                            <>
+                              {row.midTermOnPortal && <span style={{ padding: '2px 8px', borderRadius: 12, background: '#e0f2fe', color: '#0369a1', fontWeight: 600, marginRight: 4 }}>Mid-term</span>}
+                              {row.finalOnPortal && <span style={{ padding: '2px 8px', borderRadius: 12, background: '#dcfce7', color: '#166534', fontWeight: 600 }}>End of term</span>}
+                            </>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>Not sent</span>
+                          )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button
