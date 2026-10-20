@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { feesAPI, bulkReportsAPI, reportsAPI, adminAPI, marksAPI } from '../services/api';
 import { generateReportCard, calculateGrade } from '../utils/reportCard';
 import { markMode, isFrom2026Term3 } from '../utils/markPolicy';
@@ -52,6 +53,18 @@ export default function BulkReportsPage() {
   // AHJ from Term 3 2026: a Mid-Term Report and an End of Term Report, published separately.
   const [publishReportType, setPublishReportType] = useState<'final' | 'midterm'>('final');
   const [reportType, setReportType] = useState<'final' | 'midterm'>('final');
+
+  // Reports → Mid-Term (Junior) / End of Term: the menu item fixes the report type.
+  const location = useLocation();
+  const pageType: 'final' | 'midterm' = location.pathname.includes('mid-term') ? 'midterm' : 'final';
+  const isMidTermPage = pageType === 'midterm';
+  useEffect(() => {
+    setReportType(pageType);
+    setPublishReportType(pageType);
+    setCampusFilter(pageType === 'midterm' ? 'AHJ' : 'All');
+    setPublishCampus(pageType === 'midterm' ? 'AHJ' : 'All');
+    setSelected(new Set());
+  }, [pageType]);
 
   // Tabs
   const [tab, setTab] = useState<'completion' | 'approvals'>('completion');
@@ -418,7 +431,14 @@ export default function BulkReportsPage() {
   const lbl: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4, display: 'block' };
 
   return (
-    <AdminLayout title="Bulk Reports" subtitle="Generate and publish report cards for all students">
+    <AdminLayout
+      title={isMidTermPage ? 'Mid-Term Reports (Junior School)' : 'End of Term Reports'}
+      subtitle={isMidTermPage ? 'Publish and send Junior School mid-term reports' : 'Generate and publish end of term report cards for all campuses'}>
+      {isMidTermPage && termId && !isFrom2026Term3(terms.find(t => t.id === termId)) && (
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#92400e', borderRadius: 8, padding: '10px 14px', fontSize: 13, marginBottom: 12 }}>
+          Mid-term reports exist from Term 3 2026, for the Junior School only. Choose Term 3 2026 or later.
+        </div>
+      )}
       {message && (
         <div style={{
           position: 'fixed', top: 80, right: 20, padding: '14px 18px', borderRadius: 10,
@@ -587,17 +607,7 @@ export default function BulkReportsPage() {
         {/* Publish Report Cards */}
         <div style={{ background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', padding: '16px 18px' }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, margin: '0 0 12px', color: '#0f172a' }}>Publish Report Cards</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isFrom2026Term3(terms.find(t => t.id === publishTermId)) ? 4 : 3}, 1fr) auto`, gap: 12, alignItems: 'end', maxWidth: 960 }}>
-            {isFrom2026Term3(terms.find(t => t.id === publishTermId)) && (
-              <div>
-                <label style={lbl}>Report</label>
-                <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
-                  value={publishReportType} onChange={e => setPublishReportType(e.target.value as 'final' | 'midterm')}>
-                  <option value="final">End of Term Report</option>
-                  <option value="midterm">Mid-Term Report (Junior only)</option>
-                </select>
-              </div>
-            )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', gap: 12, alignItems: 'end', maxWidth: 960 }}>
             <div>
               <label style={lbl}>Term</label>
               <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
@@ -645,7 +655,7 @@ export default function BulkReportsPage() {
             <div>
               <label style={lbl}>Campus</label>
               <select className="text-field" style={{ width: '100%', appearance: 'auto' }}
-                value={campusFilter} onChange={e => setCampusFilter(e.target.value)}>
+                value={campusFilter} onChange={e => setCampusFilter(e.target.value)} disabled={isMidTermPage}>
                 {['All', 'AHJ', 'AHA', 'AHS'].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
@@ -674,14 +684,6 @@ export default function BulkReportsPage() {
           </span>
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            {isFrom2026Term3(terms.find(t => t.id === termId)) && (
-              <select className="text-field" aria-label="Report type" style={{ appearance: 'auto', fontSize: 12, padding: '6px 8px' }}
-                value={reportType} onChange={e => setReportType(e.target.value as 'final' | 'midterm')}
-                title="Mid-term reports are for Junior School (AHJ) learners only">
-                <option value="final">End of Term Report</option>
-                <option value="midterm">Mid-Term Report (Junior only)</option>
-              </select>
-            )}
             <button
               className="btn btn-secondary"
               style={{ fontSize: 12 }}

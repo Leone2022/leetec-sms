@@ -56,7 +56,14 @@ const NAV: NavItem[] = [
   { label: 'Terms & Periods', Icon: Calendar, path: '/terms', permission: 'Terms & Periods' },
   { label: 'Subjects', Icon: BookOpen, path: '/subjects', permission: 'Subjects' },
   { label: 'Marks Entry', Icon: ClipboardList, path: '/marks-entry', permission: 'Marks Entry' },
-  { label: 'Bulk Reports', Icon: FileStack, path: '/bulk-reports', permission: 'Bulk Reports' },
+  {
+    label: 'Reports',
+    Icon: FileStack,
+    children: [
+      { label: 'Mid-Term (Junior)', path: '/bulk-reports/mid-term', permission: 'Bulk Reports' },
+      { label: 'End of Term', path: '/bulk-reports/end-of-term', permission: 'Bulk Reports' },
+    ],
+  },
   { label: 'Announcements', Icon: Bell, path: '/announcements', permission: 'Announcements' },
   { label: 'Staff Assignments', Icon: Users, path: '/teacher-assignments', permission: 'Staff Assignments' },
   { label: 'Super Admin', Icon: Shield, path: '/super-admin', superAdminOnly: true },

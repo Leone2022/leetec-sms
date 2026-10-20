@@ -62,7 +62,9 @@ function App() {
       <Route path="/super-admin" element={<AdminRoute><SuperAdminPage /></AdminRoute>} />
       <Route path="/subjects" element={<AdminRoute><SubjectsPage /></AdminRoute>} />
       <Route path="/marks-entry" element={<AdminRoute><MarksEntryPage /></AdminRoute>} />
-      <Route path="/bulk-reports" element={<AdminRoute><BulkReportsPage /></AdminRoute>} />
+      <Route path="/bulk-reports" element={<Navigate to="/bulk-reports/end-of-term" replace />} />
+      <Route path="/bulk-reports/mid-term" element={<AdminRoute><BulkReportsPage /></AdminRoute>} />
+      <Route path="/bulk-reports/end-of-term" element={<AdminRoute><BulkReportsPage /></AdminRoute>} />
       <Route path="/announcements" element={<AdminRoute><AnnouncementsPage /></AdminRoute>} />
       <Route path="/teacher-assignments" element={<AdminRoute><TeacherAssignmentsPage /></AdminRoute>} />
 
