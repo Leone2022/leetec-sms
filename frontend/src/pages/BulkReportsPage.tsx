@@ -25,6 +25,9 @@ interface CompletionRow {
   enteredSubjects: number;
   fullyEntered: boolean;
   status: 'Ready' | 'Partial' | 'Not Started';
+  // Which reports the learner can actually see on their portal (published and not empty).
+  finalOnPortal?: boolean;
+  midTermOnPortal?: boolean;
 }
 
 export default function BulkReportsPage() {
@@ -267,7 +270,9 @@ export default function BulkReportsPage() {
       });
       const count = res.data?.published ?? 0;
       const what = publishReportType === 'midterm' ? 'mid-term report' : 'report card';
-      showMsg(`${count} ${what}${count !== 1 ? 's' : ''} published successfully`, 'success');
+      if (res.data?.message) showMsg(`${count} ${what}${count !== 1 ? 's' : ''} published. ${res.data.message}`, count > 0 ? 'success' : 'error');
+      else showMsg(`${count} ${what}${count !== 1 ? 's' : ''} published successfully`, 'success');
+      if (publishTermId === termId) loadStatus();
     } catch (err: any) {
       showMsg(err?.response?.data?.message || 'Failed to publish report cards', 'error');
     } finally {
@@ -381,10 +386,12 @@ export default function BulkReportsPage() {
       const res = await bulkReportsAPI.publishReports(1, termId as number, ids, reportType);
       const { published, errors } = res.data as { published: number; errors: string[] };
       if (errors.length > 0) {
-        showMsg(`Published ${published}, but ${errors.length} error(s): ${errors[0]}`, 'error');
+        const more = errors.length > 2 ? ` (and ${errors.length - 2} more)` : '';
+        showMsg(`Sent ${published} to the portal. ${errors.length} not sent: ${errors.slice(0, 2).join('; ')}${more}`, 'error');
       } else {
         showMsg(`Done — ${published} report card${published !== 1 ? 's' : ''} published to portal`, 'success');
       }
+      loadStatus();
     } catch {
       showMsg('Failed to publish reports', 'error');
     } finally {
@@ -748,6 +755,7 @@ export default function BulkReportsPage() {
                     <th>Form</th>
                     <th style={{ textAlign: 'center' }}>Subjects</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
+                    <th style={{ textAlign: 'center' }}>On portal</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
@@ -779,6 +787,16 @@ export default function BulkReportsPage() {
                           <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, fontWeight: 600, background: badge.bg, color: badge.color }}>
                             {badge.label}
                           </span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontSize: 11, whiteSpace: 'nowrap' }}>
+                          {row.midTermOnPortal || row.finalOnPortal ? (
+                            <>
+                              {row.midTermOnPortal && <span style={{ padding: '2px 8px', borderRadius: 12, background: '#e0f2fe', color: '#0369a1', fontWeight: 600, marginRight: 4 }}>Mid-term</span>}
+                              {row.finalOnPortal && <span style={{ padding: '2px 8px', borderRadius: 12, background: '#dcfce7', color: '#166534', fontWeight: 600 }}>End of term</span>}
+                            </>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>Not sent</span>
+                          )}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <button
