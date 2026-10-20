@@ -111,6 +111,38 @@ export default function StudentDashboardPage() {
   const [reportTypeChosen, setReportTypeChosen] = useState(false);
   const portalSeparate = markMode(terms.find(t => t.id === reportTermId), studentCampus) === 'separate';
 
+  // "New report" badge/banner: a published report for the current term not opened yet.
+  type ReportStatus = { midterm: { ready: boolean; isNew: boolean }; final: { ready: boolean; isNew: boolean } };
+  const [reportStatus, setReportStatus] = useState<ReportStatus | null>(null);
+  const currentTermId = (terms.find(t => t.isActive) ?? terms[0])?.id as number | undefined;
+  const refreshReportStatus = () => {
+    if (!studentId || !currentTermId) return;
+    marksAPI.getReportStatus(studentId, currentTermId).then(res => setReportStatus(res.data)).catch(() => {});
+  };
+  useEffect(() => {
+    refreshReportStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, currentTermId]);
+  const newReport: 'final' | 'midterm' | null =
+    reportStatus?.final.isNew ? 'final' : reportStatus?.midterm.isNew ? 'midterm' : null;
+  const openNewReport = () => {
+    if (!newReport || !currentTermId) return;
+    setReportTermId(currentTermId);
+    setReportTypeChosen(true);
+    setPortalReportType(newReport);
+    handleNav('reportCard');
+  };
+
+  // Record a view only when the Report Card page is actually on screen (the dashboard
+  // also loads the report for its summary card, which must not count as a view).
+  useEffect(() => {
+    if (view !== 'reportCard' || !reportCard || !studentId || !reportTermId) return;
+    marksAPI.reportViewed(studentId, reportTermId as number, reportCard.reportType ?? 'final')
+      .then(() => refreshReportStatus())
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, reportCard]);
+
   useEffect(() => {
     if (!localStorage.getItem('student_token')) navigate('/student-login');
   }, [navigate]);
@@ -345,6 +377,8 @@ export default function StudentDashboardPage() {
     setDownloadingPdf(true);
     try {
       await generateReportCard(reportCard);
+      if (studentId && reportTermId)
+        marksAPI.reportDownloaded(studentId, reportTermId as number, reportCard.reportType ?? 'final').catch(() => {});
     } finally {
       setDownloadingPdf(false);
     }
@@ -421,6 +455,9 @@ export default function StudentDashboardPage() {
             <button key={id} onClick={() => handleNav(id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left', background: active ? 'rgba(255,255,255,0.15)' : 'transparent', color: active ? 'white' : 'rgba(255,255,255,0.65)', fontWeight: active ? 600 : 400, fontSize: 13 }}>
               <Icon size={15} />
               {label}
+              {id === 'reportCard' && newReport && (
+                <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 10, background: '#f59e0b', color: '#1f2937' }}>New</span>
+              )}
             </button>
           );
         })}
@@ -454,6 +491,23 @@ export default function StudentDashboardPage() {
           )}
         </div>
       </div>
+
+      {newReport && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 20, padding: '14px 18px', borderRadius: 12, background: 'linear-gradient(90deg, #1a237e, #3949ab)', color: 'white' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>
+              Your {newReport === 'midterm' ? 'Mid-Term Report' : 'End of Term Report'} is ready
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
+              {(terms.find(t => t.id === currentTermId)?.name) ?? 'This term'} · view your results and download the PDF
+            </div>
+          </div>
+          <button onClick={openNewReport}
+            style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#f59e0b', color: '#1f2937', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+            View report
+          </button>
+        </div>
+      )}
 
       {currentVerse && (
         <div style={{ marginBottom: 24 }}>

@@ -751,5 +751,62 @@ namespace LeeTec.API.Controllers
 
             return Ok(data);
         }
+
+        // PORTAL — the learner opened the Report Card page with this report on screen.
+        // Recorded so the office can see on the Reports page who has viewed it.
+        [HttpPost("report-card/{studentId}/{termId}/viewed")]
+        public async Task<IActionResult> ReportViewed(int studentId, int termId, [FromQuery] string? reportType = null)
+        {
+            var record = await FindPublishedRecordAsync(studentId, termId, reportType);
+            if (record == null) return NotFound();
+            var now = DateTime.UtcNow;
+            record.FirstViewedAt ??= now;
+            record.LastViewedAt = now;
+            record.ViewCount++;
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        // PORTAL — the learner downloaded the PDF of a published report.
+        [HttpPost("report-card/{studentId}/{termId}/downloaded")]
+        public async Task<IActionResult> ReportDownloaded(int studentId, int termId, [FromQuery] string? reportType = null)
+        {
+            var record = await FindPublishedRecordAsync(studentId, termId, reportType);
+            if (record == null) return NotFound();
+            record.DownloadedAt ??= DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        private Task<ReportCardRecord?> FindPublishedRecordAsync(int studentId, int termId, string? reportType)
+        {
+            var publishedStatus = ReportTypes.Normalize(reportType) == ReportTypes.MidTerm ? MarkPolicy.MidTermPublished : "Published";
+            return _context.ReportCardRecords
+                .FirstOrDefaultAsync(r => r.StudentId == studentId && r.TermId == termId && r.Status == publishedStatus);
+        }
+
+        // PORTAL — which reports for this term are ready, and whether they are new (not yet opened).
+        // Drives the "New report" badge and banner in the student portal.
+        [HttpGet("report-card/{studentId}/{termId}/status")]
+        public async Task<IActionResult> ReportStatus(int studentId, int termId)
+        {
+            var records = await _context.ReportCardRecords
+                .Where(r => r.StudentId == studentId && r.TermId == termId)
+                .Select(r => new { r.Status, r.FirstViewedAt })
+                .ToListAsync();
+
+            async Task<object> Info(string type, string status)
+            {
+                var rec = records.FirstOrDefault(r => r.Status == status);
+                var ready = rec != null && await _reportCardService.HasMarksForReportAsync(studentId, termId, type);
+                return new { ready, isNew = ready && rec!.FirstViewedAt == null };
+            }
+
+            return Ok(new
+            {
+                midterm = await Info(ReportTypes.MidTerm, MarkPolicy.MidTermPublished),
+                final = await Info(ReportTypes.Final, "Published"),
+            });
+        }
     }
 }

@@ -793,7 +793,16 @@ namespace LeeTec.API.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("DownloadedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("FirstViewedAt")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LastViewedAt")
                         .HasColumnType("datetime(6)");
 
                     b.Property<string>("ReportData")
@@ -811,6 +820,9 @@ namespace LeeTec.API.Migrations
                         .HasColumnType("int");
 
                     b.Property<int>("TermId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ViewCount")
                         .HasColumnType("int");
 
                     b.HasKey("Id");

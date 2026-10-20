@@ -199,6 +199,13 @@ export const marksAPI = {
   // reportType 'midterm' = the AHJ Mid-Term Report (Term 3 2026 onward); default is end of term.
   getStudentReportCard: (studentId: number, termId: number, reportType: 'final' | 'midterm' = 'final') =>
     api.get(`/marks/report-card/${studentId}/${termId}?reportType=${reportType}`),
+  // Student portal: which reports are ready / new, and record a PDF download.
+  getReportStatus: (studentId: number, termId: number) =>
+    api.get(`/marks/report-card/${studentId}/${termId}/status`),
+  reportViewed: (studentId: number, termId: number, reportType: 'final' | 'midterm' = 'final') =>
+    api.post(`/marks/report-card/${studentId}/${termId}/viewed?reportType=${reportType}`),
+  reportDownloaded: (studentId: number, termId: number, reportType: 'final' | 'midterm' = 'final') =>
+    api.post(`/marks/report-card/${studentId}/${termId}/downloaded?reportType=${reportType}`),
   submitMarks: (data: { subjectId: number; termId: number; campus: string; form: string; submittedBy: string }) =>
     api.post('/marks/submit', data),
   approveMarks: (data: { subjectId: number; termId: number; campus: string; form: string; approvedBy: string }) =>

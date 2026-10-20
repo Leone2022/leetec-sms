@@ -14,5 +14,12 @@ namespace LeeTec.API.Models
 
         [Column(TypeName = "longtext")]
         public string ReportData { get; set; } = string.Empty; // JSON
+
+        // Set by the student portal: when the learner (or parent) first/last opened this
+        // report, how many times, and when they first downloaded the PDF.
+        public DateTime? FirstViewedAt { get; set; }
+        public DateTime? LastViewedAt { get; set; }
+        public int ViewCount { get; set; }
+        public DateTime? DownloadedAt { get; set; }
     }
 }
