@@ -1012,7 +1012,7 @@ namespace LeeTec.API.Controllers
      Bank: ZB Bank&nbsp;&nbsp;|&nbsp;&nbsp;Name: {GetBankingDetails(invoice.Student.StudentNumber).BankName}<br/>
      Branch: Msasa&nbsp;&nbsp;|&nbsp;&nbsp;NOSTRO: {GetBankingDetails(invoice.Student.StudentNumber).Nostro}<br/>
      ZWL: {GetBankingDetails(invoice.Student.StudentNumber).Zwl}</p>
-  <p style='color:#64748b;font-size:12px'>This is an automated invoice from LeeTec SMS.</p>
+  <p style='color:#64748b;font-size:12px'>This is an automated invoice from Advent Hope Academy.</p>
 </div>";
 
                 try
@@ -1120,7 +1120,7 @@ namespace LeeTec.API.Controllers
             NOSTRO: {GetBankingDetails(invoice.Student.StudentNumber).Nostro} &nbsp;|&nbsp; ZWL: {GetBankingDetails(invoice.Student.StudentNumber).Zwl}
         </div>
         <p style='color:#64748b;font-size:12px;text-align:center'>
-            This is a computer generated invoice from LeeTec SMS · Advent Hope Academy<br/>
+            This is a computer generated invoice from Advent Hope Academy<br/>
             Please retain this email for your records.
         </p>
     </div>

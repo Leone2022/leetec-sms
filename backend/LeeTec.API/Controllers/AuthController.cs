@@ -118,11 +118,11 @@ namespace LeeTec.API.Controllers
                 user.MustChangePassword = true;
                 await _context.SaveChangesAsync();
 
-                var subject = "Your LeeTec SMS Temporary Password";
+                var subject = "Your Advent Hope Academy Portal Temporary Password";
                 var body = $@"
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
                         <div style='background-color: #1a237e; padding: 20px; text-align: center;'>
-                            <h1 style='color: white; margin: 0;'>LeeTec SMS</h1>
+                            <h1 style='color: white; margin: 0;'>Advent Hope Academy</h1>
                         </div>
                         <div style='padding: 30px; background-color: #f9f9f9;'>
                             <p>Your temporary password is:</p>
@@ -132,7 +132,7 @@ namespace LeeTec.API.Controllers
                             <p style='font-size: 13px; color: #757575;'>If you did not request a password reset, please contact your administrator.</p>
                         </div>
                         <div style='background-color: #1a237e; padding: 15px; text-align: center;'>
-                            <p style='color: #c5cae9; margin: 0; font-size: 13px;'>LeeTec School Management System</p>
+                            <p style='color: #c5cae9; margin: 0; font-size: 13px;'>Advent Hope Academy · adventhope.ac.zw</p>
                         </div>
                     </div>";
 

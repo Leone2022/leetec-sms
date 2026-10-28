@@ -786,7 +786,7 @@ export default function FeeSetupPage() {
 
       const bankBoxBottom = footY + bankBoxHeight;
       doc.setFontSize(8); doc.setTextColor(150);
-      doc.text('Thank you for your continued support.  This is a computer generated invoice — LeeTec SMS', 105, bankBoxBottom + 8, { align: 'center' });
+      doc.text('Thank you for your continued support.  This is a computer generated invoice — Advent Hope Academy', 105, bankBoxBottom + 8, { align: 'center' });
 
       // Official stamp, bottom-right, below the footer text.
       if (invoiceStamp) drawInvoiceImageRight(doc, invoiceStamp, 196, bankBoxBottom + 14, 42, 42);
@@ -1024,7 +1024,7 @@ export default function FeeSetupPage() {
     doc.text(`Banking Details: ZB Bank  |  Branch: ${stmtBank.branch}  |  Account Name: ${stmtBank.name}  |  NOSTRO: ${stmtBank.nostro}`, 14, footY + 8);
     doc.text(`ZWL Account: ${stmtBank.zwl}`, 14, footY + 15);
     doc.setFontSize(8); doc.setTextColor(160, 160, 160);
-    doc.text('This is a computer generated statement.  LeeTec School Management System', 105, footY + 23, { align: 'center' });
+    doc.text('This is a computer generated statement.  Advent Hope Academy', 105, footY + 23, { align: 'center' });
 
     doc.save(`Statement_${studentNum}_${new Date().toISOString().split('T')[0]}.pdf`);
   };

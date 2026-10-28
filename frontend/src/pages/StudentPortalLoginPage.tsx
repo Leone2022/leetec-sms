@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { portalAPI } from '../services/api';
 import { Mail, Lock, ArrowRight, GraduationCap, Receipt, BarChart3, Bell, BookOpen, Hash, CheckCircle } from 'lucide-react';
+import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, pageTitle } from '../utils/brand';
 
 type Tab = 'login' | 'register' | 'forgot';
 
@@ -16,7 +17,7 @@ export default function StudentPortalLoginPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('login');
 
-  useEffect(() => { document.title = 'LeeTec SMS — Student Portal'; }, []);
+  useEffect(() => { document.title = pageTitle('Student & Parent Portal'); }, []);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -105,24 +106,29 @@ export default function StudentPortalLoginPage() {
       <header className="auth-navbar">
         <div className="container auth-navbar-inner">
           <div className="auth-navbar-brand">
-            <div className="admin-logo"><GraduationCap size={16} /></div>
+            <img src={SCHOOL_LOGO} alt={SCHOOL_NAME} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', background: 'white' }} />
             <div>
-              <p className="admin-brand-title">LeeTec SMS</p>
+              <p className="admin-brand-title">{SCHOOL_NAME}</p>
               <p className="admin-brand-subtitle">Student Portal</p>
             </div>
           </div>
-          <Link to="/login" className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }}>
-            Admin access
-          </Link>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <a href={SCHOOL_WEBSITE} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }}>
+              {SCHOOL_WEBSITE_LABEL} ↗
+            </a>
+            <Link to="/login" className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }}>
+              Admin access
+            </Link>
+          </div>
         </div>
       </header>
 
       <section className="auth-hero">
         <div className="container auth-hero-grid">
           <div>
-            <h1 className="auth-title">Everything students need, in one secure portal.</h1>
+            <h1 className="auth-title">{SCHOOL_NAME} Student &amp; Parent Portal.</h1>
             <p className="auth-subtitle">
-              Access fee statements, school updates, and academic information through a clean, always-available experience.
+              View report cards, fee statements, homework and school updates, any time, from any device.
             </p>
             <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
               {PORTAL_FEATURES.map(({ Icon, label, desc }) => (
@@ -139,9 +145,9 @@ export default function StudentPortalLoginPage() {
 
           <div className="auth-login-wrap">
             <div className="auth-login-card">
-              <img src="/leetec.jpg"
-                alt="LeeTec"
-                style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover' }}
+              <img src={SCHOOL_LOGO}
+                alt={SCHOOL_NAME}
+                style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'contain', background: 'white' }}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.nextElementSibling?.setAttribute('style', 'display:flex');
@@ -154,7 +160,7 @@ export default function StudentPortalLoginPage() {
                 borderRadius: 10,
                 alignItems: 'center', justifyContent: 'center',
                 color: 'white', fontWeight: 800, fontSize: 16
-              }}>LC</div>
+              }}>AH</div>
               {/* Tab switcher (only login + register) */}
               {tab !== 'forgot' && (
                 <>

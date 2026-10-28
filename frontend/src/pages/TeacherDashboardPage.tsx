@@ -4,7 +4,7 @@ import { marksAPI, feesAPI, authAPI, versesAPI, announcementsAPI, homeworkAPI } 
 import { teacherAssignmentsAPI } from '../services/api';
 import TeacherClassRegisterModal from '../components/TeacherClassRegisterModal';
 import {
-  GraduationCap, LogOut, BookOpen, User, Menu, X,
+  LogOut, BookOpen, User, Menu, X,
   ClipboardList, ChevronLeft, Save, Send, AlertTriangle,
   CheckCircle, Users, Clock, Bell, Phone, Mail, LayoutDashboard,
   FileText, Plus, Trash2, ArrowRight, Edit3,
@@ -13,6 +13,7 @@ import VerseCard, { type VerseData } from '../components/VerseCard';
 import { calculateGrade } from '../utils/reportCard';
 import { markMode } from '../utils/markPolicy';
 import { CHECKPOINT_MAX, checkpointBand, isCheckpointCampus } from '../utils/checkpoint';
+import { SCHOOL_NAME, SCHOOL_LOGO, pageTitle } from '../utils/brand';
 
 interface MarkRow {
   studentId: number;
@@ -65,7 +66,7 @@ export default function TeacherDashboardPage() {
     }
   }, [navigate, teacherInfo]);
 
-  useEffect(() => { document.title = 'LeeTec SMS — Teacher Portal'; }, []);
+  useEffect(() => { document.title = pageTitle('Teacher Portal'); }, []);
 
   const [view, setView] = useState<View>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -599,11 +600,9 @@ export default function TeacherDashboardPage() {
     <aside style={{ width: 240, background: '#1a237e', display: 'flex', flexDirection: 'column', height: '100%', flexShrink: 0 }}>
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <div style={{ width: 32, height: 32, background: 'rgba(255,255,255,0.15)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <GraduationCap size={16} color="white" />
-          </div>
+          <img src={SCHOOL_LOGO} alt={SCHOOL_NAME} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain', background: 'white', flexShrink: 0 }} />
           <div>
-            <p style={{ color: 'white', fontWeight: 700, fontSize: 13, margin: 0 }}>LeeTec SMS</p>
+            <p style={{ color: 'white', fontWeight: 700, fontSize: 13, margin: 0 }}>{SCHOOL_NAME}</p>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: 0 }}>Teacher Portal</p>
           </div>
         </div>

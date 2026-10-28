@@ -22,6 +22,7 @@ import {
   KeyRound,
   ClipboardCheck,
 } from 'lucide-react';
+import { SCHOOL_NAME, SCHOOL_LOGO, pageTitle } from '../utils/brand';
 
 interface NavChild {
   label: string;
@@ -84,7 +85,7 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
   const [pendingSubjectRequests, setPendingSubjectRequests] = useState(0);
 
   useEffect(() => {
-    document.title = `LeeTec SMS — ${title}`;
+    document.title = pageTitle(title);
   }, [title]);
 
   useEffect(() => {
@@ -124,9 +125,9 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
     <div className={`admin-shell${open ? ' sidebar-open' : ''}`}>
       <aside className="admin-sidebar">
         <div className="admin-sidebar-header">
-          <img src="/leetec.jpg"
-            alt="LeeTec"
-            style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover' }}
+          <img src={SCHOOL_LOGO}
+            alt={SCHOOL_NAME}
+            style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'contain', background: 'white' }}
             onError={(e) => {
               e.currentTarget.style.display = 'none';
               e.currentTarget.nextElementSibling?.setAttribute('style', 'display:flex');
@@ -139,9 +140,9 @@ export default function AdminLayout({ children, title, subtitle }: AdminLayoutPr
             borderRadius: 10,
             alignItems: 'center', justifyContent: 'center',
             color: 'white', fontWeight: 800, fontSize: 16
-          }}>LC</div>
+          }}>AH</div>
           <div>
-            <p className="admin-brand-title">LeeTec SMS</p>
+            <p className="admin-brand-title">{SCHOOL_NAME}</p>
             <p className="admin-brand-subtitle">Admin Console</p>
           </div>
           <button className="admin-sidebar-close" onClick={close} aria-label="Close sidebar">

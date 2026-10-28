@@ -10,6 +10,7 @@ import {
   FileText, Bell, User, Menu, X, FileDown, BookOpen, Clock, Sparkles,
 } from 'lucide-react';
 import VerseCard, { type VerseData } from '../components/VerseCard';
+import { SCHOOL_NAME, SCHOOL_LOGO, pageTitle } from '../utils/brand';
 
 const CAMPUS_FULL_NAMES: Record<string, string> = {
   AHJ: 'ADVENT HOPE JUNIOR SCHOOL',
@@ -148,7 +149,7 @@ export default function StudentDashboardPage() {
   }, [navigate]);
 
   useEffect(() => {
-    document.title = 'LeeTec SMS — Student Portal';
+    document.title = pageTitle('Student Portal');
   }, []);
 
   useEffect(() => { loadData(); }, []);
@@ -418,11 +419,9 @@ export default function StudentDashboardPage() {
     <aside style={{ width: 260, background: '#1a237e', display: 'flex', flexDirection: 'column', height: '100%', flexShrink: 0 }}>
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-          <div style={{ width: 32, height: 32, background: 'rgba(255,255,255,0.15)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <GraduationCap size={16} color="white" />
-          </div>
+          <img src={SCHOOL_LOGO} alt={SCHOOL_NAME} style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain', background: 'white', flexShrink: 0 }} />
           <div>
-            <p style={{ color: 'white', fontWeight: 700, fontSize: 13, margin: 0 }}>LeeTec SMS</p>
+            <p style={{ color: 'white', fontWeight: 700, fontSize: 13, margin: 0 }}>{SCHOOL_NAME}</p>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: 0 }}>Student Portal</p>
           </div>
         </div>
@@ -1366,8 +1365,8 @@ export default function StudentDashboardPage() {
             {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <GraduationCap size={15} color="white" />
-            <span style={{ color: 'white', fontWeight: 700, fontSize: 13 }}>LeeTec SMS</span>
+            <img src={SCHOOL_LOGO} alt="" style={{ width: 22, height: 22, borderRadius: 4, objectFit: 'contain', background: 'white' }} />
+            <span style={{ color: 'white', fontWeight: 700, fontSize: 13 }}>{SCHOOL_NAME}</span>
           </div>
           <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white' }}>{initials}</div>
         </div>
