@@ -17,7 +17,7 @@ export default function StudentPortalLoginPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('login');
 
-  useEffect(() => { document.title = pageTitle('Student & Parent Portal'); }, []);
+  useEffect(() => { document.title = pageTitle('Student Portal'); }, []);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -126,9 +126,9 @@ export default function StudentPortalLoginPage() {
       <section className="auth-hero">
         <div className="container auth-hero-grid">
           <div>
-            <h1 className="auth-title">{SCHOOL_NAME} Student &amp; Parent Portal.</h1>
+            <h1 className="auth-title">Everything students need, in one secure portal.</h1>
             <p className="auth-subtitle">
-              View report cards, fee statements, homework and school updates, any time, from any device.
+              Access fee statements, school updates, and academic information through a clean, always-available experience.
             </p>
             <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
               {PORTAL_FEATURES.map(({ Icon, label, desc }) => (

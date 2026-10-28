@@ -39,7 +39,7 @@ export default function ChangePasswordPage() {
             <img src={SCHOOL_LOGO} alt={SCHOOL_NAME} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', background: 'white' }} />
             <div>
               <p className="admin-brand-title">{SCHOOL_NAME}</p>
-              <p className="admin-brand-subtitle">School Portal</p>
+              <p className="admin-brand-subtitle">School Management Platform</p>
             </div>
           </div>
         </div>
