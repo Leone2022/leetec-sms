@@ -585,7 +585,7 @@ export default function SuperAdminPage() {
               <div>
                 <label style={labelStyle}>School Name *</label>
                 <input type="text" value={schoolForm.name} onChange={(e) => setSchoolForm({ ...schoolForm, name: e.target.value })}
-                  placeholder="e.g. LeeTec High School" required className="text-field" style={fieldStyle} />
+                  placeholder="e.g. Advent Hope Academy" required className="text-field" style={fieldStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Address</label>

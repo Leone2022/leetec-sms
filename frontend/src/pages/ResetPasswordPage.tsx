@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { portalAPI } from '../services/api';
 import { GraduationCap, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { pageTitle } from '../utils/brand';
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => { document.title = 'LeeTec SMS — Reset Password'; }, []);
+  useEffect(() => { document.title = pageTitle('Reset Password'); }, []);
 
   if (!token) {
     return (

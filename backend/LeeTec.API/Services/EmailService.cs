@@ -134,11 +134,11 @@ namespace LeeTec.API.Services
 
         public async Task SendAccountApprovedAsync(string toEmail, string studentName)
         {
-            var subject = "Account Approved - LeeTec School System";
+            var subject = "Account Approved - Advent Hope Academy";
             var body = $@"
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
                     <div style='background-color: #1a5276; padding: 20px; text-align: center;'>
-                        <h1 style='color: white; margin: 0;'>LeeTec School System</h1>
+                        <h1 style='color: white; margin: 0;'>Advent Hope Academy</h1>
                     </div>
                     <div style='padding: 30px; background-color: #f9f9f9;'>
                         <h2>Hello {studentName}!</h2>
@@ -158,7 +158,7 @@ namespace LeeTec.API.Services
                         </div>
                     </div>
                     <div style='background-color: #1a5276; padding: 15px; text-align: center;'>
-                        <p style='color: white; margin: 0;'>LeeTec School Management System</p>
+                        <p style='color: white; margin: 0;'>Advent Hope Academy · adventhope.ac.zw</p>
                     </div>
                 </div>";
 
@@ -198,11 +198,11 @@ namespace LeeTec.API.Services
 
         public async Task SendWelcomeEmailAsync(string toEmail, string studentName)
         {
-            var subject = "Welcome to LeeTec Student Portal!";
+            var subject = "Welcome to the Advent Hope Academy Student Portal!";
             var body = $@"
                 <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
                     <div style='background-color: #1a5276; padding: 20px; text-align: center;'>
-                        <h1 style='color: white; margin: 0;'>LeeTec School System</h1>
+                        <h1 style='color: white; margin: 0;'>Advent Hope Academy</h1>
                     </div>
                     <div style='padding: 30px; background-color: #f9f9f9;'>
                         <h2>Welcome {studentName}! 🎉</h2>
@@ -210,7 +210,7 @@ namespace LeeTec.API.Services
                         <p>Education for Service and Eternity!</p>
                     </div>
                     <div style='background-color: #1a5276; padding: 15px; text-align: center;'>
-                        <p style='color: white; margin: 0;'>LeeTec School Management System</p>
+                        <p style='color: white; margin: 0;'>Advent Hope Academy · adventhope.ac.zw</p>
                     </div>
                 </div>";
 

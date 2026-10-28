@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
-import { Lock, Eye, EyeOff, ArrowRight, GraduationCap } from 'lucide-react';
+import { Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { SCHOOL_NAME, SCHOOL_LOGO, pageTitle } from '../utils/brand';
 
 export default function ChangePasswordPage() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -12,7 +13,7 @@ export default function ChangePasswordPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => { document.title = 'LeeTec SMS — Change Password'; }, []);
+  useEffect(() => { document.title = pageTitle('Change Password'); }, []);
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -35,12 +36,10 @@ export default function ChangePasswordPage() {
       <header className="auth-navbar">
         <div className="container auth-navbar-inner">
           <div className="auth-navbar-brand">
-            <div className="admin-logo">
-              <GraduationCap size={16} />
-            </div>
+            <img src={SCHOOL_LOGO} alt={SCHOOL_NAME} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', background: 'white' }} />
             <div>
-              <p className="admin-brand-title">LeeTec Solutions</p>
-              <p className="admin-brand-subtitle">School Management Platform</p>
+              <p className="admin-brand-title">{SCHOOL_NAME}</p>
+              <p className="admin-brand-subtitle">School Portal</p>
             </div>
           </div>
         </div>

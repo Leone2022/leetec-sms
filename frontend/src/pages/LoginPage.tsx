@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, GraduationCap } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, SCHOOL_MOTTO, pageTitle } from '../utils/brand';
 
 const FEATURES = [
   'Student Information System',
@@ -26,7 +27,7 @@ export default function LoginPage() {
   const [forgotError, setForgotError] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
-  useEffect(() => { document.title = 'LeeTec SMS — Admin Login'; }, []);
+  useEffect(() => { document.title = pageTitle('Staff Login'); }, []);
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -84,18 +85,16 @@ export default function LoginPage() {
       <header className="auth-navbar">
         <div className="container auth-navbar-inner">
           <div className="auth-navbar-brand">
-            <div className="admin-logo">
-              <GraduationCap size={16} />
-            </div>
+            <img src={SCHOOL_LOGO} alt={SCHOOL_NAME} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', background: 'white' }} />
             <div>
-              <p className="admin-brand-title">LeeTec Solutions</p>
-              <p className="admin-brand-subtitle">School Management Platform</p>
+              <p className="admin-brand-title">{SCHOOL_NAME}</p>
+              <p className="admin-brand-subtitle">School Portal</p>
             </div>
           </div>
           <div className="auth-navbar-meta">
-            <span>Legacy Software</span>
-            <span className="divider" />
-            <span>Harare, Zimbabwe</span>
+            <a href={SCHOOL_WEBSITE} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', fontWeight: 600 }}>
+              {SCHOOL_WEBSITE_LABEL} ↗
+            </a>
           </div>
         </div>
       </header>
@@ -103,16 +102,16 @@ export default function LoginPage() {
       <section className="auth-hero">
         <div className="container auth-hero-grid">
           <div>
-            <h1 className="auth-title">A premium command center for modern school operations.</h1>
+            <h1 className="auth-title">Welcome to the {SCHOOL_NAME} school portal.</h1>
             <p className="auth-subtitle">
-              Manage enrolment, billing, and academic administration through one secure,
-              streamlined control panel.
+              Staff sign in here to manage enrolment, fees, marks and reports for the Junior School,
+              Academy and High School. Parents and students use the Student Portal.
             </p>
 
             <div className="auth-actions">
-              <button className="btn btn-primary" type="button">
-                Request Demo
-              </button>
+              <a className="btn btn-primary" href={SCHOOL_WEBSITE} target="_blank" rel="noopener noreferrer">
+                Visit our website
+              </a>
               <Link className="btn btn-secondary" to="/student-login">
                 Student Portal
               </Link>
@@ -127,17 +126,17 @@ export default function LoginPage() {
             </div>
 
             <div className="auth-stats">
-              <span className="auth-stat one">99.9% uptime</span>
-              <span className="auth-stat two">Role-based access</span>
-              <span className="auth-stat three">Secure API workflows</span>
+              {SCHOOL_MOTTO.map((word, i) => (
+                <span key={word} className={`auth-stat ${['one', 'two', 'three'][i % 3]}`}>{word}</span>
+              ))}
             </div>
           </div>
 
           <div className="auth-login-wrap">
             <div className="auth-login-card">
-              <img src="/leetec.jpg"
-                alt="LeeTec"
-                style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover' }}
+              <img src={SCHOOL_LOGO}
+                alt={SCHOOL_NAME}
+                style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'contain', background: 'white' }}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.nextElementSibling?.setAttribute('style', 'display:flex');
@@ -150,7 +149,7 @@ export default function LoginPage() {
                 borderRadius: 10,
                 alignItems: 'center', justifyContent: 'center',
                 color: 'white', fontWeight: 800, fontSize: 16
-              }}>LC</div>
+              }}>AH</div>
               {showForgotPassword ? (
                 <>
                   <span className="auth-badge">Staff Access</span>

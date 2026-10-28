@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { teacherAuthAPI } from '../services/api';
-import { Mail, Lock, ArrowRight, GraduationCap, BookOpen, ClipboardList, Users } from 'lucide-react';
+import { Mail, Lock, ArrowRight, BookOpen, ClipboardList, Users } from 'lucide-react';
+import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, pageTitle } from '../utils/brand';
 
 const FEATURES = [
   { Icon: BookOpen, label: 'My Classes', desc: 'View assigned subjects and classes' },
@@ -16,7 +17,7 @@ export default function TeacherLoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { document.title = 'LeeTec SMS — Teacher Portal'; }, []);
+  useEffect(() => { document.title = pageTitle('Teacher Portal'); }, []);
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -41,15 +42,20 @@ export default function TeacherLoginPage() {
       <header className="auth-navbar">
         <div className="container auth-navbar-inner">
           <div className="auth-navbar-brand">
-            <div className="admin-logo"><GraduationCap size={16} /></div>
+            <img src={SCHOOL_LOGO} alt={SCHOOL_NAME} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', background: 'white' }} />
             <div>
-              <p className="admin-brand-title">LeeTec SMS</p>
+              <p className="admin-brand-title">{SCHOOL_NAME}</p>
               <p className="admin-brand-subtitle">Teacher Portal</p>
             </div>
           </div>
-          <Link to="/login" className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }}>
-            Admin access
-          </Link>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <a href={SCHOOL_WEBSITE} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }}>
+              {SCHOOL_WEBSITE_LABEL} ↗
+            </a>
+            <Link to="/login" className="btn btn-secondary" style={{ padding: '8px 12px', fontSize: 12 }}>
+              Admin access
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -75,9 +81,9 @@ export default function TeacherLoginPage() {
 
           <div className="auth-login-wrap">
             <div className="auth-login-card">
-              <img src="/leetec.jpg"
-                alt="LeeTec"
-                style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover' }}
+              <img src={SCHOOL_LOGO}
+                alt={SCHOOL_NAME}
+                style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'contain', background: 'white' }}
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.nextElementSibling?.setAttribute('style', 'display:flex');
@@ -90,7 +96,7 @@ export default function TeacherLoginPage() {
                 borderRadius: 10,
                 alignItems: 'center', justifyContent: 'center',
                 color: 'white', fontWeight: 800, fontSize: 16
-              }}>LC</div>
+              }}>AH</div>
               <span className="auth-badge">Teacher Access</span>
               <h2 className="auth-login-title">Welcome back</h2>
               <p className="auth-login-sub">Sign in with your staff account to access your classes.</p>

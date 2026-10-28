@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { activationAPI } from '../services/api';
 import { GraduationCap, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { pageTitle } from '../utils/brand';
 
 export default function ActivatePage() {
   const navigate = useNavigate();
@@ -14,7 +15,7 @@ export default function ActivatePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { document.title = 'LeeTec SMS — Activate Account'; }, []);
+  useEffect(() => { document.title = pageTitle('Activate Account'); }, []);
 
   if (!token) {
     return (
