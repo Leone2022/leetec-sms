@@ -2,9 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Advent Hope Academy</title>
     <meta name="application-name" content="Advent Hope Academy" />
@@ -13,6 +15,29 @@
     <meta property="og:title" content="Advent Hope Academy" />
     <meta property="og:image" content="https://www.adventhopeacademy.com/og-image.jpg" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.adventhopeacademy.com/" />
+    <!-- Tells Google the site name and logo to show in search results. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "Advent Hope Academy",
+            "alternateName": ["Advent Hope", "Advent Hope Group of Schools"],
+            "url": "https://www.adventhopeacademy.com/"
+          },
+          {
+            "@type": "EducationalOrganization",
+            "name": "Advent Hope Academy",
+            "alternateName": "Advent Hope Group of Schools",
+            "url": "https://www.adventhopeacademy.com/",
+            "logo": "https://www.adventhopeacademy.com/icon-512.png",
+            "sameAs": ["https://adventhope.ac.zw"]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
