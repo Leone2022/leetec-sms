@@ -19,6 +19,10 @@
       "dest": "/frontend/favicon.ico"
     },
     {
+      "src": "/(.*\\.(?:png|jpe?g|svg|ico|webp|gif|txt|xml|webmanifest))",
+      "dest": "/frontend/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/frontend/index.html"
     }
