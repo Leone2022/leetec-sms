@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, SCHOOL_MOTTO, pageTitle } from '../utils/brand';
+import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, pageTitle } from '../utils/brand';
 
 const FEATURES = [
   'Student Information System',
@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [forgotError, setForgotError] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
-  useEffect(() => { document.title = pageTitle('Staff Login'); }, []);
+  useEffect(() => { document.title = pageTitle('Admin Login'); }, []);
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -88,7 +88,7 @@ export default function LoginPage() {
             <img src={SCHOOL_LOGO} alt={SCHOOL_NAME} style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'contain', background: 'white' }} />
             <div>
               <p className="admin-brand-title">{SCHOOL_NAME}</p>
-              <p className="admin-brand-subtitle">School Portal</p>
+              <p className="admin-brand-subtitle">School Management Platform</p>
             </div>
           </div>
           <div className="auth-navbar-meta">
@@ -102,10 +102,10 @@ export default function LoginPage() {
       <section className="auth-hero">
         <div className="container auth-hero-grid">
           <div>
-            <h1 className="auth-title">Welcome to the {SCHOOL_NAME} school portal.</h1>
+            <h1 className="auth-title">A premium command center for modern school operations.</h1>
             <p className="auth-subtitle">
-              Staff sign in here to manage enrolment, fees, marks and reports for the Junior School,
-              Academy and High School. Parents and students use the Student Portal.
+              Manage enrolment, billing, and academic administration through one secure,
+              streamlined control panel.
             </p>
 
             <div className="auth-actions">
@@ -126,9 +126,9 @@ export default function LoginPage() {
             </div>
 
             <div className="auth-stats">
-              {SCHOOL_MOTTO.map((word, i) => (
-                <span key={word} className={`auth-stat ${['one', 'two', 'three'][i % 3]}`}>{word}</span>
-              ))}
+              <span className="auth-stat one">99.9% uptime</span>
+              <span className="auth-stat two">Role-based access</span>
+              <span className="auth-stat three">Secure API workflows</span>
             </div>
           </div>
 
