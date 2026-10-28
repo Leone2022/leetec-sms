@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { teacherAuthAPI } from '../services/api';
 import { Mail, Lock, ArrowRight, BookOpen, ClipboardList, Users } from 'lucide-react';
-import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, pageTitle } from '../utils/brand';
+import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, setPageMeta } from '../utils/brand';
 
 const FEATURES = [
   { Icon: BookOpen, label: 'My Classes', desc: 'View assigned subjects and classes' },
@@ -17,7 +17,7 @@ export default function TeacherLoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { document.title = pageTitle('Teacher Portal'); }, []);
+  useEffect(() => { setPageMeta('Teacher Portal', 'Advent Hope Academy Teacher Portal: teachers sign in to enter marks, manage classes and set homework. School website: adventhope.ac.zw'); }, []);
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();

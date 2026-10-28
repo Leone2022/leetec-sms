@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, SCHOOL_MOTTO, pageTitle } from '../utils/brand';
+import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, SCHOOL_MOTTO, setPageMeta } from '../utils/brand';
 
 const FEATURES = [
   'Student Information System',
@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [forgotError, setForgotError] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
-  useEffect(() => { document.title = pageTitle('Staff Login'); }, []);
+  useEffect(() => { setPageMeta('Staff Login', 'Advent Hope Academy staff portal: sign in to manage enrolment, fees, marks and reports. Students and parents use the Student Portal. School website: adventhope.ac.zw'); }, []);
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();

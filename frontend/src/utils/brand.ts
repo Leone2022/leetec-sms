@@ -7,3 +7,16 @@ export const SCHOOL_LOGO = '/advent-hope-logo.png';
 export const SCHOOL_MOTTO = ['Focus', 'Hope', 'Integrity', 'Success'];
 
 export const pageTitle = (page: string) => `${SCHOOL_NAME} — ${page}`;
+
+// Sets the browser tab title and the description search engines show for the page.
+export const setPageMeta = (page: string, description?: string) => {
+  document.title = pageTitle(page);
+  if (!description) return;
+  let tag = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+  if (!tag) {
+    tag = document.createElement('meta');
+    tag.name = 'description';
+    document.head.appendChild(tag);
+  }
+  tag.content = description;
+};

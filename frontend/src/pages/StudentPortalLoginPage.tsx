@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { portalAPI } from '../services/api';
 import { Mail, Lock, ArrowRight, GraduationCap, Receipt, BarChart3, Bell, BookOpen, Hash, CheckCircle } from 'lucide-react';
-import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, pageTitle } from '../utils/brand';
+import { SCHOOL_NAME, SCHOOL_LOGO, SCHOOL_WEBSITE, SCHOOL_WEBSITE_LABEL, setPageMeta } from '../utils/brand';
 
 type Tab = 'login' | 'register' | 'forgot';
 
@@ -17,7 +17,7 @@ export default function StudentPortalLoginPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('login');
 
-  useEffect(() => { document.title = pageTitle('Student & Parent Portal'); }, []);
+  useEffect(() => { setPageMeta('Student Portal', 'Advent Hope Academy Student Portal: students and parents sign in to view report cards, fee statements, homework and school updates. School website: adventhope.ac.zw'); }, []);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
