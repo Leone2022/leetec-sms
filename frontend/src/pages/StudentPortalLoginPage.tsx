@@ -126,9 +126,16 @@ export default function StudentPortalLoginPage() {
       <section className="auth-hero">
         <div className="container auth-hero-grid">
           <div>
-            <h1 className="auth-title">Everything students need, in one secure portal.</h1>
+            <h1 className="auth-title">Everything {SCHOOL_NAME} students need, in one secure portal.</h1>
             <p className="auth-subtitle">
-              Access fee statements, school updates, and academic information through a clean, always-available experience.
+              Access your {SCHOOL_NAME} fee statements, school updates, and academic information through a clean,
+              always-available experience.
+            </p>
+            <p className="auth-subtitle" style={{ marginTop: 10 }}>
+              For applications and to learn more about our school, please visit{' '}
+              <a href={SCHOOL_WEBSITE} target="_blank" rel="noopener noreferrer" style={{ color: '#1a237e', fontWeight: 600, textDecoration: 'underline' }}>
+                {SCHOOL_WEBSITE_LABEL}
+              </a>.
             </p>
             <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
               {PORTAL_FEATURES.map(({ Icon, label, desc }) => (
