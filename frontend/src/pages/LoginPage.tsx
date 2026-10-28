@@ -102,10 +102,16 @@ export default function LoginPage() {
       <section className="auth-hero">
         <div className="container auth-hero-grid">
           <div>
-            <h1 className="auth-title">A premium command center for modern school operations.</h1>
+            <h1 className="auth-title">A premium command center for {SCHOOL_NAME} school operations.</h1>
             <p className="auth-subtitle">
-              Manage enrolment, billing, and academic administration through one secure,
+              Manage {SCHOOL_NAME} enrolment, billing, and academic administration through one secure,
               streamlined control panel.
+            </p>
+            <p className="auth-subtitle" style={{ marginTop: 10 }}>
+              For applications and to learn more about our school, please visit{' '}
+              <a href={SCHOOL_WEBSITE} target="_blank" rel="noopener noreferrer" style={{ color: '#1a237e', fontWeight: 600, textDecoration: 'underline' }}>
+                {SCHOOL_WEBSITE_LABEL}
+              </a>.
             </p>
 
             <div className="auth-actions">
