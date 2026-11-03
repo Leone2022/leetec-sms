@@ -2,3 +2,5 @@
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 15 2 * * * root /usr/local/sbin/leetec-backup.sh
+# Off-site copy to Google Drive; runs only once rclone's "gdrive" remote is set up (see README.md).
+45 2 * * * root rclone listremotes 2>/dev/null | grep -qx 'gdrive:' && /usr/local/sbin/leetec-offsite.sh
