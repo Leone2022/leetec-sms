@@ -1,0 +1,4 @@
+# Nightly LeeTec SMS database backup (server time). Installed as /etc/cron.d/leetec-backup.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+15 2 * * * root /usr/local/sbin/leetec-backup.sh
