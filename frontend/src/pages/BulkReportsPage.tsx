@@ -309,12 +309,12 @@ export default function BulkReportsPage() {
     loadStatus();
     setSelected(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [termId]);
+  }, [termId, isMidTermPage]);
 
   const loadStatus = async () => {
     setLoading(true);
     try {
-      const res = await bulkReportsAPI.getCompletionStatus(termId as number);
+      const res = await bulkReportsAPI.getCompletionStatus(termId as number, isMidTermPage ? 'midterm' : 'final');
       setRows(res.data || []);
     } catch {
       showMsg('Failed to load completion status', 'error');

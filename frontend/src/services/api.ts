@@ -266,8 +266,8 @@ export const versesAPI = {
 };
 
 export const bulkReportsAPI = {
-  getCompletionStatus: (termId: number, schoolId = 1) =>
-    api.get(`/reports/completion-status?termId=${termId}&schoolId=${schoolId}`),
+  getCompletionStatus: (termId: number, reportType: 'final' | 'midterm' = 'final', schoolId = 1) =>
+    api.get(`/reports/completion-status?termId=${termId}&schoolId=${schoolId}&reportType=${reportType}`),
   publishReports: (schoolId: number, termId: number, studentIds: number[], reportType: 'final' | 'midterm' = 'final') =>
     api.post('/reports/publish', { schoolId, termId, studentIds, reportType }),
 };
