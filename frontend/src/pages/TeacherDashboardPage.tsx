@@ -157,14 +157,15 @@ export default function TeacherDashboardPage() {
           const endByStudent = new Map(endData.map((d: any) => [d.studentId, d]));
           const mode = markMode(statsTerm, a.campus);
           const finalOnly = mode === 'final-only';
-          // Separate (AHJ): the class is on its end-of-term marks once any are entered.
+          // Separate (AHJ): the class is on its end-of-term marks once any are entered, and a
+          // learner whose mid-term is already submitted/approved is on end-of-term too.
           const onEndTerm = endData.some((d: any) => d.score != null);
           const combined = midData.map((d: any) => {
             const endD = endByStudent.get(d.studentId);
             const midStatus = d.status || 'Draft';
             const endStatus = endD?.status || 'Draft';
             const status = finalOnly ? endStatus
-              : mode === 'separate' ? (onEndTerm ? endStatus : midStatus)
+              : mode === 'separate' ? (onEndTerm || midStatus !== 'Draft' ? endStatus : midStatus)
               : statusRank[midStatus] >= statusRank[endStatus] ? midStatus : endStatus;
             const sendBackComment = (finalOnly ? endD?.sendBackComment : d.sendBackComment || endD?.sendBackComment) || null;
             return { status, sendBackComment };
@@ -333,7 +334,11 @@ export default function TeacherDashboardPage() {
         const status = finalOnly ? endStatus : statusRank[midStatus] >= statusRank[endStatus] ? midStatus : endStatus;
         const common = { midComments: d.comments || '', endComments: endD?.comments || '', midStatus, endStatus };
         if (mode === 'separate') {
-          const current = onEndTerm ? endD : d;
+          // On end-of-term once any end-of-term mark exists or this learner's mid-term is locked
+          // (submitted/approved); otherwise Save All and Submit would stay disabled for the
+          // still-empty end-of-term boxes.
+          const onEnd = onEndTerm || midStatus !== 'Draft';
+          const current = onEnd ? endD : d;
           return {
             studentId: d.studentId,
             studentName: d.studentName,
@@ -343,7 +348,7 @@ export default function TeacherDashboardPage() {
             endOfTermScore: show(endD?.score),
             comments: '',
             ...common,
-            status: onEndTerm ? endStatus : midStatus,
+            status: onEnd ? endStatus : midStatus,
             sendBackComment: current?.sendBackComment || null,
             amendmentRequested: Boolean(current?.amendmentRequested),
             amendmentRequestedAt: current?.amendmentRequestedAt || null,

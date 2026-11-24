@@ -33,7 +33,7 @@ namespace LeeTec.API.Controllers
         // ── GET /api/reports/completion-status ───────────────────────────────────
 
         [HttpGet("completion-status")]
-        public async Task<IActionResult> GetCompletionStatus([FromQuery] int termId, [FromQuery] int schoolId = 1)
+        public async Task<IActionResult> GetCompletionStatus([FromQuery] int termId, [FromQuery] int schoolId = 1, [FromQuery] string? reportType = null)
         {
             try
             {
@@ -55,12 +55,6 @@ namespace LeeTec.API.Controllers
                     .ToListAsync();
                 var term = await _context.Terms.FindAsync(termId);
 
-                var enteredByStudent = rawMarks
-                    .GroupBy(m => m.StudentId)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.Select(m => m.SubjectId).Distinct().ToHashSet()
-                    );
 
                 // The denominator must be each student's own active subject registrations,
                 // not the full catalogue of subjects the school offers for their campus —
@@ -95,18 +89,28 @@ namespace LeeTec.API.Controllers
                         .Where(a => studentIds.Contains(a.StudentId) && a.Status == "Active")
                         .Select(a => a.StudentId).ToListAsync()).ToHashSet();
 
-                bool HasReportMarks(int studentId, string reportType)
+                // The marks that count towards a report: AHJ (Term 3 2026+) mid-term marks for the
+                // Mid-Term Report and end-of-term marks for the End of Term Report; AHA/AHS the
+                // end-of-term mark; earlier terms any mark (they were averaged).
+                IEnumerable<int> ReportSubjectIds(int studentId, string reportType)
                 {
-                    if (term == null) return false;
-                    var active = activeSubjectsByStudent.TryGetValue(studentId, out var ids) ? ids : new HashSet<int>();
+                    if (term == null) return Enumerable.Empty<int>();
                     var campus = registrations.First(r => r.StudentId == studentId).Student?.Campus;
                     var mode = MarkPolicy.ModeFor(term, campus);
                     string? assessment = mode == MarkMode.Averaged ? null
                         : mode == MarkMode.Separate && reportType == ReportTypes.MidTerm ? MarkPolicy.MidTerm
                         : MarkPolicy.EndOfTerm;
-                    return rawMarks.Any(m => m.StudentId == studentId && m.HasScore && active.Contains(m.SubjectId)
-                        && (assessment == null || m.AssessmentType == assessment));
+                    return rawMarks
+                        .Where(m => m.StudentId == studentId && m.HasScore && (assessment == null || m.AssessmentType == assessment))
+                        .Select(m => m.SubjectId)
+                        .Distinct();
                 }
+                bool HasReportMarks(int studentId, string reportType)
+                {
+                    var active = activeSubjectsByStudent.TryGetValue(studentId, out var ids) ? ids : new HashSet<int>();
+                    return ReportSubjectIds(studentId, reportType).Any(active.Contains);
+                }
+                var pageReportType = ReportTypes.Normalize(reportType);
 
                 var result = registrations.Select(reg =>
                 {
@@ -120,9 +124,9 @@ namespace LeeTec.API.Controllers
 
                     var totalSubjects = activeSubjectIds.Count;
 
-                    var entered = enteredByStudent.TryGetValue(reg.StudentId, out var markedIds)
-                        ? markedIds.Count(id => activeSubjectIds.Contains(id))
-                        : 0;
+                    // Subjects with a mark for the report this page is about (on the End of Term
+                    // page, a Junior learner's mid-term marks do not make them "Ready").
+                    var entered = ReportSubjectIds(reg.StudentId, pageReportType).Count(activeSubjectIds.Contains);
 
                     var fullyEntered = entered >= totalSubjects && totalSubjects > 0;
                     var status = fullyEntered ? "Ready" : entered > 0 ? "Partial" : "Not Started";
