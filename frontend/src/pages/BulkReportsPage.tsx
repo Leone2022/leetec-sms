@@ -99,9 +99,9 @@ export default function BulkReportsPage() {
   const [amendmentForm, setAmendmentForm] = useState({ reason: '', meetingDate: '', minuteReference: '' });
   const [submittingAmendment, setSubmittingAmendment] = useState(false);
 
-  const showMsg = (text: string, type: 'success' | 'error') => {
+  const showMsg = (text: string, type: 'success' | 'error', ms = 5000) => {
     setMessage({ type, text });
-    setTimeout(() => setMessage(null), 5000);
+    setTimeout(() => setMessage(null), ms);
   };
 
   const loadPendingApprovals = async () => {
@@ -435,11 +435,22 @@ export default function BulkReportsPage() {
     try {
       const res = await bulkReportsAPI.publishReports(1, termId as number, ids, reportType);
       const { published, errors } = res.data as { published: number; errors: string[] };
-      if (errors.length > 0) {
-        const more = errors.length > 2 ? ` (and ${errors.length - 2} more)` : '';
-        showMsg(`Sent ${published} to the portal. ${errors.length} not sent: ${errors.slice(0, 2).join('; ')}${more}`, 'error');
+      // Learners with no marks for this report are left out on purpose (never an empty report);
+      // that is not a failure. Anything else in `errors` is a real problem.
+      const noMarks = errors.filter(e => /no (end-of-term|mid-term) marks yet/.test(e));
+      const problems = errors.filter(e => !noMarks.includes(e));
+      const names = (list: string[]) => list.map(e => e.split(':')[0]).join(', ');
+      const sent = `${published} ${reportLabel}${published !== 1 ? 's' : ''} sent to the portal.`;
+      const notYet = noMarks.length > 0
+        ? ` Not sent yet (no ${reportType === 'midterm' ? 'mid-term' : 'end-of-term'} marks): ${names(noMarks)}. Send again once their marks are in.`
+        : '';
+      const failed = problems.length > 0 ? ` Could not send: ${problems.join('; ')}` : '';
+      if (published === 0 && noMarks.length > 0 && problems.length === 0) {
+        showMsg(`Nothing sent: none of these learners has ${reportType === 'midterm' ? 'mid-term' : 'end-of-term'} marks yet.`, 'error', 15000);
+      } else if (errors.length > 0) {
+        showMsg(`✅ ${sent}${notYet}${failed}`, problems.length > 0 ? 'error' : 'success', 30000);
       } else {
-        showMsg(`Done — ${published} report card${published !== 1 ? 's' : ''} published to portal`, 'success');
+        showMsg(`✅ ${sent}`, 'success');
       }
       loadStatus();
     } catch {
